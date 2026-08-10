@@ -52,7 +52,7 @@ npm run dev
 docker compose up -d --build
 ```
 
-将启动 3 个容器:`ioedu-mysql`(数据卷持久化)、`ioedu-backend`(8080,仅内网)、`ioedu-frontend`(Nginx,对外 80 端口,反代 /api)。浏览器直接访问服务器 IP 即可。
+将启动 3 个容器:`ioedu-mysql`(数据卷持久化)、`ioedu-backend`(8080,仅内网)、`ioedu-frontend`(Nginx,对外 8093 端口,反代 /api)。浏览器访问 http://服务器IP:8093 即可。
 
 - 修改数据库密码:项目根目录建 `.env` 文件写 `DB_PASSWORD=你的密码`(默认 123456789)
 - 更新发版:`git pull && docker compose up -d --build`
