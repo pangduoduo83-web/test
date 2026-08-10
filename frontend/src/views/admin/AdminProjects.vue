@@ -38,8 +38,8 @@
       </div>
     </div>
 
-    <!-- 编辑弹窗:基础信息 + 高级 JSON -->
-    <el-dialog v-model="editVisible" :title="form.id ? '编辑项目' : '新增项目'" width="720px" top="4vh">
+    <!-- 编辑弹窗:基础信息 + 高级内容(结构化行编辑) -->
+    <el-dialog v-model="editVisible" :title="form.id ? '编辑项目' : '新增项目'" width="860px" top="4vh">
       <el-tabs v-model="editTab">
         <el-tab-pane label="基础信息" name="basic">
           <el-form :model="form" label-width="90px">
@@ -62,6 +62,7 @@
                   <el-option v-for="c in categoryOptions" :key="c" :label="c" :value="c" />
                 </el-select>
               </el-form-item>
+              <el-form-item label="图标"><el-input v-model="form.icon" placeholder="emoji 图标,如: 🔌" /></el-form-item>
               <el-form-item label="指派讲师">
                 <el-select v-model="form.mentorId" placeholder="选择讲师" clearable>
                   <el-option v-for="t in teachers" :key="t.id" :label="t.name" :value="t.id" />
@@ -89,26 +90,78 @@
           </el-form>
         </el-tab-pane>
 
-        <el-tab-pane label="高级内容(JSON)" name="advanced">
-          <p class="json-tip">以下字段为 JSON 数组,直接编辑;格式错误会导致学生端展示异常。</p>
-          <el-form label-width="90px">
-            <el-form-item label="技能要求">
-              <el-input v-model="form.skillsJson" type="textarea" :rows="4"
-                        placeholder='[{"name":"嵌入式开发","required":40}]' />
-            </el-form-item>
-            <el-form-item label="教学大纲">
-              <el-input v-model="form.syllabusJson" type="textarea" :rows="6"
-                        placeholder='[{"phase":"第1周","title":"...","content":"...","hours":8}]' />
-            </el-form-item>
-            <el-form-item label="BOM清单">
-              <el-input v-model="form.bomJson" type="textarea" :rows="6"
-                        placeholder='[{"ref":"U1","name":"...","qty":1,"footprint":"...","price":1.0}]' />
-            </el-form-item>
-            <el-form-item label="学习资源">
-              <el-input v-model="form.resourcesJson" type="textarea" :rows="4"
-                        placeholder='[{"type":"文档","name":"..."}]' />
-            </el-form-item>
-          </el-form>
+        <el-tab-pane label="高级内容" name="advanced">
+          <p class="json-tip">以下内容按行编辑,保存时自动生成 JSON;学生端「项目详情」按此展示。</p>
+
+          <div class="adv-section">
+            <div class="adv-head">
+              <h4>技能要求</h4>
+              <el-button size="small" plain @click="skillRows.push({ name: '', required: 50 })">+ 添加技能</el-button>
+            </div>
+            <div v-for="(s, i) in skillRows" :key="i" class="adv-row">
+              <el-input v-model="s.name" placeholder="技能名称,如: 嵌入式开发" class="grow" />
+              <span class="row-label">掌握度</span>
+              <el-input-number v-model="s.required" :min="0" :max="100" :step="5" class="num-narrow" />
+              <el-button size="small" text type="danger" @click="skillRows.splice(i, 1)">删除</el-button>
+            </div>
+            <p v-if="!skillRows.length" class="empty-hint">暂无技能要求,点击右上角添加</p>
+          </div>
+
+          <div class="adv-section">
+            <div class="adv-head">
+              <h4>教学大纲</h4>
+              <el-button size="small" plain @click="syllabusRows.push({ phase: '', title: '', content: '', hours: 4 })">+ 添加阶段</el-button>
+            </div>
+            <div v-for="(s, i) in syllabusRows" :key="i" class="syllabus-item">
+              <div class="adv-row">
+                <el-input v-model="s.phase" placeholder="阶段,如: 第1周" class="w-120" />
+                <el-input v-model="s.title" placeholder="阶段标题" class="grow" />
+                <span class="row-label">学时</span>
+                <el-input-number v-model="s.hours" :min="0" :max="500" class="num-narrow" />
+                <el-button size="small" text type="danger" @click="syllabusRows.splice(i, 1)">删除</el-button>
+              </div>
+              <el-input v-model="s.content" type="textarea" :rows="2" placeholder="阶段内容说明" />
+            </div>
+            <p v-if="!syllabusRows.length" class="empty-hint">暂无教学大纲,点击右上角添加</p>
+          </div>
+
+          <div class="adv-section">
+            <div class="adv-head">
+              <h4>BOM 清单</h4>
+              <el-button size="small" plain @click="bomRows.push({ ref: '', name: '', qty: 1, footprint: '', price: 0 })">+ 添加元件</el-button>
+            </div>
+            <div v-for="(b, i) in bomRows" :key="i" class="adv-row">
+              <el-input v-model="b.ref" placeholder="位号" class="w-80" />
+              <el-input v-model="b.name" placeholder="元件名称/型号" class="grow" />
+              <span class="row-label">数量</span>
+              <el-input-number v-model="b.qty" :min="1" class="num-narrow" />
+              <el-input v-model="b.footprint" placeholder="封装" class="w-120" />
+              <span class="row-label">单价¥</span>
+              <el-input-number v-model="b.price" :min="0" :step="0.1" :precision="2" class="num-narrow" />
+              <el-button size="small" text type="danger" @click="bomRows.splice(i, 1)">删除</el-button>
+            </div>
+            <p v-if="!bomRows.length" class="empty-hint">暂无 BOM 清单,点击右上角添加</p>
+          </div>
+
+          <div class="adv-section">
+            <div class="adv-head">
+              <h4>学习资源</h4>
+              <el-button size="small" plain @click="resourceRows.push({ type: '文档', name: '', url: '', uploading: false })">+ 添加资源</el-button>
+            </div>
+            <div v-for="(r, i) in resourceRows" :key="i" class="adv-row">
+              <el-select v-model="r.type" class="res-type-sel">
+                <el-option v-for="t in resourceTypes" :key="t" :label="t" :value="t" />
+              </el-select>
+              <el-input v-model="r.name" placeholder="资源名称,如: 项目开发指南.pdf" class="grow" />
+              <el-upload :show-file-list="false" :http-request="(opt) => doUploadRes(opt, r)" accept="*">
+                <el-button size="small" :type="r.url ? 'success' : 'primary'" plain :loading="r.uploading">
+                  {{ r.url ? '已上传' : '上传附件' }}
+                </el-button>
+              </el-upload>
+              <el-button size="small" text type="danger" @click="resourceRows.splice(i, 1)">删除</el-button>
+            </div>
+            <p v-if="!resourceRows.length" class="empty-hint">暂无学习资源,点击右上角添加</p>
+          </div>
         </el-tab-pane>
       </el-tabs>
 
@@ -124,7 +177,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  adminCreateProject, adminDeleteProject, adminListProjects, adminListUsers, adminUpdateProject
+  adminCreateProject, adminDeleteProject, adminListProjects, adminListUsers,
+  adminUpdateProject, uploadDocFile
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 
@@ -144,18 +198,26 @@ const categoryOptions = [
   '测量仪器', '通信模块', 'FPGA/EDA', '消费电子'
 ]
 
+const resourceTypes = ['文档', '视频', '代码', '手册', '工具', '课件']
+
 const emptyForm = {
   id: null, title: '', summary: '', description: '', difficulty: '入门', duration: '2周',
   teamSize: '1人', category: '', icon: '🔌', coverUrl: '', mentorId: null, author: '', license: 'GPL-3.0',
   layers: 2, pcbSize: '', cost: 0, rating: 5.0, verified: false, status: 'PUBLISHED',
-  tagsText: '', featuresText: '', goalsText: '', prereqText: '', equipText: '',
-  skillsJson: '[]', syllabusJson: '[]', bomJson: '[]', resourcesJson: '[]'
+  tagsText: '', featuresText: '', goalsText: '', prereqText: '', equipText: ''
 }
 const form = reactive({ ...emptyForm })
 
+// 高级内容:结构化行编辑,保存时组装为 JSON 数组
+const skillRows = ref([])      // {name, required}
+const syllabusRows = ref([])   // {phase, title, content, hours}
+const bomRows = ref([])        // {ref, name, qty, footprint, price}
+const resourceRows = ref([])   // {type, name, url}
+
 const splitText = (t) => t ? t.split(/[,，]/).map((s) => s.trim()).filter(Boolean) : []
 const joinArr = (v) => Array.isArray(v) ? v.join(',') : ''
-const toJsonText = (v) => JSON.stringify(v ?? [], null, 0)
+const arr = (v) => Array.isArray(v) ? v : []
+const num = (v, fallback = 0) => (Number.isFinite(Number(v)) ? Number(v) : fallback)
 
 const load = async () => {
   items.value = await adminListProjects()
@@ -170,6 +232,19 @@ const loadTeachers = async () => {
 const openEdit = (row) => {
   Object.assign(form, emptyForm)
   editTab.value = 'basic'
+  skillRows.value = arr(row?.skillRequirements).map((s) => ({
+    name: s.name || '', required: num(s.required)
+  }))
+  syllabusRows.value = arr(row?.syllabus).map((s) => ({
+    phase: s.phase || '', title: s.title || '', content: s.content || '', hours: num(s.hours)
+  }))
+  bomRows.value = arr(row?.bom).map((b) => ({
+    ref: b.ref || '', name: b.name || '', qty: num(b.qty, 1),
+    footprint: b.footprint || '', price: num(b.price)
+  }))
+  resourceRows.value = arr(row?.resources).map((r) => ({
+    type: r.type || '文档', name: r.name || '', url: r.url || '', uploading: false
+  }))
   if (row) {
     Object.assign(form, {
       id: row.id, title: row.title, summary: row.summary, description: row.description,
@@ -179,33 +254,51 @@ const openEdit = (row) => {
       rating: row.rating, verified: !!row.verified, status: row.status,
       tagsText: joinArr(row.tags), featuresText: joinArr(row.features),
       goalsText: joinArr(row.learningGoals), prereqText: joinArr(row.prerequisites),
-      equipText: joinArr(row.equipmentNames),
-      skillsJson: toJsonText(row.skillRequirements),
-      syllabusJson: toJsonText(row.syllabus),
-      bomJson: toJsonText(row.bom),
-      resourcesJson: toJsonText(row.resources)
+      equipText: joinArr(row.equipmentNames)
     })
   }
   editVisible.value = true
 }
 
-const validJson = (text, label) => {
+// el-upload 自定义上传:走 /api/upload/file,成功后把 url 写回该行(与教师端一致)
+const doUploadRes = async (opt, row) => {
+  row.uploading = true
   try {
-    JSON.parse(text || '[]')
-    return true
-  } catch (e) {
-    ElMessage.error(`「${label}」不是合法 JSON,请检查`)
-    return false
+    const { url, name } = await uploadDocFile(opt.file)
+    row.url = url
+    if (!row.name) row.name = name
+    ElMessage.success(`附件上传成功: ${name}`)
+  } catch (e) { /* 错误已提示 */ } finally {
+    row.uploading = false
   }
 }
+
+const buildSkills = () => skillRows.value
+  .filter((s) => (s.name || '').trim())
+  .map((s) => ({ name: s.name.trim(), required: Math.min(100, Math.max(0, num(s.required))) }))
+
+const buildSyllabus = () => syllabusRows.value
+  .filter((s) => (s.phase || '').trim() || (s.title || '').trim() || (s.content || '').trim())
+  .map((s) => ({
+    phase: (s.phase || '').trim(), title: (s.title || '').trim(),
+    content: (s.content || '').trim(), hours: num(s.hours)
+  }))
+
+const buildBom = () => bomRows.value
+  .filter((b) => (b.name || '').trim())
+  .map((b) => ({
+    ref: (b.ref || '').trim(), name: b.name.trim(), qty: num(b.qty, 1),
+    footprint: (b.footprint || '').trim(), price: num(b.price)
+  }))
+
+// 过滤空 name;保留已有 url,避免抹掉教师上传的附件
+const buildResources = () => resourceRows.value
+  .filter((r) => (r.name || '').trim())
+  .map((r) => ({ type: r.type || '文档', name: r.name.trim(), url: r.url || '' }))
 
 const save = async () => {
   if (!form.title.trim()) {
     ElMessage.warning('请填写项目标题')
-    return
-  }
-  if (!validJson(form.skillsJson, '技能要求') || !validJson(form.syllabusJson, '教学大纲')
-    || !validJson(form.bomJson, 'BOM清单') || !validJson(form.resourcesJson, '学习资源')) {
     return
   }
   saving.value = true
@@ -223,10 +316,10 @@ const save = async () => {
       learningGoals: JSON.stringify(splitText(form.goalsText)),
       prerequisites: JSON.stringify(splitText(form.prereqText)),
       equipmentNames: JSON.stringify(splitText(form.equipText)),
-      skillRequirements: form.skillsJson || '[]',
-      syllabus: form.syllabusJson || '[]',
-      bom: form.bomJson || '[]',
-      resources: form.resourcesJson || '[]'
+      skillRequirements: JSON.stringify(buildSkills()),
+      syllabus: JSON.stringify(buildSyllabus()),
+      bom: JSON.stringify(buildBom()),
+      resources: JSON.stringify(buildResources())
     }
     if (form.id) await adminUpdateProject(form.id, payload)
     else await adminCreateProject(payload)
@@ -257,6 +350,20 @@ onMounted(() => {
 .sub-text { font-size: 12px; color: var(--text-secondary); }
 .form-2col { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
 :deep(.el-select) { width: 100%; }
-.json-tip { font-size: 12px; color: #ca8a04; background: #fefce8; padding: 8px 12px; border-radius: 8px; }
+.json-tip { font-size: 12px; color: #1d4ed8; background: #eff6ff; padding: 8px 12px; border-radius: 8px; }
 .pager { display: flex; justify-content: flex-end; margin-top: 14px; }
+
+/* 高级内容:结构化行编辑(布局参考教师端 .res-edit-row) */
+.adv-section { margin-bottom: 20px; }
+.adv-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.adv-head h4 { margin: 0; font-size: 14px; }
+.adv-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.adv-row .grow { flex: 1; }
+.adv-row .w-80 { width: 80px; flex-shrink: 0; }
+.adv-row .w-120 { width: 120px; flex-shrink: 0; }
+.adv-row .num-narrow { width: 110px; flex-shrink: 0; }
+.adv-row .res-type-sel { width: 100px; flex-shrink: 0; }
+.row-label { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
+.syllabus-item { padding: 10px 12px; background: #f9fafb; border-radius: 8px; margin-bottom: 10px; }
+.empty-hint { font-size: 12px; color: #9ca3af; margin: 0; }
 </style>

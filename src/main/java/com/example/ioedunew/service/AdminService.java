@@ -9,6 +9,8 @@ import com.example.ioedunew.repository.BorrowRequestRepository;
 import com.example.ioedunew.repository.EquipmentRepository;
 import com.example.ioedunew.repository.ProjectRepository;
 import com.example.ioedunew.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,15 +30,18 @@ public class AdminService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final BorrowRequestRepository borrowRepository;
+    private final ObjectMapper objectMapper;
 
     public AdminService(EquipmentRepository equipmentRepository,
                         ProjectRepository projectRepository,
                         UserRepository userRepository,
-                        BorrowRequestRepository borrowRepository) {
+                        BorrowRequestRepository borrowRepository,
+                        ObjectMapper objectMapper) {
         this.equipmentRepository = equipmentRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.borrowRepository = borrowRepository;
+        this.objectMapper = objectMapper;
     }
 
     // ---------- 设备 ----------
@@ -83,9 +88,10 @@ public class AdminService {
             input.setViews(existing.getViews());
             input.setFavoriteCount(existing.getFavoriteCount());
             input.setDownloads(existing.getDownloads());
-            if (input.getForks() == null) {
-                input.setForks(existing.getForks());
-            }
+            // 统计量一律保留旧值:实体字段默认 0,payload 不带时反序列化得到 0 而非 null,
+            // 若不强制保留会把已有统计清零
+            input.setCompletionRate(existing.getCompletionRate());
+            input.setForks(existing.getForks());
         }
         input.setUpdatedAt(LocalDateTime.now());
         return projectRepository.save(input);
@@ -188,18 +194,34 @@ public class AdminService {
     }
 
     private void normalizeProjectJson(Project p) {
-        p.setTags(orEmptyArray(p.getTags()));
-        p.setFeatures(orEmptyArray(p.getFeatures()));
-        p.setLearningGoals(orEmptyArray(p.getLearningGoals()));
-        p.setPrerequisites(orEmptyArray(p.getPrerequisites()));
-        p.setSkillRequirements(orEmptyArray(p.getSkillRequirements()));
-        p.setSyllabus(orEmptyArray(p.getSyllabus()));
-        p.setBom(orEmptyArray(p.getBom()));
-        p.setResources(orEmptyArray(p.getResources()));
-        p.setEquipmentNames(orEmptyArray(p.getEquipmentNames()));
+        p.setTags(requireJsonArray(p.getTags(), "标签"));
+        p.setFeatures(requireJsonArray(p.getFeatures(), "项目特性"));
+        p.setLearningGoals(requireJsonArray(p.getLearningGoals(), "学习目标"));
+        p.setPrerequisites(requireJsonArray(p.getPrerequisites(), "前置要求"));
+        p.setSkillRequirements(requireJsonArray(p.getSkillRequirements(), "技能要求"));
+        p.setSyllabus(requireJsonArray(p.getSyllabus(), "教学大纲"));
+        p.setBom(requireJsonArray(p.getBom(), "BOM清单"));
+        p.setResources(requireJsonArray(p.getResources(), "学习资源"));
+        p.setEquipmentNames(requireJsonArray(p.getEquipmentNames(), "所需设备"));
     }
 
     private String orEmptyArray(String json) {
         return (json == null || json.trim().isEmpty()) ? "[]" : json;
+    }
+
+    /** 空值兜底为 "[]",非空时校验必须是合法 JSON 且为数组,否则拒绝保存(学生端按数组解析展示)。 */
+    private String requireJsonArray(String json, String label) {
+        String value = orEmptyArray(json);
+        try {
+            JsonNode node = objectMapper.readTree(value);
+            if (!node.isArray()) {
+                throw new BusinessException("「" + label + "」必须是 JSON 数组");
+            }
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException("「" + label + "」不是合法 JSON");
+        }
+        return value;
     }
 }
