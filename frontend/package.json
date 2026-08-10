@@ -1,0 +1,25 @@
+{
+  "name": "ioedu-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "设备图书馆 - 项目驱动教学实验平台前端(Vue 3 + Vite + Element Plus)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "echarts": "^5.5.0",
+    "element-plus": "^2.7.5",
+    "lucide-vue-next": "^0.577.0",
+    "pinia": "^2.1.7",
+    "qrcode": "^1.5.4",
+    "vue": "^3.4.27",
+    "vue-router": "^4.3.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.2.11"
+  }
+}

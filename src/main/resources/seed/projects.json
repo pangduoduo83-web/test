@@ -1,0 +1,514 @@
+[
+  {
+    "title": "STM32F103C8T6核心板",
+    "summary": "基于STM32F103C8T6的最小系统板，集成USB转串口、按键、LED等，适合初学者入门ARM开发。",
+    "description": "本项目从零开始设计一块 STM32F103C8T6 最小系统核心板：完成原理图设计、四层 PCB 布局布线、制板焊接与调试的全流程。板载 USB 转串口、复位/用户按键、电源与用户 LED，全部 GPIO 引出,是入门 ARM 嵌入式开发与 PCB 设计的最佳起点。",
+    "difficulty": "入门",
+    "duration": "2周",
+    "teamSize": "1人",
+    "category": "开发板/评估板",
+    "icon": "🔲",
+    "mentor": "李老师",
+    "author": "开源电子",
+    "license": "GPL-3.0",
+    "verified": true,
+    "layers": 4,
+    "pcbSize": "50x30mm",
+    "cost": 35,
+    "coverUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=60",
+    "rating": 4.8,
+    "enrolledCount": 892,
+    "completionRate": 86,
+    "views": 45100,
+    "favoriteCount": 2341,
+    "downloads": 8800,
+    "forks": 567,
+    "tags": ["开发板", "入门", "开源", "PCB设计", "C语言", "电路设计"],
+    "features": ["四层PCB", "USB下载", "全GPIO引出", "低成本"],
+    "learningGoals": ["掌握STM32最小系统设计", "学习四层PCB设计规范", "理解晶振电路和复位电路", "掌握USB转串口原理", "完成从设计到焊接的全流程"],
+    "prerequisites": ["具备基础电路知识", "了解电子元器件特性", "有C语言基础更佳"],
+    "skillRequirements": [
+      {"name": "嵌入式开发", "required": 40},
+      {"name": "PCB设计", "required": 35},
+      {"name": "编程能力", "required": 30}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "原理图设计", "content": "STM32外围电路设计，电源电路，晶振电路，USB转串口电路", "hours": 8},
+      {"phase": "第2周", "title": "PCB设计与制作", "content": "四层板层叠设计，布局布线，阻抗控制，制板与焊接调试", "hours": 10}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "STM32F103C8T6", "qty": 1, "footprint": "LQFP-48", "price": 11.5},
+      {"ref": "Y1", "name": "8MHz晶振", "qty": 1, "footprint": "HC-49S", "price": 0.8},
+      {"ref": "Y2", "name": "32.768kHz晶振", "qty": 1, "footprint": "3215", "price": 0.6},
+      {"ref": "D1", "name": "电源指示灯", "qty": 1, "footprint": "0603", "price": 0.1},
+      {"ref": "D2", "name": "用户LED", "qty": 1, "footprint": "0603", "price": 0.1},
+      {"ref": "SW1", "name": "复位按键", "qty": 1, "footprint": "SMD-4P", "price": 0.3},
+      {"ref": "SW2", "name": "用户按键", "qty": 1, "footprint": "SMD-4P", "price": 0.3}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "视频", "name": "硬件搭建教程.mp4"},
+      {"type": "代码", "name": "示例代码仓库"},
+      {"type": "手册", "name": "芯片数据手册.pdf"}
+    ],
+    "equipmentNames": ["ST-Link V2 下载器", "高精度数字万用表", "数字示波器", "恒温电烙铁套装"]
+  },
+  {
+    "title": "DS18B20智能温控器",
+    "summary": "基于ESP8266的WiFi温控器，支持手机APP远程控制，DS18B20数字温度传感器，继电器控制输出。",
+    "description": "使用 ESP8266 打造一台可远程控制的智能温控器：DS18B20 单总线温度采集、继电器输出控制、OLED 实时显示,接入云平台后可通过微信小程序远程查看与控制,是物联网入门到进阶的完整实战。",
+    "difficulty": "进阶",
+    "duration": "3周",
+    "teamSize": "1-2人",
+    "category": "物联网应用",
+    "icon": "🌡️",
+    "mentor": "王老师",
+    "author": "智能家居DIY",
+    "license": "MIT",
+    "verified": true,
+    "layers": 2,
+    "pcbSize": "60x40mm",
+    "cost": 58,
+    "coverUrl": "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=800&q=60",
+    "forks": 186,
+    "rating": 4.7,
+    "enrolledCount": 96,
+    "completionRate": 78,
+    "views": 2800,
+    "favoriteCount": 74,
+    "downloads": 431,
+    "tags": ["物联网", "温度控制", "手机APP", "WiFi"],
+    "features": ["温控", "智能家居", "WiFi控制", "OLED显示", "高温报警"],
+    "learningGoals": ["掌握ESP8266开发", "学习单总线通信协议", "理解继电器驱动电路", "开发物联网云平台应用", "完成温控算法设计"],
+    "prerequisites": ["有Arduino开发经验", "了解基础模拟电路", "熟悉C/C++编程"],
+    "skillRequirements": [
+      {"name": "嵌入式开发", "required": 50},
+      {"name": "通信技术", "required": 45},
+      {"name": "编程能力", "required": 40}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "硬件设计", "content": "ESP8266外围电路，温度采集电路，继电器驱动，电源设计", "hours": 8},
+      {"phase": "第2周", "title": "固件开发", "content": "Arduino框架开发，WiFi配网，温度读取，继电器控制逻辑", "hours": 10},
+      {"phase": "第3周", "title": "云平台与APP", "content": "接入机智云/巴法云，开发微信小程序，实现远程控制", "hours": 8}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "ESP-12F模块", "qty": 1, "footprint": "SMD-22P", "price": 8.5},
+      {"ref": "U2", "name": "DS18B20传感器", "qty": 1, "footprint": "TO-92", "price": 3.2},
+      {"ref": "K1", "name": "继电器HF3FF", "qty": 1, "footprint": "DIP", "price": 2.8},
+      {"ref": "LCD1", "name": "OLED显示屏", "qty": 1, "footprint": "0.96寸", "price": 9.9},
+      {"ref": "D1", "name": "红色LED", "qty": 2, "footprint": "0603", "price": 0.2},
+      {"ref": "R1", "name": "10K电阻", "qty": 4, "footprint": "0603", "price": 0.1},
+      {"ref": "R2", "name": "1K电阻", "qty": 4, "footprint": "0603", "price": 0.1}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "视频", "name": "硬件搭建教程.mp4"},
+      {"type": "代码", "name": "示例代码仓库"},
+      {"type": "手册", "name": "理论讲解课件.pptx"}
+    ],
+    "equipmentNames": ["ESP32-S3 开发板", "高精度数字万用表", "恒温电烙铁套装"]
+  },
+  {
+    "title": "LM2596可调降压电源模块",
+    "summary": "基于LM2596-ADJ的DC-DC降压模块，输入4.5-40V，输出1.25-37V可调，最大输出电流3A。",
+    "description": "从 Buck 降压原理出发,设计一块 LM2596-ADJ 可调降压电源模块。宽电压输入、大电流输出,重点学习电源类 PCB 布局要点,并用电子负载完成效率与纹波测试,是电源方向的最佳入门项目。",
+    "difficulty": "入门",
+    "duration": "1周",
+    "teamSize": "1人",
+    "category": "电源管理",
+    "icon": "🔋",
+    "mentor": "赵老师",
+    "author": "电源小白",
+    "license": "CC-BY-SA",
+    "verified": true,
+    "layers": 2,
+    "pcbSize": "45x30mm",
+    "cost": 8.2,
+    "coverUrl": "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=60",
+    "rating": 4.5,
+    "enrolledCount": 1233,
+    "completionRate": 92,
+    "views": 56800,
+    "favoriteCount": 3456,
+    "downloads": 12300,
+    "forks": 789,
+    "tags": ["电源", "降压", "DCDC转换", "电子焊接"],
+    "features": ["宽电压输入", "大电流输出", "可调电压", "高效率"],
+    "learningGoals": ["理解Buck降压原理", "掌握LM2596应用电路", "学习电源PCB layout", "测试电源效率和纹波"],
+    "prerequisites": ["基础电路知识", "会使用电烙铁"],
+    "skillRequirements": [
+      {"name": "PCB设计", "required": 25},
+      {"name": "硬件调试", "required": 30}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "设计与制作", "content": "DCDC原理学习，原理图设计，PCB布局，焊接调试，效率测试", "hours": 10}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "LM2596-ADJ", "qty": 1, "footprint": "TO-263", "price": 3.5},
+      {"ref": "D1", "name": "SS34肖特基", "qty": 1, "footprint": "SMA", "price": 0.4},
+      {"ref": "L1", "name": "33uH电感", "qty": 1, "footprint": "SMD", "price": 1.2},
+      {"ref": "RP1", "name": "1K电位器", "qty": 1, "footprint": "3296W", "price": 1.0}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "手册", "name": "芯片数据手册.pdf"}
+    ],
+    "equipmentNames": ["恒温电烙铁套装", "高精度数字万用表", "函数信号发生器"]
+  },
+  {
+    "title": "TB6612FNG双路电机驱动",
+    "summary": "基于TB6612FNG的双路直流电机驱动模块，支持PWM调速，1.2A持续电流，内置过热保护。",
+    "description": "设计一块 TB6612FNG 双路直流电机驱动模块,理解 H 桥驱动原理,用 STM32 输出 PWM 完成正反转与调速控制,并扩展编码器测速,是智能小车与机器人方向的基础模块项目。",
+    "difficulty": "入门",
+    "duration": "2周",
+    "teamSize": "1人",
+    "category": "电机控制",
+    "icon": "⚙️",
+    "mentor": "李老师",
+    "author": "机器人爱好者",
+    "license": "MIT",
+    "verified": true,
+    "layers": 2,
+    "pcbSize": "40x25mm",
+    "cost": 22,
+    "coverUrl": "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=800&q=60",
+    "forks": 142,
+    "rating": 4.6,
+    "enrolledCount": 88,
+    "completionRate": 84,
+    "views": 1900,
+    "favoriteCount": 43,
+    "downloads": 377,
+    "tags": ["电机控制", "PWM控制", "H桥原理", "智能小车"],
+    "features": ["H桥", "双路驱动", "过热保护", "低压锁定"],
+    "learningGoals": ["理解H桥驱动原理", "掌握TB6612FNG应用", "学习PWM调速算法", "实现编码器测速"],
+    "prerequisites": ["了解直流电机原理", "有STM32基础更佳"],
+    "skillRequirements": [
+      {"name": "嵌入式开发", "required": 40},
+      {"name": "硬件调试", "required": 35}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "硬件设计", "content": "TB6612FNG外围电路，电源滤波，接口设计，PCB layout", "hours": 8},
+      {"phase": "第2周", "title": "驱动开发", "content": "GPIO控制，PWM配置，正反转控制，调速测试", "hours": 8}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "TB6612FNG模块", "qty": 1, "footprint": "SSOP-24", "price": 4.8},
+      {"ref": "M1", "name": "直流减速电机", "qty": 2, "footprint": "-", "price": 12.0},
+      {"ref": "D1", "name": "电机指示灯", "qty": 2, "footprint": "0603", "price": 0.2},
+      {"ref": "J1", "name": "2.54排针", "qty": 2, "footprint": "2.54mm", "price": 0.5}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "代码", "name": "示例代码仓库"}
+    ],
+    "equipmentNames": ["STM32F4 Discovery", "ST-Link V2 下载器", "数字示波器"]
+  },
+  {
+    "title": "简易数字示波器 DIY套件",
+    "summary": "基于STM32F103的简易数字示波器，200kHz带宽，2.4寸TFT彩屏显示，支持波形存储和FFT频谱分析。",
+    "description": "综合运用模拟前端、高速 ADC 采集、TFT 图形界面与 FFT 算法,亲手制作一台 200kHz 带宽的数字示波器。涵盖输入衰减、抗混叠滤波、DMA 双缓冲采集、数字触发、光标测量、频谱分析与波形存储,是一个高含金量的挑战级项目。",
+    "difficulty": "挑战",
+    "duration": "4周",
+    "teamSize": "2-3人",
+    "category": "测量仪器",
+    "icon": "📈",
+    "mentor": "陈老师",
+    "author": "仪器仪表DIY",
+    "license": "GPL-3.0",
+    "verified": true,
+    "layers": 2,
+    "pcbSize": "80x60mm",
+    "cost": 96,
+    "coverUrl": "https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=800&q=60",
+    "forks": 231,
+    "rating": 4.9,
+    "enrolledCount": 64,
+    "completionRate": 61,
+    "views": 4100,
+    "favoriteCount": 187,
+    "downloads": 704,
+    "tags": ["ADC采集", "信号处理", "FFT算法", "GUI设计"],
+    "features": ["200kHz带宽", "FFT分析", "波形存储"],
+    "learningGoals": ["掌握高速ADC采集技术", "学习模拟前端设计", "实现数字触发系统", "开发图形界面", "完成FFT频谱分析"],
+    "prerequisites": ["扎实的STM32开发基础", "了解信号与系统", "熟悉模拟电路", "有GUI开发经验"],
+    "skillRequirements": [
+      {"name": "嵌入式开发", "required": 70},
+      {"name": "信号处理", "required": 60},
+      {"name": "编程能力", "required": 55}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "模拟前端设计", "content": "输入衰减电路，阻抗匹配，抗混叠滤波，运算放大器选型", "hours": 10},
+      {"phase": "第2周", "title": "高速数据采集", "content": "ADC配置，DMA传输，双缓冲，采样率控制", "hours": 10},
+      {"phase": "第3周", "title": "波形显示与控制", "content": "TFT驱动，波形绘制，触发系统，光标测量", "hours": 10},
+      {"phase": "第4周", "title": "高级功能", "content": "FFT实现，频谱显示，SD卡存储，USB通信", "hours": 10}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "STM32F103开发板", "qty": 1, "footprint": "-", "price": 25.0},
+      {"ref": "LCD1", "name": "2.4寸TFT", "qty": 1, "footprint": "-", "price": 18.5},
+      {"ref": "U2", "name": "运算放大器", "qty": 2, "footprint": "SOP-8", "price": 2.4},
+      {"ref": "R*", "name": "精密电阻", "qty": 12, "footprint": "0603", "price": 0.15},
+      {"ref": "C*", "name": "滤波电容", "qty": 10, "footprint": "0603", "price": 0.1}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "视频", "name": "硬件搭建教程.mp4"},
+      {"type": "代码", "name": "示例代码仓库"},
+      {"type": "手册", "name": "理论讲解课件.pptx"},
+      {"type": "工具", "name": "调试工具包"}
+    ],
+    "equipmentNames": ["数字示波器", "函数信号发生器", "STM32F4 Discovery", "恒温电烙铁套装"]
+  },
+  {
+    "title": "NRF24L01无线通信模块",
+    "summary": "2.4GHz无线收发模块，支持6通道数据接收，最高2Mbps速率，SPI接口，适用于短距离无线通信。",
+    "description": "设计并调试一块 NRF24L01 2.4GHz 无线收发模块:学习 SPI 驱动与寄存器配置,自己画 PCB 天线并做阻抗匹配,最终实现两块模块间可靠的双向无线传输。",
+    "difficulty": "进阶",
+    "duration": "2周",
+    "teamSize": "1人",
+    "category": "通信模块",
+    "icon": "📡",
+    "mentor": "王老师",
+    "author": "无线通",
+    "license": "MIT",
+    "verified": false,
+    "layers": 2,
+    "pcbSize": "20x15mm",
+    "cost": 26,
+    "coverUrl": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=60",
+    "rating": 4.4,
+    "enrolledCount": 468,
+    "completionRate": 74,
+    "views": 23500,
+    "favoriteCount": 1123,
+    "downloads": 4600,
+    "forks": 209,
+    "tags": ["SPI协议", "PCB天线", "射频基础"],
+    "features": ["多速率", "多通道", "低功耗"],
+    "learningGoals": ["掌握NRF24L01配置", "学习SPI通信协议", "设计PCB天线", "实现可靠无线传输"],
+    "prerequisites": ["有SPI通信基础", "了解无线通信概念", "会使用逻辑分析仪"],
+    "skillRequirements": [
+      {"name": "通信技术", "required": 55},
+      {"name": "嵌入式开发", "required": 45}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "硬件设计", "content": "NRF24L01外围电路，晶振电路，天线设计，阻抗匹配", "hours": 8},
+      {"phase": "第2周", "title": "通信协议开发", "content": "SPI驱动，寄存器配置，发送接收，协议设计", "hours": 8}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "NRF24L01+", "qty": 1, "footprint": "QFN-20", "price": 6.8},
+      {"ref": "Y1", "name": "16MHz晶振", "qty": 1, "footprint": "3225", "price": 0.9}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "手册", "name": "芯片数据手册.pdf"}
+    ],
+    "equipmentNames": ["逻辑分析仪", "STM32F4 Discovery", "数字示波器"]
+  },
+  {
+    "title": "FPGA开发板 - 踏浪100",
+    "summary": "基于Xilinx Artix-7的FPGA开发板，DDR3内存，千兆网口，HDMI输出，适合数字设计和图像处理学习。",
+    "description": "以 Xilinx Artix-7 为核心的 FPGA 学习平台:从流水灯、状态机等基础实验,到 UART/SPI/I2C 接口协议,再到 DDR3 控制器、千兆网 MAC 与 HDMI 图像处理综合项目,六周吃透 FPGA 开发全流程。",
+    "difficulty": "挑战",
+    "duration": "6周",
+    "teamSize": "1-2人",
+    "category": "FPGA/EDA",
+    "icon": "🧩",
+    "mentor": "陈老师",
+    "author": "数字逻辑工坊",
+    "license": "Apache-2.0",
+    "verified": true,
+    "layers": 6,
+    "pcbSize": "120x90mm",
+    "cost": 320,
+    "coverUrl": "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=800&q=60",
+    "forks": 178,
+    "rating": 4.8,
+    "enrolledCount": 42,
+    "completionRate": 55,
+    "views": 2600,
+    "favoriteCount": 121,
+    "downloads": 356,
+    "tags": ["数字设计", "高速PCB", "Verilog"],
+    "features": ["高速设计", "千兆网", "DDR3", "HDMI"],
+    "learningGoals": ["掌握FPGA开发全流程", "学习高速电路设计", "实现DDR3控制器", "开发千兆网通信", "完成图像处理项目"],
+    "prerequisites": ["数字电路基础扎实", "了解Verilog/VHDL", "有PCB设计经验", "熟悉Linux系统"],
+    "skillRequirements": [
+      {"name": "嵌入式开发", "required": 65},
+      {"name": "PCB设计", "required": 60},
+      {"name": "信号处理", "required": 50}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "硬件平台", "content": "FPGA架构，电源设计，时钟分配，配置电路", "hours": 10},
+      {"phase": "第2周", "title": "基础实验", "content": "流水灯，数码管，按键消抖，状态机设计", "hours": 8},
+      {"phase": "第3周", "title": "接口协议", "content": "UART，SPI，I2C，FIFO设计", "hours": 8},
+      {"phase": "第4周", "title": "存储器接口", "content": "DDR3控制器，MIG配置，读写测试", "hours": 10},
+      {"phase": "第5周", "title": "高级接口", "content": "千兆网MAC，RGMII接口，UDP协议栈", "hours": 10},
+      {"phase": "第6周", "title": "综合项目", "content": "图像采集，处理算法，HDMI显示", "hours": 12}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "XC7A100T", "qty": 1, "footprint": "FGG484", "price": 220.0},
+      {"ref": "J1", "name": "HDMI座", "qty": 1, "footprint": "HDMI-A", "price": 1.8},
+      {"ref": "SW*", "name": "带灯按键", "qty": 4, "footprint": "SMD", "price": 0.8}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "视频", "name": "硬件搭建教程.mp4"},
+      {"type": "代码", "name": "示例代码仓库"},
+      {"type": "工具", "name": "Vivado软件"}
+    ],
+    "equipmentNames": ["数字示波器", "逻辑分析仪"]
+  },
+  {
+    "title": "Type-C PD快充模块",
+    "summary": "支持PD3.0/QC4.0协议的65W快充模块，内置PPS调压，可用于笔记本供电和快充设备开发。",
+    "description": "围绕 SW3518H 快充协议芯片设计一块 65W Type-C PD 快充模块:学习 USB PD3.0 协议与 PPS 调压机制,完成主控电路、功率回路与保护电路设计,并做协议、效率、温升与兼容性四类测试。",
+    "difficulty": "进阶",
+    "duration": "2周",
+    "teamSize": "1人",
+    "category": "电源管理",
+    "icon": "⚡",
+    "mentor": "赵老师",
+    "author": "快充实验室",
+    "license": "CC-BY-SA",
+    "verified": true,
+    "layers": 2,
+    "pcbSize": "35x25mm",
+    "cost": 45,
+    "coverUrl": "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=60",
+    "forks": 95,
+    "rating": 4.6,
+    "enrolledCount": 58,
+    "completionRate": 79,
+    "views": 1750,
+    "favoriteCount": 51,
+    "downloads": 264,
+    "tags": ["电源管理", "Buck电路", "协议芯片"],
+    "features": ["PD协议", "PPS调压", "多协议"],
+    "learningGoals": ["理解PD快充协议", "掌握SW3518H应用", "学习Type-C接口设计", "测试快充兼容性", "优化电源效率"],
+    "prerequisites": ["了解开关电源原理", "有Buck电路基础", "会使用电子负载"],
+    "skillRequirements": [
+      {"name": "硬件调试", "required": 50},
+      {"name": "PCB设计", "required": 45}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "协议学习与硬件设计", "content": "USB PD3.0协议，PPS调压，快充握手流程；主控电路，功率回路，Type-C接口，保护电路", "hours": 10},
+      {"phase": "第2周", "title": "测试优化", "content": "协议测试，效率测试，温升测试，兼容性测试", "hours": 8}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "SW3518H", "qty": 1, "footprint": "QFN-32", "price": 5.6},
+      {"ref": "J1", "name": "C-C 5A母座", "qty": 1, "footprint": "Type-C", "price": 1.2},
+      {"ref": "L1", "name": "4.7uH电感", "qty": 1, "footprint": "SMD", "price": 1.5},
+      {"ref": "R1", "name": "5mR采样电阻", "qty": 1, "footprint": "2512", "price": 0.4}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "手册", "name": "芯片数据手册.pdf"}
+    ],
+    "equipmentNames": ["高精度数字万用表", "数字示波器"]
+  },
+  {
+    "title": "ESP32-S3 AI开发板",
+    "summary": "基于ESP32-S3的AIoT开发板，集成WiFi+蓝牙5.0，支持AI加速，适合边缘计算和语音识别项目。",
+    "description": "基于 ESP32-S3 搭建边缘 AI 开发平台:从 ESP-IDF 环境搭建开始,部署 TensorFlow Lite Micro 推理框架,完成音频采集、特征提取与关键词识别,最终实现语音控制与云端联动的完整 AIoT 应用。",
+    "difficulty": "挑战",
+    "duration": "4周",
+    "teamSize": "1-2人",
+    "category": "物联网应用",
+    "icon": "🤖",
+    "mentor": "陈老师",
+    "author": "AIoT创客",
+    "license": "Apache-2.0",
+    "verified": true,
+    "layers": 4,
+    "pcbSize": "55x28mm",
+    "cost": 88,
+    "coverUrl": "https://images.unsplash.com/photo-1555949963-aa79dcee981c?auto=format&fit=crop&w=800&q=60",
+    "forks": 203,
+    "rating": 4.7,
+    "enrolledCount": 76,
+    "completionRate": 66,
+    "views": 3100,
+    "favoriteCount": 142,
+    "downloads": 401,
+    "tags": ["边缘AI", "语音识别", "神经网络"],
+    "features": ["AI加速", "语音处理", "蓝牙5.0"],
+    "learningGoals": ["掌握ESP32-S3开发", "学习神经网络部署", "实现语音识别功能", "开发边缘AI应用"],
+    "prerequisites": ["有ESP32基础", "了解机器学习", "熟悉FreeRTOS"],
+    "skillRequirements": [
+      {"name": "嵌入式开发", "required": 60},
+      {"name": "编程能力", "required": 55},
+      {"name": "信号处理", "required": 45}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "环境搭建", "content": "ESP-IDF安装，硬件测试，基础外设", "hours": 8},
+      {"phase": "第2周", "title": "AI框架", "content": "TensorFlow Lite Micro，模型转换，推理优化", "hours": 10},
+      {"phase": "第3周", "title": "语音应用", "content": "音频采集，特征提取，关键词识别", "hours": 10},
+      {"phase": "第4周", "title": "综合项目", "content": "语音控制，云端联动，系统优化", "hours": 10}
+    ],
+    "bom": [
+      {"ref": "U1", "name": "ESP32-S3-WROOM", "qty": 1, "footprint": "SMD", "price": 16.8},
+      {"ref": "MK1", "name": "MEMS麦克风", "qty": 1, "footprint": "SMD", "price": 3.5},
+      {"ref": "SP1", "name": "扬声器", "qty": 1, "footprint": "-", "price": 2.8},
+      {"ref": "J1", "name": "Type-C母座", "qty": 1, "footprint": "Type-C", "price": 0.8}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "视频", "name": "硬件搭建教程.mp4"},
+      {"type": "代码", "name": "示例代码仓库"}
+    ],
+    "equipmentNames": ["ESP32-S3 开发板", "逻辑分析仪"]
+  },
+  {
+    "title": "智能小车底盘+控制器",
+    "summary": "完整的智能小车解决方案，包含底盘结构、电机驱动、主控板，支持循迹、避障、遥控等功能。",
+    "description": "从机械组装到智能算法的完整机器人项目:完成底盘安装与传感器布局,实现电机 PWM 调速与方向控制,再开发循迹、避障与红外/蓝牙遥控功能,收获一台属于自己的智能小车。",
+    "difficulty": "进阶",
+    "duration": "3周",
+    "teamSize": "2-3人",
+    "category": "消费电子",
+    "icon": "🚗",
+    "mentor": "李老师",
+    "author": "机器人工作室",
+    "license": "MIT",
+    "verified": true,
+    "layers": 2,
+    "pcbSize": "100x80mm",
+    "cost": 156,
+    "coverUrl": "https://images.unsplash.com/photo-1473968512647-3e447244af8f?auto=format&fit=crop&w=800&q=60",
+    "forks": 256,
+    "rating": 4.8,
+    "enrolledCount": 112,
+    "completionRate": 81,
+    "views": 3800,
+    "favoriteCount": 165,
+    "downloads": 489,
+    "tags": ["电机控制", "传感器融合", "PID算法", "机器人"],
+    "features": ["完整套件", "多传感器", "开源代码", "教程丰富"],
+    "learningGoals": ["学习传感器应用", "实现PID调速", "开发完整机器人"],
+    "prerequisites": ["有STM32基础", "了解机械结构", "熟悉PID控制"],
+    "skillRequirements": [
+      {"name": "嵌入式开发", "required": 50},
+      {"name": "编程能力", "required": 45},
+      {"name": "硬件调试", "required": 40}
+    ],
+    "syllabus": [
+      {"phase": "第1周", "title": "机械组装", "content": "底盘安装，电机接线，传感器布局", "hours": 6},
+      {"phase": "第2周", "title": "基础控制", "content": "电机驱动，PWM调速，方向控制", "hours": 8},
+      {"phase": "第3周", "title": "智能功能", "content": "循迹算法，避障逻辑，遥控通信", "hours": 10}
+    ],
+    "bom": [
+      {"ref": "KIT", "name": "智能小车套件", "qty": 1, "footprint": "-", "price": 89.0},
+      {"ref": "M*", "name": "直流减速电机", "qty": 4, "footprint": "-", "price": 12.0},
+      {"ref": "IR1", "name": "红外遥控", "qty": 1, "footprint": "-", "price": 3.5},
+      {"ref": "BT1", "name": "蓝牙模块", "qty": 1, "footprint": "-", "price": 8.8},
+      {"ref": "BAT", "name": "电池组", "qty": 1, "footprint": "-", "price": 15.0},
+      {"ref": "CHS", "name": "亚克力底盘", "qty": 1, "footprint": "-", "price": 12.0}
+    ],
+    "resources": [
+      {"type": "文档", "name": "项目开发指南.pdf"},
+      {"type": "视频", "name": "硬件搭建教程.mp4"},
+      {"type": "代码", "name": "示例代码仓库"}
+    ],
+    "equipmentNames": ["STM32F4 Discovery", "ST-Link V2 下载器", "高精度数字万用表"]
+  }
+]

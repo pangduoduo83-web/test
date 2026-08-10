@@ -1,0 +1,8 @@
+target/
+frontend/
+IoeduFront/
+.idea/
+*.bat
+*.md
+.git/
+uploads/
