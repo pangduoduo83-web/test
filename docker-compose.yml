@@ -40,7 +40,7 @@ services:
     build: ./frontend
     container_name: ioedu-frontend
     ports:
-      - "80:80"
+      - "8093:80"
     depends_on:
       - backend
     restart: unless-stopped
