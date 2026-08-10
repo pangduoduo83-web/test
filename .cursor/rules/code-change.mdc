@@ -6,7 +6,7 @@ alwaysApply: false
 
 # 写代码 / 改代码 / 修 bug / 重构 Checklist
 
-按 `00-fable5-routing.mdc` 约定，这类任务应由 `fable5-code-writer` 子代理（Fable 5 thinking max）执行。工作流如下：
+按 `00-model-routing.mdc` 约定，这类任务应由 `sol-code-writer` 子代理（GPT 5.6 Sol max thinking fast）执行。工作流如下：
 
 ## 1. 动手前：读懂再改
 
@@ -30,4 +30,4 @@ alwaysApply: false
 ## 4. 收尾
 
 - 简述改了什么、为什么、如何验证。
-- 末尾按固定格式署名：`✅ 本任务由 <子代理中文名>（<name>）· Fable 5 thinking max 完成`
+- 末尾按固定格式署名：`✅ 本任务由 <子代理中文名>（<name>）· GPT 5.6 Sol max thinking fast 完成`

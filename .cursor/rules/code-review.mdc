@@ -5,7 +5,7 @@ alwaysApply: false
 
 # 代码审查 / PR 审查 Checklist
 
-按 `00-fable5-routing.mdc` 约定，审查任务应由只读子代理 `fable5-code-reviewer`（Fable 5 thinking max）执行。审查时逐项过以下清单，结论按「必须修复 / 建议改进 / 可选」分级：
+按 `00-model-routing.mdc` 约定，审查任务应由只读子代理 `sol-code-reviewer`（GPT 5.6 Sol max thinking fast）执行。审查时逐项过以下清单，结论按「必须修复 / 建议改进 / 可选」分级：
 
 ## 正确性与回归
 
@@ -32,4 +32,4 @@ alwaysApply: false
 ## 收尾
 
 - 输出审查结论摘要（通过 / 需修改），列出分级问题清单。
-- 末尾按固定格式署名：`✅ 本任务由 <子代理中文名>（<name>）· Fable 5 thinking max 完成`
+- 末尾按固定格式署名：`✅ 本任务由 <子代理中文名>（<name>）· GPT 5.6 Sol max thinking fast 完成`
