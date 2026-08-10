@@ -1,0 +1,39 @@
+---
+description: Fable 5 routing policy — always delegate code writing/modification/review/debugging/testing AND substantive Q&A/consulting to the pinned Fable 5 thinking max subagents, and sign off with the executor's name at the end of every completed task
+alwaysApply: true
+---
+
+# Fable 5 委派与署名总规则（本仓库默认约定）
+
+本仓库（IOEDU-New 设备图书馆，Spring Boot 2.6 + Vue 3 全栈）约定：**所有实现类、审查类与实质性问答/咨询类工作默认由 Fable 5 thinking max 执行**。规则本身无法在平台层切换主会话模型，因此正确做法是：父代理遇到下表中的任务时，**主动委派**到 `.cursor/agents/` 下已用 `model: claude-fable-5[effort=xhigh]` 钉死模型的子代理。
+
+## 路由表（何时委派给谁）
+
+| 任务类型 | 委派目标子代理 | 说明 |
+|---|---|---|
+| 写新代码 / 实现功能 / 改代码 / 修 bug / 重构 | `fable5-code-writer` | 任何会产生代码 diff 的工作 |
+| 代码审查 / PR 审查 / diff 评估 / 安全检查 | `fable5-code-reviewer` | 只读审查，不改代码 |
+| 排查报错 / 定位缺陷 / 分析异常日志 | `fable5-debugger` | 先诊断根因，修复动作可再交给 code-writer 或经确认后自行小修 |
+| 写测试 / 冒烟验证 / 扩展 smoke-test.ps1 | `fable5-tester` | 本项目测试薄弱，新增行为尽量补验证 |
+| 问答 / 咨询 / 方案建议 / 架构选型 / 如何部署 / 概念解释 | `fable5-advisor` | 不改代码的实质性技术问答与方案咨询，一律委派 |
+| 文档、PR 说明、提交信息等围绕代码变更的写作 | 随所属主任务的子代理一并完成 | 例如实现后由 code-writer 顺带写 PR 说明 |
+
+## 父代理行为约束（问答也必须委派）
+
+- 父代理收到用户问题后，应通过 `Task` 工具委派到对应子代理执行，**自己不要长篇直接作答**。允许父代理自行输出的仅限：极短的确认、转述子代理结论、或一两句澄清。
+- **实质性技术问答也必须委派**到 `fable5-advisor`：包括「能不能做 X」「怎么部署 / 怎么配 CI/CD」「方案 A 和 B 怎么选」「解释某概念/某段代码为什么这样写」等。不得以「只是回答问题、不改代码」为由跳过委派。
+- 唯一例外：与任务内容无关的寒暄、一句话可答的事实性确认（如「文件在哪个目录」）。有任何犹豫时，一律委派。
+- 委派时注意：agent 文件 frontmatter 中的模型写作 `claude-fable-5[effort=xhigh]`；父代理通过 `Task` 工具实际调用时对应的 model slug 为 `claude-fable-5-thinking-xhigh`，两者指同一模型（Fable 5 thinking max）。
+
+## 署名要求（强制）
+
+任何一次任务完成后，最终回复末尾必须单独一行输出实际执行者，固定格式：
+
+```
+✅ 本任务由 <子代理中文名>（<name>）· Fable 5 thinking max 完成
+```
+
+例如：`✅ 本任务由 Fable 5 代码工匠（fable5-code-writer）· Fable 5 thinking max 完成`
+
+- 若父代理未委派而自行完成了实现/审查，也必须如实署名，例如：`✅ 本任务由主代理按 Fable 5 约定完成（未委派子代理）`。
+- 署名必须真实反映执行者，禁止虚构。多个子代理协作时逐一列出。

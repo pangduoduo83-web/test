@@ -1,0 +1,33 @@
+---
+description: Workflow checklist for writing, modifying, fixing, or refactoring code in this repo (Spring Boot backend + Vue 3 frontend) — apply whenever producing a code diff
+globs: src/**/*.java,src/main/resources/**,frontend/src/**,pom.xml,frontend/package.json,docker-compose.yml,Dockerfile
+alwaysApply: false
+---
+
+# 写代码 / 改代码 / 修 bug / 重构 Checklist
+
+按 `00-fable5-routing.mdc` 约定，这类任务应由 `fable5-code-writer` 子代理（Fable 5 thinking max）执行。工作流如下：
+
+## 1. 动手前：读懂再改
+
+- 先读目标文件及其直接依赖（Controller → Service → Repository / 前端 view → store → api），不凭猜测改代码。
+- 涉及借阅流程时必读 `src/main/java/com/example/ioedunew/service/BorrowService.java`：状态机为 `PENDING → APPROVED（扣库存）→ RETURN_REQUESTED → RETURNED（回补库存）`，另有 `REJECTED` / `CANCELLED` 分支。**库存增减与状态流转只能发生在 BorrowService 内**，状态不匹配一律抛 `BusinessException`，不做静默兜底。
+- 涉及权限时对照 `config/AuthInterceptor.java` 三级角色：`/api/auth`、`/api/public` 放行；`/api/admin` 要求 ADMIN；`/api/teacher` 要求 TEACHER 或 ADMIN；其余登录即可。新接口路径必须落在正确前缀下。
+
+## 2. 修改原则
+
+- **小 diff**：只改与任务直接相关的代码，不顺手重构、不引入无关格式化。
+- **匹配现有风格**：后端 Java 8（无 var、无新语法）、构造器注入、统一响应与 `BusinessException`；前端 Vue 3 `<script setup>` + Element Plus + Pinia，接口调用集中在 `frontend/src/api/`。
+- 数据库 schema 变化要兼容老库自动回填的启动逻辑（见 `init/` 与 README）。
+- 不要把 JWT 密钥、数据库密码等敏感值硬编码扩散；新配置走 `application.properties` + 环境变量（如 `IOEDU_DB_PASSWORD`）。
+
+## 3. 验证
+
+- 能编译则编译：后端 `mvn -q compile`，前端 `cd frontend && npm run build`（或至少确认 vite 无语法报错）。
+- 本项目几乎没有单测，主要靠 `smoke-test.ps1` 冒烟；触及借阅/审批/鉴权链路时，评估是否需要更新冒烟脚本或至少手动走一遍受影响接口。
+- 修 bug 时先复现、后修复、再确认不复现，把验证方式写进回复。
+
+## 4. 收尾
+
+- 简述改了什么、为什么、如何验证。
+- 末尾按固定格式署名：`✅ 本任务由 <子代理中文名>（<name>）· Fable 5 thinking max 完成`
