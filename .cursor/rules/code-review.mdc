@@ -1,0 +1,35 @@
+---
+description: Checklist for code review / PR review / diff evaluation in this repo — apply whenever reviewing code changes, pull requests, or assessing diffs for correctness and security
+alwaysApply: false
+---
+
+# 代码审查 / PR 审查 Checklist
+
+按 `00-fable5-routing.mdc` 约定，审查任务应由只读子代理 `fable5-code-reviewer`（Fable 5 thinking max）执行。审查时逐项过以下清单，结论按「必须修复 / 建议改进 / 可选」分级：
+
+## 正确性与回归
+
+- diff 是否完整实现了声明的意图？有没有漏改的调用方、前端联动页面或种子数据？
+- 借阅状态机不变量：状态流转与库存增减是否仍然只发生在 `BorrowService` 内？`approve` 扣库存 / `confirmReturn` 回补是否配对？非法状态是否仍抛 `BusinessException` 而非静默兜底？
+- JPA/事务：写操作是否在 `@Transactional` 内？懒加载与 N+1 是否被引入？
+
+## 并发与库存
+
+- 库存扣减路径是否存在并发超借风险（读-改-写竞态）？新增的库存相关逻辑是否考虑了并发申请同一设备的场景？
+
+## 安全与鉴权
+
+- 新接口的 URL 前缀是否匹配 `AuthInterceptor` 三级角色（`/api/admin` → ADMIN，`/api/teacher` → TEACHER/ADMIN，其余登录态）？是否存在越权读写他人数据（如按 userId 查询未校验归属）？
+- 是否引入新的硬编码密钥/密码？现有 JWT 密钥与演示账号为已知上线风险，diff 不应使其恶化。
+- 前端是否把敏感信息写进了可公开访问的代码或日志？
+
+## 与项目约定一致性
+
+- 后端：Java 8 语法、构造器注入、统一响应结构、异常走 `common/` 下的机制。
+- 前端：Vue 3 `<script setup>`、Element Plus 组件、状态放 Pinia、请求集中在 `frontend/src/api/`。
+- Docker/部署相关改动是否与 `docker-compose.yml` 和部署指南一致。
+
+## 收尾
+
+- 输出审查结论摘要（通过 / 需修改），列出分级问题清单。
+- 末尾按固定格式署名：`✅ 本任务由 <子代理中文名>（<name>）· Fable 5 thinking max 完成`
