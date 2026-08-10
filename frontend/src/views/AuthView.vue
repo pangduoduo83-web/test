@@ -13,7 +13,7 @@
             <BookOpen :size="30" color="#4f46e5" :stroke-width="2.2" />
           </div>
           <div>
-            <h1 class="brand-title">设备图书馆</h1>
+            <h1 class="brand-title">AI未来实践中心</h1>
             <div class="brand-sub">项目驱动教学实验平台</div>
           </div>
         </div>
