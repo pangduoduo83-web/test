@@ -24,8 +24,9 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
+            <el-button size="small" type="primary" plain @click="viewStudents(row)">学生</el-button>
             <el-button size="small" @click="openEdit(row)">编辑</el-button>
             <el-button size="small" type="danger" plain @click="remove(row)">删除</el-button>
           </template>
@@ -175,6 +176,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   adminCreateProject, adminDeleteProject, adminListProjects, adminListUsers,
@@ -182,6 +184,7 @@ import {
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 
+const router = useRouter()
 const items = ref([])
 const teachers = ref([])
 const editVisible = ref(false)
@@ -336,6 +339,10 @@ const remove = async (row) => {
   await adminDeleteProject(row.id)
   ElMessage.success('已删除')
   await load()
+}
+
+const viewStudents = (row) => {
+  router.push({ path: '/admin/enrollments', query: { projectId: row.id } })
 }
 
 onMounted(() => {

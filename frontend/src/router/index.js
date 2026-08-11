@@ -40,6 +40,9 @@ const router = createRouter({
         { path: 'equipment', name: 'admin-equipment', component: () => import('../views/admin/AdminEquipment.vue') },
         { path: 'borrows', name: 'admin-borrows', component: () => import('../views/admin/AdminBorrows.vue') },
         { path: 'projects', name: 'admin-projects', component: () => import('../views/admin/AdminProjects.vue') },
+        { path: 'enrollments', name: 'admin-enrollments', component: () => import('../views/admin/AdminEnrollments.vue') },
+        { path: 'submissions', name: 'admin-submissions', component: () => import('../views/admin/AdminSubmissions.vue') },
+        { path: 'notifications', name: 'admin-notifications', component: () => import('../views/admin/AdminNotifications.vue') },
         { path: 'users', name: 'admin-users', component: () => import('../views/admin/AdminUsers.vue') }
       ]
     }

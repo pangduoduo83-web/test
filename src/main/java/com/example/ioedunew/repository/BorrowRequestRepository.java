@@ -19,4 +19,6 @@ public interface BorrowRequestRepository extends JpaRepository<BorrowRequest, Lo
     long countByUserIdAndStatus(Long userId, String status);
 
     long countByStatus(String status);
+
+    boolean existsByUserId(Long userId);
 }

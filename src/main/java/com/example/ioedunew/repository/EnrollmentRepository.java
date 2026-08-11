@@ -18,4 +18,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     long countByUserId(Long userId);
 
     long countByUserIdAndStatus(Long userId, String status);
+
+    boolean existsByUserId(Long userId);
 }

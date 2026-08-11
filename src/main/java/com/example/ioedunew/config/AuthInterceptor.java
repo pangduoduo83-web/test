@@ -1,5 +1,7 @@
 package com.example.ioedunew.config;
 
+import com.example.ioedunew.entity.User;
+import com.example.ioedunew.repository.UserRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -18,9 +20,11 @@ import java.nio.charset.StandardCharsets;
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
 
-    public AuthInterceptor(JwtUtil jwtUtil) {
+    public AuthInterceptor(JwtUtil jwtUtil, UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -29,15 +33,8 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
         String uri = request.getRequestURI();
-        if (uri.startsWith("/api/auth/") || uri.startsWith("/api/public/")) {
-            // 白名单路径:携带了令牌就尽力解析(供 /api/auth/me 使用),解析失败不拦截
-            String h = request.getHeader("Authorization");
-            if (h != null && h.startsWith("Bearer ")) {
-                try {
-                    request.setAttribute(AuthUser.REQUEST_ATTR, jwtUtil.parseToken(h.substring(7)));
-                } catch (Exception ignored) {
-                }
-            }
+        if (uri.startsWith("/api/public/") || "/api/auth/login".equals(uri)
+                || "/api/auth/register".equals(uri)) {
             return true;
         }
 
@@ -51,6 +48,15 @@ public class AuthInterceptor implements HandlerInterceptor {
         } catch (Exception e) {
             return reject(response, 401, "令牌无效或已过期");
         }
+        User current = userRepository.findById(user.getId()).orElse(null);
+        if (current == null) {
+            return reject(response, 401, "用户不存在或已被删除");
+        }
+        if (!Boolean.TRUE.equals(current.getEnabled())) {
+            return reject(response, 401, "账号已被禁用,请联系管理员");
+        }
+        // JWT 仅用于确认身份,角色权限始终以数据库中的当前值为准。
+        user = new AuthUser(current.getId(), current.getRole());
         if (uri.startsWith("/api/admin/") && !user.isAdmin()) {
             return reject(response, 403, "需要管理员权限");
         }
