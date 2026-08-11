@@ -1,23 +1,34 @@
 package com.example.ioedunew.service;
 
 import com.example.ioedunew.common.BusinessException;
-import com.example.ioedunew.dto.MiscDtos;
+import com.example.ioedunew.dto.AdminDtos;
+import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.Equipment;
 import com.example.ioedunew.entity.Project;
+import com.example.ioedunew.entity.SkillScore;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.BorrowRequestRepository;
+import com.example.ioedunew.repository.DiscussionRepository;
 import com.example.ioedunew.repository.EquipmentRepository;
+import com.example.ioedunew.repository.EnrollmentRepository;
+import com.example.ioedunew.repository.FavoriteRepository;
+import com.example.ioedunew.repository.NotificationRepository;
 import com.example.ioedunew.repository.ProjectRepository;
+import com.example.ioedunew.repository.SkillScoreRepository;
+import com.example.ioedunew.repository.SubmissionRepository;
 import com.example.ioedunew.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 管理端服务:设备/项目 CRUD、用户管理与数据看板统计。
@@ -30,17 +41,41 @@ public class AdminService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final BorrowRequestRepository borrowRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final SubmissionRepository submissionRepository;
+    private final FavoriteRepository favoriteRepository;
+    private final DiscussionRepository discussionRepository;
+    private final SkillScoreRepository skillScoreRepository;
+    private final NotificationRepository notificationRepository;
+    private final ProjectService projectService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
     public AdminService(EquipmentRepository equipmentRepository,
                         ProjectRepository projectRepository,
                         UserRepository userRepository,
                         BorrowRequestRepository borrowRepository,
+                        EnrollmentRepository enrollmentRepository,
+                        SubmissionRepository submissionRepository,
+                        FavoriteRepository favoriteRepository,
+                        DiscussionRepository discussionRepository,
+                        SkillScoreRepository skillScoreRepository,
+                        NotificationRepository notificationRepository,
+                        ProjectService projectService,
+                        NotificationService notificationService,
                         ObjectMapper objectMapper) {
         this.equipmentRepository = equipmentRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.borrowRepository = borrowRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.submissionRepository = submissionRepository;
+        this.favoriteRepository = favoriteRepository;
+        this.discussionRepository = discussionRepository;
+        this.skillScoreRepository = skillScoreRepository;
+        this.notificationRepository = notificationRepository;
+        this.projectService = projectService;
+        this.notificationService = notificationService;
         this.objectMapper = objectMapper;
     }
 
@@ -104,25 +139,182 @@ public class AdminService {
 
     // ---------- 用户 ----------
 
-    public List<User> listUsers() {
-        return userRepository.findAll();
+    public List<User> listUsers(String keyword, String role, Boolean enabled) {
+        String kw = keyword == null ? "" : keyword.trim().toLowerCase();
+        return userRepository.findAll().stream()
+                .filter(u -> kw.isEmpty() || contains(u.getName(), kw) || contains(u.getEmail(), kw)
+                        || contains(u.getStudentNo(), kw) || contains(u.getMajor(), kw))
+                .filter(u -> role == null || role.trim().isEmpty() || "ALL".equalsIgnoreCase(role)
+                        || role.equalsIgnoreCase(u.getRole()))
+                .filter(u -> enabled == null || enabled.equals(u.getEnabled()))
+                .sorted(Comparator.comparing(User::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.toList());
+    }
+
+    public User getUser(Long id) {
+        return requireUser(id);
     }
 
     @Transactional
-    public User updateUser(Long id, MiscDtos.UserAdminUpdateRequest req) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(404, "用户不存在"));
+    public User createUser(AdminDtos.UserCreateRequest req) {
+        String email = normalizeEmail(req.getEmail());
+        if (userRepository.existsByEmail(email)) {
+            throw new BusinessException("该邮箱已被使用");
+        }
+        User user = new User();
+        user.setName(requireText(req.getName(), "姓名"));
+        user.setEmail(email);
+        user.setPasswordHash(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()));
+        user.setStudentNo(cleanNullable(req.getStudentNo()));
+        user.setMajor(cleanNullable(req.getMajor()));
+        user.setGrade(cleanNullable(req.getGrade()));
+        user.setAvatarUrl(cleanNullable(req.getAvatarUrl()));
+        user.setRole(normalizeRole(req.getRole()));
+        user.setEnabled(req.getEnabled() == null || req.getEnabled());
+        userRepository.save(user);
+
+        for (String dimension : AuthService.SKILL_DIMENSIONS) {
+            SkillScore score = new SkillScore();
+            score.setUserId(user.getId());
+            score.setSkillName(dimension);
+            score.setScore(30);
+            skillScoreRepository.save(score);
+        }
+        return user;
+    }
+
+    @Transactional
+    public User updateUser(Long id, AdminDtos.UserUpdateRequest req) {
+        User user = requireUser(id);
+        if (req.getName() != null) {
+            user.setName(requireText(req.getName(), "姓名"));
+        }
+        if (req.getEmail() != null) {
+            String email = normalizeEmail(req.getEmail());
+            User sameEmail = userRepository.findByEmail(email).orElse(null);
+            if (sameEmail != null && !sameEmail.getId().equals(id)) {
+                throw new BusinessException("该邮箱已被使用");
+            }
+            user.setEmail(email);
+        }
+        if (req.getStudentNo() != null) {
+            user.setStudentNo(cleanNullable(req.getStudentNo()));
+        }
+        if (req.getMajor() != null) {
+            user.setMajor(cleanNullable(req.getMajor()));
+        }
+        if (req.getGrade() != null) {
+            user.setGrade(cleanNullable(req.getGrade()));
+        }
+        if (req.getAvatarUrl() != null) {
+            user.setAvatarUrl(cleanNullable(req.getAvatarUrl()));
+        }
         if (req.getEnabled() != null) {
             user.setEnabled(req.getEnabled());
         }
         if (req.getRole() != null) {
-            if (!"STUDENT".equals(req.getRole()) && !"TEACHER".equals(req.getRole())
-                    && !"ADMIN".equals(req.getRole())) {
-                throw new BusinessException("非法角色:" + req.getRole());
+            String role = normalizeRole(req.getRole());
+            if ("ADMIN".equals(user.getRole()) && !"ADMIN".equals(role)
+                    && userRepository.countByRole("ADMIN") <= 1) {
+                throw new BusinessException(409, "不能变更最后一个管理员的角色");
             }
-            user.setRole(req.getRole());
+            user.setRole(role);
         }
         return userRepository.save(user);
+    }
+
+    @Transactional
+    public void resetPassword(Long id, String password) {
+        User user = requireUser(id);
+        user.setPasswordHash(BCrypt.hashpw(password, BCrypt.gensalt()));
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(Long id, Long currentAdminId) {
+        User user = requireUser(id);
+        if (id.equals(currentAdminId)) {
+            throw new BusinessException(409, "不能删除当前登录账号");
+        }
+        if ("ADMIN".equals(user.getRole()) && userRepository.countByRole("ADMIN") <= 1) {
+            throw new BusinessException(409, "不能删除最后一个管理员");
+        }
+        if (borrowRepository.existsByUserId(id) || enrollmentRepository.existsByUserId(id)
+                || submissionRepository.existsByUserId(id) || projectRepository.existsByMentorId(id)) {
+            throw new BusinessException(409, "该用户存在借阅、报名、成果或导师项目等核心关联,请改为禁用账号");
+        }
+        favoriteRepository.deleteByUserId(id);
+        discussionRepository.deleteByUserId(id);
+        skillScoreRepository.deleteByUserId(id);
+        notificationRepository.deleteByUserId(id);
+        userRepository.delete(user);
+    }
+
+    // ---------- 报名与进度 ----------
+
+    public List<Enrollment> listEnrollments(Long projectId, Long userId, String status) {
+        return enrollmentRepository.findAll().stream()
+                .filter(e -> projectId == null || projectId.equals(e.getProjectId()))
+                .filter(e -> userId == null || userId.equals(e.getUserId()))
+                .filter(e -> status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status)
+                        || status.equalsIgnoreCase(e.getStatus()))
+                .sorted(Comparator.comparing(Enrollment::getEnrolledAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Enrollment createEnrollment(AdminDtos.EnrollmentCreateRequest req) {
+        User user = requireUser(req.getUserId());
+        if (!"STUDENT".equals(user.getRole())) {
+            throw new BusinessException("只能为学生代报名");
+        }
+        if (!Boolean.TRUE.equals(user.getEnabled())) {
+            throw new BusinessException("该学生账号已禁用");
+        }
+        return projectService.enroll(req.getUserId(), req.getProjectId());
+    }
+
+    @Transactional
+    public Enrollment updateEnrollment(Long id, AdminDtos.EnrollmentUpdateRequest req) {
+        Enrollment enrollment = enrollmentRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(404, "报名记录不存在"));
+        boolean wasCompleted = "COMPLETED".equals(enrollment.getStatus());
+        if (req.getProgress() != null) {
+            enrollment.setProgress(req.getProgress());
+            if (req.getProgress() >= 100 && !wasCompleted) {
+                enrollment.setStatus("COMPLETED");
+                userRepository.findById(enrollment.getUserId()).ifPresent(u -> {
+                    u.setExp(u.getExp() + 50);
+                    userRepository.save(u);
+                });
+                notificationService.create(enrollment.getUserId(), "project", "项目完成",
+                        "管理员已将《" + enrollment.getProjectTitle() + "》进度更新为完成,经验值 +50!");
+            }
+        }
+        if (req.getCurrentTask() != null) {
+            enrollment.setCurrentTask(cleanNullable(req.getCurrentTask()));
+        }
+        enrollment.setDeadline(req.getDeadline());
+        return enrollmentRepository.save(enrollment);
+    }
+
+    @Transactional
+    public void deleteEnrollment(Long id) {
+        Enrollment enrollment = enrollmentRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(404, "报名记录不存在"));
+        if (submissionRepository.existsByUserIdAndProjectId(
+                enrollment.getUserId(), enrollment.getProjectId())) {
+            throw new BusinessException(409, "该报名已有成果提交,不能删除");
+        }
+        Project project = projectRepository.findById(enrollment.getProjectId()).orElse(null);
+        if (project != null) {
+            int count = project.getEnrolledCount() == null ? 0 : project.getEnrolledCount();
+            project.setEnrolledCount(Math.max(0, count - 1));
+            projectRepository.save(project);
+        }
+        enrollmentRepository.delete(enrollment);
     }
 
     // ---------- 数据看板 ----------
@@ -182,6 +374,43 @@ public class AdminService {
         result.put("returned", returned);
         result.put("utilization", utilization);
         return result;
+    }
+
+    private User requireUser(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(404, "用户不存在"));
+    }
+
+    private String normalizeEmail(String email) {
+        String value = requireText(email, "邮箱").toLowerCase();
+        if (!value.contains("@")) {
+            throw new BusinessException("邮箱格式不正确");
+        }
+        return value;
+    }
+
+    private String normalizeRole(String role) {
+        String value = role == null || role.trim().isEmpty()
+                ? "STUDENT" : role.trim().toUpperCase();
+        if (!"STUDENT".equals(value) && !"TEACHER".equals(value) && !"ADMIN".equals(value)) {
+            throw new BusinessException("非法角色:" + role);
+        }
+        return value;
+    }
+
+    private String requireText(String value, String label) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new BusinessException(label + "不能为空");
+        }
+        return value.trim();
+    }
+
+    private String cleanNullable(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    private boolean contains(String value, String keyword) {
+        return value != null && value.toLowerCase().contains(keyword);
     }
 
     // ---------- JSON 字段兜底 ----------

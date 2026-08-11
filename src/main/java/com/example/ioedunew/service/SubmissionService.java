@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 项目成果提交与评分服务。
@@ -75,10 +76,20 @@ public class SubmissionService {
     }
 
     public List<Submission> listAll(String status) {
+        return listAll(status, null, null);
+    }
+
+    public List<Submission> listAll(String status, Long userId, Long projectId) {
+        List<Submission> items;
         if (status == null || status.isEmpty() || "ALL".equals(status)) {
-            return submissionRepository.findAllByOrderBySubmittedAtDesc();
+            items = submissionRepository.findAllByOrderBySubmittedAtDesc();
+        } else {
+            items = submissionRepository.findByStatusOrderBySubmittedAtDesc(status);
         }
-        return submissionRepository.findByStatusOrderBySubmittedAtDesc(status);
+        return items.stream()
+                .filter(s -> userId == null || userId.equals(s.getUserId()))
+                .filter(s -> projectId == null || projectId.equals(s.getProjectId()))
+                .collect(Collectors.toList());
     }
 
     @Transactional

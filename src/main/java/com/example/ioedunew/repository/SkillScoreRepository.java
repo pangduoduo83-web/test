@@ -9,4 +9,6 @@ import java.util.List;
 public interface SkillScoreRepository extends JpaRepository<SkillScore, Long> {
 
     List<SkillScore> findByUserId(Long userId);
+
+    void deleteByUserId(Long userId);
 }
