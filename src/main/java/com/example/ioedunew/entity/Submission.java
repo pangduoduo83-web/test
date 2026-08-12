@@ -43,6 +43,10 @@ public class Submission {
     @Column(length = 255)
     private String attachmentUrl;
 
+    /** 对应的考核项名称;为空表示整体单一成果(兼容旧数据) */
+    @Column(length = 50)
+    private String assessmentName;
+
     /** SUBMITTED / GRADED */
     @Column(nullable = false, length = 20)
     private String status = "SUBMITTED";

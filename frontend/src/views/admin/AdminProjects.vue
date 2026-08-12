@@ -49,7 +49,9 @@
               <ImageUploader v-model="form.coverUrl" />
             </el-form-item>
             <el-form-item label="简介"><el-input v-model="form.summary" type="textarea" :rows="2" /></el-form-item>
-            <el-form-item label="详细描述"><el-input v-model="form.description" type="textarea" :rows="3" /></el-form-item>
+            <el-form-item label="详细描述">
+              <RichEditor v-model="form.description" />
+            </el-form-item>
             <div class="form-2col">
               <el-form-item label="难度">
                 <el-select v-model="form.difficulty">
@@ -98,6 +100,28 @@
 
         <el-tab-pane label="高级内容" name="advanced">
           <p class="json-tip">以下内容按行编辑,保存时自动生成 JSON;学生端「项目详情」按此展示。</p>
+
+          <div class="adv-section">
+            <div class="adv-head">
+              <h4>成果考核项
+                <span class="weight-sum" :class="{ ok: assessWeightSum === 100 }">
+                  权重合计 {{ assessWeightSum }}/100
+                </span>
+              </h4>
+              <el-button size="small" plain @click="assessRows.push({ name: '', weight: 0, desc: '' })">+ 添加考核项</el-button>
+            </div>
+            <p class="json-tip" style="margin-top:0">
+              设置后学生按考核项分阶段提交成果,每项单独评分,全部评完自动按权重计算综合分(≥60 判定项目完成);留空则为整体单一成果。
+            </p>
+            <div v-for="(a, i) in assessRows" :key="i" class="adv-row">
+              <el-input v-model="a.name" placeholder="考核项,如: 原理图设计" class="grow" />
+              <span class="row-label">权重%</span>
+              <el-input-number v-model="a.weight" :min="0" :max="100" :step="5" class="num-narrow" />
+              <el-input v-model="a.desc" placeholder="要求说明(选填)" class="grow" />
+              <el-button size="small" text type="danger" @click="assessRows.splice(i, 1)">删除</el-button>
+            </div>
+            <p v-if="!assessRows.length" class="empty-hint">未设置考核项,学生提交整体单一成果</p>
+          </div>
 
           <div class="adv-section">
             <div class="adv-head">
@@ -194,6 +218,7 @@ import {
   adminUpdateProject, fetchEquipment, uploadDocFile
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
+import RichEditor from '../../components/RichEditor.vue'
 import { loadSiteConfig, siteConfig as site } from '../../utils/siteConfig'
 
 const router = useRouter()
@@ -223,6 +248,9 @@ const emptyForm = {
 const form = reactive({ ...emptyForm })
 
 // 高级内容:结构化行编辑,保存时组装为 JSON 数组
+const assessRows = ref([])     // {name, weight, desc}
+const assessWeightSum = computed(() =>
+  assessRows.value.reduce((s, a) => s + (Number(a.weight) || 0), 0))
 const skillRows = ref([])      // {name, required}
 const syllabusRows = ref([])   // {phase, title, content, hours}
 const bomRows = ref([])        // {ref, name, qty, footprint, price}
@@ -246,6 +274,9 @@ const loadTeachers = async () => {
 const openEdit = (row) => {
   Object.assign(form, emptyForm)
   editTab.value = 'basic'
+  assessRows.value = arr(row?.assessments).map((a) => ({
+    name: a.name || '', weight: num(a.weight), desc: a.desc || ''
+  }))
   skillRows.value = arr(row?.skillRequirements).map((s) => ({
     name: s.name || '', required: num(s.required)
   }))
@@ -348,9 +379,19 @@ const buildResources = () => resourceRows.value
   .filter((r) => (r.name || '').trim())
   .map((r) => ({ type: r.type || '文档', name: r.name.trim(), url: r.url || '' }))
 
+const buildAssessments = () => assessRows.value
+  .filter((a) => (a.name || '').trim())
+  .map((a) => ({ name: a.name.trim(), weight: num(a.weight), desc: (a.desc || '').trim() }))
+
 const save = async () => {
   if (!form.title.trim()) {
     ElMessage.warning('请填写项目标题')
+    return
+  }
+  const assessments = buildAssessments()
+  if (assessments.length && assessments.reduce((s, a) => s + a.weight, 0) !== 100) {
+    ElMessage.warning('成果考核项的权重合计必须等于 100')
+    editTab.value = 'advanced'
     return
   }
   saving.value = true
@@ -368,6 +409,7 @@ const save = async () => {
       learningGoals: JSON.stringify(splitText(form.goalsText)),
       prerequisites: JSON.stringify(splitText(form.prereqText)),
       equipmentNames: JSON.stringify(form.equipNames.filter(Boolean)),
+      assessments: JSON.stringify(buildAssessments()),
       skillRequirements: JSON.stringify(buildSkills()),
       syllabus: JSON.stringify(buildSyllabus()),
       bom: JSON.stringify(buildBom()),
@@ -420,6 +462,8 @@ onMounted(() => {
 .adv-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .adv-head h4 { margin: 0; font-size: 14px; }
 .bom-btns { display: flex; gap: 8px; align-items: center; }
+.weight-sum { font-size: 12px; color: #ca8a04; font-weight: 400; margin-left: 8px; }
+.weight-sum.ok { color: #16a34a; }
 .adv-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .adv-row .grow { flex: 1; }
 .adv-row .w-80 { width: 80px; flex-shrink: 0; }

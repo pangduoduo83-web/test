@@ -92,7 +92,13 @@
 
       <!-- 概览 -->
       <view v-if="activeTab === 'overview'" class="tab-body">
-        <text class="desc">{{ project.description }}</text>
+        <template v-if="richDesc">
+          <template v-for="(seg, i) in richDesc" :key="i">
+            <rich-text v-if="seg.type === 'html'" class="rich-html" :nodes="seg.content" />
+            <video v-else class="rich-video" :src="seg.src" controls />
+          </template>
+        </template>
+        <text v-else class="desc">{{ project.description || project.summary || '暂无详细描述' }}</text>
         <view v-if="features.length" class="sub-block">
           <text class="sub-title">项目特性</text>
           <view class="tags">
@@ -303,6 +309,7 @@ import {
 } from '@/api'
 import { fullUrl } from '@/config'
 import { asList, formatDate, relativeTime, shortNum } from '@/utils/format'
+import { prepareRich } from '@/utils/rich'
 
 const tabs = [
   { key: 'overview', label: '概览' },
@@ -336,6 +343,8 @@ const equipmentNames = computed(() => asList(project.value?.equipmentNames))
 const syllabus = computed(() => asList(project.value?.syllabus))
 const bom = computed(() => asList(project.value?.bom))
 const resources = computed(() => asList(project.value?.resources))
+
+const richDesc = computed(() => prepareRich(project.value?.description))
 
 const bomTotal = computed(() =>
   bom.value.reduce((sum, b) => sum + (Number(b.price) || 0) * (Number(b.qty) || 1), 0).toFixed(1)
@@ -701,6 +710,18 @@ const sendDiscussion = async () => {
   font-size: 28rpx;
   color: $text-main;
   line-height: 1.8;
+}
+
+.rich-html {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.8;
+}
+
+.rich-video {
+  width: 100%;
+  border-radius: 16rpx;
+  margin: 16rpx 0;
 }
 
 .sub-block {

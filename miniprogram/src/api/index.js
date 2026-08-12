@@ -21,6 +21,7 @@ export const fetchDiscussions = (id) => get(`/projects/${id}/discussions`)
 export const postDiscussion = (id, data) => post(`/projects/${id}/discussions`, data)
 export const submitWork = (id, data) => post(`/projects/${id}/submissions`, data)
 export const fetchMySubmission = (id) => get(`/projects/${id}/submissions/mine`, null, { silent: true })
+export const fetchMySubmissions = (id) => get(`/projects/${id}/submissions/mine-all`, null, { silent: true })
 
 // ---------- 设备图书馆 ----------
 export const fetchEquipment = (params) => get('/equipment', params)

@@ -82,7 +82,7 @@
         <div class="ec-body">
           <h3 class="ec-title">{{ e.name }}</h3>
           <div class="ec-model">{{ e.model }} · {{ e.manufacturer }}</div>
-          <p class="ec-desc">{{ e.description }}</p>
+          <p class="ec-desc">{{ plainText(e.description) }}</p>
           <div class="ec-specs">
             <span v-for="s in arr(e.specs).slice(0, 3)" :key="s" class="chip">{{ s }}</span>
             <span v-if="arr(e.specs).length > 3" class="chip">+{{ arr(e.specs).length - 3 }}</span>
@@ -128,7 +128,8 @@
           </div>
         </div>
         <h4>设备描述</h4>
-        <p class="dd-desc">{{ current.description }}</p>
+        <div v-if="isRich(current.description)" class="dd-desc rich-content" v-html="current.description"></div>
+        <p v-else class="dd-desc">{{ current.description }}</p>
         <h4>技术规格</h4>
         <div><span v-for="s in arr(current.specs)" :key="s" class="chip">{{ s }}</span></div>
         <h4>适用项目</h4>
@@ -335,6 +336,10 @@ const arr = (v) => Array.isArray(v) ? v : []
 const docName = (d) => (typeof d === 'string' ? d : d?.name || '')
 const docUrl = (d) => (typeof d === 'object' && d?.url ? d.url : '')
 
+// 富文本描述:卡片摘要转纯文本,详情弹窗按 HTML 渲染
+const isRich = (v) => typeof v === 'string' && v.includes('<')
+const plainText = (v) => (isRich(v) ? v.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : v)
+
 const statusText = (e) => e.status === 'MAINTENANCE' ? '维护中'
   : e.availableCount > 0 ? `可借阅 (${e.availableCount}件)` : '已借完'
 const statusColor = (e) => e.status === 'MAINTENANCE' ? 'yellow' : e.availableCount > 0 ? 'green' : 'red'
@@ -514,6 +519,9 @@ onMounted(async () => {
 .dd-model { font-size: 14px; font-weight: 600; }
 .dd-price, .dd-loc { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
 .dd-desc { font-size: 13px; color: #374151; }
+.rich-content { line-height: 1.8; }
+.rich-content :deep(img), .rich-content :deep(video) { max-width: 100%; border-radius: 10px; margin: 8px 0; }
+.rich-content :deep(p) { margin: 6px 0; }
 h4 { margin: 14px 0 8px; font-size: 14px; }
 .dd-docs { font-size: 13px; color: #374151; display: grid; gap: 6px; }
 .dd-doc-row { display: flex; align-items: center; gap: 6px; }

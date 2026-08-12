@@ -33,6 +33,12 @@
           </el-tooltip>
         </template>
       </el-table-column>
+      <el-table-column label="考核项" width="110">
+        <template #default="{ row }">
+          <span v-if="row.assessmentName" class="badge badge-purple">{{ row.assessmentName }}</span>
+          <span v-else class="sub-text">整体成果</span>
+        </template>
+      </el-table-column>
       <el-table-column label="附件" width="80">
         <template #default="{ row }">
           <el-link v-if="row.attachmentUrl" :href="row.attachmentUrl" target="_blank" type="primary">查看</el-link>

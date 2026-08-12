@@ -120,7 +120,8 @@
       <el-tabs v-model="tab">
         <el-tab-pane label="项目概览" name="overview">
           <h4 class="sec-head"><ClipboardList :size="16" color="#2563eb" /> 项目简介</h4>
-          <div class="intro-box">{{ project.description }}</div>
+          <div v-if="isRich(project.description)" class="intro-box rich-content" v-html="project.description"></div>
+          <div v-else class="intro-box">{{ project.description || project.summary || '暂无详细描述' }}</div>
 
           <h4 class="sec-head"><Zap :size="16" color="#f59e0b" /> 项目特性</h4>
           <div class="tag-wrap">
@@ -265,6 +266,61 @@
 
         <el-tab-pane label="项目成果" name="submission">
           <el-empty v-if="!detail.enrollment" description="报名参与项目后,可在这里提交成果并查看评审结果" />
+
+          <!-- 分阶段考核模式 -->
+          <template v-else-if="assessments.length">
+            <div class="assess-summary">
+              <b>分阶段考核</b>
+              <span class="pg-meta">共 {{ assessments.length }} 项,每项单独评分,全部评完自动按权重计算综合分(≥60 判定项目完成)</span>
+              <span v-if="overallScore !== null" class="assess-overall" :class="{ pass: overallScore >= 60 }">
+                综合 {{ overallScore }} 分 {{ overallScore >= 60 ? '· 已达标' : '· 未达标' }}
+              </span>
+            </div>
+
+            <div v-for="a in assessments" :key="a.name" class="assess-item">
+              <div class="assess-head">
+                <b>{{ a.name }}</b>
+                <span class="chip">权重 {{ a.weight }}%</span>
+                <span v-if="latestFor(a.name)" class="badge"
+                      :class="latestFor(a.name).status === 'GRADED'
+                        ? (latestFor(a.name).score >= 60 ? 'badge-green' : 'badge-red') : 'badge-yellow'">
+                  {{ latestFor(a.name).status === 'GRADED' ? `已评 ${latestFor(a.name).score} 分` : '评审中' }}
+                </span>
+                <span v-else class="badge badge-gray">未提交</span>
+                <el-button v-if="canSubmitFor(a.name)" size="small" type="primary" plain class="assess-btn"
+                           @click="toggleForm(a.name)">
+                  {{ activeAssessment === a.name ? '收起' : latestFor(a.name) ? '再次提交' : '提交成果' }}
+                </el-button>
+              </div>
+              <div v-if="a.desc" class="assess-desc">{{ a.desc }}</div>
+
+              <div v-if="latestFor(a.name)" class="sub-last">
+                <div class="sub-content">{{ latestFor(a.name).content }}</div>
+                <img v-if="latestFor(a.name).attachmentUrl" :src="latestFor(a.name).attachmentUrl"
+                     class="sub-shot" alt="成果截图" />
+                <div v-if="latestFor(a.name).status === 'GRADED' && latestFor(a.name).feedback"
+                     class="sub-grade" :class="{ pass: latestFor(a.name).score >= 60 }">
+                  评语: {{ latestFor(a.name).feedback }}
+                  <span class="sub-meta">{{ latestFor(a.name).graderName }} 评于 {{ fmtTime(latestFor(a.name).gradedAt) }}</span>
+                </div>
+              </div>
+
+              <div v-if="activeAssessment === a.name" class="sub-form">
+                <el-input v-model="workContent" type="textarea" :rows="3" maxlength="1000" show-word-limit
+                          :placeholder="`描述「${a.name}」的完成情况与实现细节...`" />
+                <div class="sub-form-row">
+                  <div class="sub-uploader">
+                    <ImageUploader v-model="workShot" />
+                  </div>
+                  <el-button type="primary" :loading="submittingWork" class="sub-submit"
+                             @click="doSubmitWork(a.name)">
+                    提交「{{ a.name }}」成果
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </template>
+
           <template v-else>
             <div class="pg-head">
               <b>我的成果</b>
@@ -293,7 +349,7 @@
                 <div class="sub-uploader">
                   <ImageUploader v-model="workShot" />
                 </div>
-                <el-button type="primary" :loading="submittingWork" class="sub-submit" @click="doSubmitWork">
+                <el-button type="primary" :loading="submittingWork" class="sub-submit" @click="doSubmitWork('')">
                   {{ mySubmission ? '再次提交成果' : '提交成果' }}
                 </el-button>
               </div>
@@ -314,8 +370,8 @@ import {
   GitFork, Heart, Pin, Share2, Star, Target, User, Users, Wrench, Zap
 } from 'lucide-vue-next'
 import {
-  enrollProject, fetchDiscussions, fetchMySubmission, fetchProjectDetail, fetchSkills,
-  postDiscussion, submitWork, toggleFavorite
+  enrollProject, fetchDiscussions, fetchMySubmission, fetchMySubmissions, fetchProjectDetail,
+  fetchSkills, postDiscussion, submitWork, toggleFavorite
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 
@@ -331,6 +387,8 @@ const replyTarget = ref(null)
 const replyContent = ref('')
 const posting = ref(false)
 const mySubmission = ref(null)
+const mySubs = ref([])
+const activeAssessment = ref('')
 const workContent = ref('')
 const workShot = ref('')
 const submittingWork = ref(false)
@@ -344,6 +402,8 @@ const diffColor = (d) => d === '入门' ? 'green' : d === '进阶' ? 'blue' : 'r
 
 const project = computed(() => detail.value.project)
 const arr = (v) => Array.isArray(v) ? v : []
+// 富文本描述(后端已消毒);旧数据为纯文本
+const isRich = (v) => typeof v === 'string' && v.includes('<')
 
 const mySkill = (name) => {
   const s = skills.value.find((x) => x.skillName === name)
@@ -353,14 +413,44 @@ const mySkill = (name) => {
 const canSubmitWork = computed(() =>
   detail.value.enrollment && (!mySubmission.value || mySubmission.value.status === 'GRADED'))
 
+// ---------- 分阶段考核 ----------
+const assessments = computed(() => arr(project.value?.assessments))
+
+const latestFor = (name) =>
+  mySubs.value.find((s) => (s.assessmentName || '') === name) || null
+
+const canSubmitFor = (name) => {
+  const latest = latestFor(name)
+  return !latest || latest.status === 'GRADED'
+}
+
+const overallScore = computed(() => {
+  if (!assessments.value.length) return null
+  let total = 0
+  for (const a of assessments.value) {
+    const graded = mySubs.value.find(
+      (s) => (s.assessmentName || '') === a.name && s.status === 'GRADED')
+    if (!graded) return null
+    total += graded.score * a.weight / 100
+  }
+  return Math.round(total)
+})
+
+const toggleForm = (name) => {
+  activeAssessment.value = activeAssessment.value === name ? '' : name
+  workContent.value = ''
+  workShot.value = ''
+}
+
 const loadSubmission = async () => {
   if (!detail.value.enrolled) return
   try {
     mySubmission.value = await fetchMySubmission(route.params.id)
+    mySubs.value = await fetchMySubmissions(route.params.id)
   } catch (e) { /* 成果加载失败不阻塞详情 */ }
 }
 
-const doSubmitWork = async () => {
+const doSubmitWork = async (assessName) => {
   if (!workContent.value.trim()) {
     ElMessage.warning('请填写成果说明')
     return
@@ -369,11 +459,13 @@ const doSubmitWork = async () => {
   try {
     await submitWork(route.params.id, {
       content: workContent.value.trim(),
-      attachmentUrl: workShot.value || undefined
+      attachmentUrl: workShot.value || undefined,
+      assessmentName: assessName || undefined
     })
     ElMessage.success('提交成功,等待管理员评审')
     workContent.value = ''
     workShot.value = ''
+    activeAssessment.value = ''
     await loadSubmission()
   } catch (e) { /* 已提示 */ } finally {
     submittingWork.value = false
@@ -549,6 +641,29 @@ onMounted(load)
 .pg-meta { font-size: 12px; color: var(--text-secondary); }
 
 .submission-card { padding: 16px 20px; margin-bottom: 16px; }
+.assess-summary {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: #f9fafb; border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 14px; font-size: 14px;
+}
+.assess-overall { font-weight: 700; color: #dc2626; margin-left: auto; }
+.assess-overall.pass { color: #16a34a; }
+.assess-item {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 16px; margin-bottom: 12px;
+}
+.assess-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.assess-btn { margin-left: auto; }
+.assess-desc { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+.assess-item .sub-last { margin-top: 10px; }
+.assess-item .sub-form { margin-top: 12px; }
+
+.rich-content { line-height: 1.8; }
+.rich-content :deep(img) { max-width: 100%; border-radius: 10px; margin: 8px 0; }
+.rich-content :deep(video) { max-width: 100%; border-radius: 10px; margin: 8px 0; }
+.rich-content :deep(p) { margin: 6px 0; }
+.rich-content :deep(table) { border-collapse: collapse; }
+.rich-content :deep(td), .rich-content :deep(th) { border: 1px solid #e5e7eb; padding: 4px 10px; }
 .sub-last { margin-bottom: 14px; }
 .sub-content {
   background: #f9fafb; border-radius: 10px; padding: 12px 14px;

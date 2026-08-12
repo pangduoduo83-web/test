@@ -89,6 +89,7 @@ public class AdminService {
     @Transactional
     public Equipment saveEquipment(Equipment input) {
         normalizeEquipmentJson(input);
+        input.setDescription(com.example.ioedunew.common.HtmlSanitizer.clean(input.getDescription()));
         if (input.getId() != null) {
             Equipment existing = equipmentRepository.findById(input.getId())
                     .orElseThrow(() -> new BusinessException(404, "设备不存在"));
@@ -121,6 +122,7 @@ public class AdminService {
     @Transactional
     public Project saveProject(Project input) {
         normalizeProjectJson(input);
+        input.setDescription(com.example.ioedunew.common.HtmlSanitizer.clean(input.getDescription()));
         if (input.getId() != null) {
             Project existing = projectRepository.findById(input.getId())
                     .orElseThrow(() -> new BusinessException(404, "项目不存在"));
@@ -466,6 +468,7 @@ public class AdminService {
         p.setBom(requireJsonArray(p.getBom(), "BOM清单"));
         p.setResources(requireJsonArray(p.getResources(), "学习资源"));
         p.setEquipmentNames(requireJsonArray(p.getEquipmentNames(), "所需设备"));
+        p.setAssessments(requireJsonArray(p.getAssessments(), "成果考核项"));
     }
 
     private String orEmptyArray(String json) {

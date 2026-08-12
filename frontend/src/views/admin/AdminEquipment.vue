@@ -70,7 +70,7 @@
           <ImageUploader v-model="form.imageUrl" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="form.description" type="textarea" :rows="2" />
+          <RichEditor v-model="form.description" />
         </el-form-item>
         <el-form-item label="技术规格">
           <el-input v-model="form.specsText" placeholder="逗号分隔,如: 50MHz带宽,4通道" />
@@ -112,6 +112,7 @@ import {
   adminCreateEquipment, adminDeleteEquipment, adminUpdateEquipment, fetchEquipment, uploadDocFile
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
+import RichEditor from '../../components/RichEditor.vue'
 import { loadSiteConfig, siteConfig as site } from '../../utils/siteConfig'
 
 const items = ref([])

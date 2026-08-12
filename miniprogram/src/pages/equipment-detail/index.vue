@@ -50,7 +50,13 @@
     <!-- 描述 -->
     <view class="card block">
       <text class="section-title">📋 设备描述</text>
-      <text class="desc">{{ equip.description }}</text>
+      <template v-if="richDesc">
+        <template v-for="(seg, i) in richDesc" :key="i">
+          <rich-text v-if="seg.type === 'html'" class="rich-html" :nodes="seg.content" />
+          <video v-else class="rich-video" :src="seg.src" controls />
+        </template>
+      </template>
+      <text v-else class="desc">{{ equip.description }}</text>
     </view>
 
     <!-- 技术规格 -->
@@ -116,6 +122,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { fetchEquipmentDetail, fetchEquipmentFavorites, toggleEquipmentFavorite } from '@/api'
 import { fullUrl } from '@/config'
 import { asList } from '@/utils/format'
+import { prepareRich } from '@/utils/rich'
 
 const equip = ref(null)
 const imgFailed = ref(false)
@@ -124,6 +131,8 @@ const wished = ref(false)
 const canBorrow = computed(
   () => equip.value && equip.value.status === 'AVAILABLE' && equip.value.availableCount > 0
 )
+
+const richDesc = computed(() => prepareRich(equip.value?.description))
 
 const statusText = computed(() => {
   if (!equip.value) return ''
@@ -313,6 +322,19 @@ const goApply = () => {
   color: $text-main;
   line-height: 1.8;
   margin-top: 20rpx;
+}
+
+.rich-html {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.8;
+  margin-top: 20rpx;
+}
+
+.rich-video {
+  width: 100%;
+  border-radius: 16rpx;
+  margin: 16rpx 0;
 }
 
 .spec-grid {

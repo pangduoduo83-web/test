@@ -35,6 +35,7 @@ export const fetchDiscussions = (id) => http.get(`/projects/${id}/discussions`)
 export const postDiscussion = (id, data) => http.post(`/projects/${id}/discussions`, data)
 export const submitWork = (id, data) => http.post(`/projects/${id}/submissions`, data)
 export const fetchMySubmission = (id) => http.get(`/projects/${id}/submissions/mine`)
+export const fetchMySubmissions = (id) => http.get(`/projects/${id}/submissions/mine-all`)
 
 // ---------- 设备图书馆 ----------
 export const fetchEquipment = (params) => http.get('/equipment', { params })

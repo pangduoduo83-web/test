@@ -32,7 +32,8 @@ public class Equipment {
     @Column(length = 100)
     private String model;
 
-    @Column(length = 500)
+    /** 设备描述:支持富文本 HTML(含图片/视频),旧数据为纯文本 */
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     /** 开发板 / 仪器仪表 / 模块 / 工具 */

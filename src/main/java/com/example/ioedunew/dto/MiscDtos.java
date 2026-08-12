@@ -51,6 +51,9 @@ public class MiscDtos {
 
         /** 成果截图地址,可为空 */
         private String attachmentUrl;
+
+        /** 对应考核项名称;项目未设置考核项时留空 */
+        private String assessmentName;
     }
 
     @Data

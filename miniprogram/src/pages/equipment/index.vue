@@ -95,7 +95,7 @@
             </text>
           </view>
           <text class="model ellipsis">{{ e.model }} · {{ e.manufacturer }}</text>
-          <text class="desc ellipsis-2">{{ e.description }}</text>
+          <text class="desc ellipsis-2">{{ stripHtml(e.description) }}</text>
           <view class="specs">
             <text v-for="s in asList(e.specs).slice(0, 3)" :key="s" class="chip">{{ s }}</text>
           </view>
@@ -127,6 +127,7 @@ import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { fetchEquipment, fetchLocations, fetchEquipmentFavorites, toggleEquipmentFavorite } from '@/api'
 import { fullUrl } from '@/config'
 import { asList } from '@/utils/format'
+import { stripHtml } from '@/utils/rich'
 import { getToken } from '@/utils/auth'
 
 const statusOptions = [

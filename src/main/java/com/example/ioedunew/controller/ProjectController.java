@@ -97,6 +97,13 @@ public class ProjectController {
         return ApiResponse.ok(submissionService.mySubmission(auth(request).getId(), id));
     }
 
+    /** 我的全部提交(含各考核项),用于分阶段考核视图 */
+    @GetMapping("/{id}/submissions/mine-all")
+    public ApiResponse<java.util.List<Submission>> mySubmissions(@PathVariable Long id,
+                                                                 HttpServletRequest request) {
+        return ApiResponse.ok(submissionService.mySubmissions(auth(request).getId(), id));
+    }
+
     private AuthUser auth(HttpServletRequest request) {
         return (AuthUser) request.getAttribute(AuthUser.REQUEST_ATTR);
     }

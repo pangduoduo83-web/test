@@ -5,8 +5,65 @@
       <text class="p-sub muted">完成项目后在此提交成果,管理员评分 ≥60 分即判定项目完成并获得经验值</text>
     </view>
 
+    <!-- 分阶段考核模式 -->
+    <template v-if="assessments.length">
+      <view class="card block">
+        <view class="last-head">
+          <text class="section-title">🧮 分阶段考核({{ assessments.length }} 项)</text>
+          <text v-if="overallScore !== null" class="badge" :class="overallScore >= 60 ? 'badge-green' : 'badge-red'">
+            综合 {{ overallScore }} 分
+          </text>
+        </view>
+        <text class="muted assess-tip">每项单独评分,全部评完自动按权重计算综合分,≥60 判定项目完成</text>
+
+        <view v-for="a in assessments" :key="a.name" class="assess-item">
+          <view class="assess-head">
+            <text class="assess-name">{{ a.name }}</text>
+            <text class="chip">权重 {{ a.weight }}%</text>
+            <text v-if="latestFor(a.name)" class="badge"
+                  :class="latestFor(a.name).status === 'GRADED'
+                    ? (latestFor(a.name).score >= 60 ? 'badge-green' : 'badge-red') : 'badge-yellow'">
+              {{ latestFor(a.name).status === 'GRADED' ? `已评 ${latestFor(a.name).score}` : '评审中' }}
+            </text>
+            <text v-else class="badge badge-gray">未提交</text>
+          </view>
+          <text v-if="a.desc" class="assess-desc muted">{{ a.desc }}</text>
+          <view v-if="latestFor(a.name) && latestFor(a.name).feedback" class="assess-feedback">
+            评语:{{ latestFor(a.name).feedback }}
+          </view>
+          <button v-if="canSubmitFor(a.name)" class="assess-submit-btn"
+                  @click="toggleForm(a.name)">
+            {{ activeAssessment === a.name ? '收起' : latestFor(a.name) ? '再次提交' : '提交该项成果' }}
+          </button>
+
+          <view v-if="activeAssessment === a.name" class="assess-form">
+            <textarea
+              v-model="content"
+              class="field-textarea"
+              :placeholder="`描述「${a.name}」的完成情况...`"
+              placeholder-class="ph"
+              :maxlength="1000"
+            />
+            <view class="attach-row">
+              <view v-if="attachmentUrl" class="attach-preview">
+                <image :src="fullUrl(attachmentUrl)" class="attach-img" mode="aspectFill" @click="preview" />
+                <text class="attach-del" @click="attachmentUrl = ''">×</text>
+              </view>
+              <view v-else class="attach-add" @click="chooseShot">
+                <text class="attach-plus">+</text>
+                <text class="attach-text">成果截图(选填)</text>
+              </view>
+            </view>
+            <button class="btn-gradient" :disabled="submitting" @click="submit(a.name)">
+              {{ submitting ? '提交中...' : `提交「${a.name}」` }}
+            </button>
+          </view>
+        </view>
+      </view>
+    </template>
+
     <!-- 最近一次提交 -->
-    <view v-if="last" class="card block">
+    <view v-if="!assessments.length && last" class="card block">
       <view class="last-head">
         <text class="section-title">📄 最近一次提交</text>
         <text class="badge" :class="last.status === 'GRADED' ? 'badge-green' : 'badge-yellow'">
@@ -34,8 +91,8 @@
       <text class="last-time muted">提交于 {{ relativeTime(last.submittedAt) }}</text>
     </view>
 
-    <!-- 提交表单 -->
-    <view v-if="canSubmit" class="card block">
+    <!-- 提交表单(整体单一成果模式) -->
+    <view v-if="!assessments.length && canSubmit" class="card block">
       <text class="section-title">✍️ {{ last ? '再次提交' : '提交成果' }}</text>
       <textarea
         v-model="content"
@@ -54,12 +111,12 @@
           <text class="attach-text">成果截图(选填)</text>
         </view>
       </view>
-      <button class="btn-gradient" :disabled="submitting" @click="submit">
+      <button class="btn-gradient" :disabled="submitting" @click="submit('')">
         {{ submitting ? '提交中...' : '提交成果' }}
       </button>
     </view>
 
-    <view v-else-if="last && last.status === 'SUBMITTED'" class="card block waiting-card">
+    <view v-else-if="!assessments.length && last && last.status === 'SUBMITTED'" class="card block waiting-card">
       <text class="waiting-icon">⏳</text>
       <text class="waiting-text">成果评审中,请耐心等待管理员评分</text>
       <text class="muted">评分结果将通过站内通知告知</text>
@@ -70,23 +127,52 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { fetchMySubmission, submitWork } from '@/api'
+import { fetchMySubmission, fetchMySubmissions, fetchProjectDetail, submitWork } from '@/api'
 import { uploadImage } from '@/utils/request'
 import { fullUrl } from '@/config'
-import { relativeTime } from '@/utils/format'
+import { asList, relativeTime } from '@/utils/format'
 
 const projectId = ref(null)
 const projectTitle = ref('')
 const last = ref(null)
+const subs = ref([])
+const assessments = ref([])
+const activeAssessment = ref('')
 const content = ref('')
 const attachmentUrl = ref('')
 const submitting = ref(false)
 
 const canSubmit = computed(() => !last.value || last.value.status === 'GRADED')
 
+const latestFor = (name) => subs.value.find((s) => (s.assessmentName || '') === name) || null
+
+const canSubmitFor = (name) => {
+  const latest = latestFor(name)
+  return !latest || latest.status === 'GRADED'
+}
+
+const overallScore = computed(() => {
+  if (!assessments.value.length) return null
+  let total = 0
+  for (const a of assessments.value) {
+    const graded = subs.value.find(
+      (s) => (s.assessmentName || '') === a.name && s.status === 'GRADED')
+    if (!graded) return null
+    total += graded.score * a.weight / 100
+  }
+  return Math.round(total)
+})
+
+const toggleForm = (name) => {
+  activeAssessment.value = activeAssessment.value === name ? '' : name
+  content.value = ''
+  attachmentUrl.value = ''
+}
+
 const load = async () => {
   try {
     last.value = await fetchMySubmission(projectId.value)
+    subs.value = (await fetchMySubmissions(projectId.value)) || []
   } catch (e) {
     // 静默
   }
@@ -96,6 +182,11 @@ onLoad((options) => {
   projectId.value = options.projectId
   projectTitle.value = decodeURIComponent(options.title || '项目成果')
   load()
+  fetchProjectDetail(options.projectId)
+    .then((d) => {
+      assessments.value = asList(d.project?.assessments)
+    })
+    .catch(() => {})
 })
 
 const chooseShot = () => {
@@ -124,7 +215,7 @@ const previewLast = () => {
   uni.previewImage({ urls: [fullUrl(last.value.attachmentUrl)] })
 }
 
-const submit = async () => {
+const submit = async (assessName) => {
   if (!content.value.trim()) {
     uni.showToast({ title: '请填写成果说明', icon: 'none' })
     return
@@ -133,11 +224,13 @@ const submit = async () => {
   try {
     await submitWork(projectId.value, {
       content: content.value.trim(),
-      attachmentUrl: attachmentUrl.value || undefined
+      attachmentUrl: attachmentUrl.value || undefined,
+      assessmentName: assessName || undefined
     })
     uni.showToast({ title: '提交成功,等待评审', icon: 'success' })
     content.value = ''
     attachmentUrl.value = ''
+    activeAssessment.value = ''
     load()
   } catch (e) {
     // 已提示
@@ -313,6 +406,65 @@ const submit = async () => {
   align-items: center;
   gap: 12rpx;
   padding: 60rpx 32rpx;
+}
+
+/* ---- 分阶段考核 ---- */
+.assess-tip {
+  display: block;
+  font-size: 23rpx;
+  margin-top: 10rpx;
+}
+
+.assess-item {
+  border: 2rpx solid $border-color;
+  border-radius: 18rpx;
+  padding: 22rpx;
+  margin-top: 20rpx;
+}
+
+.assess-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.assess-name {
+  font-size: 29rpx;
+  font-weight: 600;
+}
+
+.assess-desc {
+  display: block;
+  font-size: 23rpx;
+  margin-top: 8rpx;
+}
+
+.assess-feedback {
+  margin-top: 12rpx;
+  background: $gray-bg;
+  border-radius: 12rpx;
+  padding: 14rpx 18rpx;
+  font-size: 24rpx;
+  color: $text-sub;
+}
+
+.assess-submit-btn {
+  margin-top: 16rpx;
+  background: $blue-bg;
+  color: $blue;
+  font-size: 25rpx;
+  border-radius: 14rpx;
+  padding: 12rpx 0;
+  line-height: 1.6;
+
+  &::after {
+    border: none;
+  }
+}
+
+.assess-form {
+  margin-top: 16rpx;
 }
 
 .waiting-icon {

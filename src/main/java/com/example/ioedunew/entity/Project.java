@@ -154,6 +154,12 @@ public class Project {
     @Column(columnDefinition = "TEXT")
     private String equipmentNames = "[]";
 
+    /** 成果考核项,JSON 数组字符串 [{name,weight,desc}],权重合计 100;空数组表示整体单一成果 */
+    @JsonRawValue
+    @JsonDeserialize(using = RawJsonStringDeserializer.class)
+    @Column(columnDefinition = "TEXT")
+    private String assessments = "[]";
+
     /** PUBLISHED / DRAFT */
     @Column(nullable = false, length = 20)
     private String status = "PUBLISHED";

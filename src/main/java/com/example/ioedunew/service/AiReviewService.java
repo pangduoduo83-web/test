@@ -80,6 +80,10 @@ public class AiReviewService {
         ObjectNode sub = input.putObject("submission");
         sub.put("content", cut(submission.getContent(), 1500));
         sub.put("hasAttachment", submission.getAttachmentUrl() != null && !submission.getAttachmentUrl().isEmpty());
+        if (submission.getAssessmentName() != null && !submission.getAssessmentName().isEmpty()) {
+            sub.put("assessmentName", submission.getAssessmentName());
+            sub.put("note", "本次仅评审该考核项对应的阶段成果,请针对该考核项的完成质量打分");
+        }
 
         Map<String, Object> result;
         try {
