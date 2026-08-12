@@ -39,6 +39,8 @@ export const fetchMySubmission = (id) => http.get(`/projects/${id}/submissions/m
 export const fetchEquipment = (params) => http.get('/equipment', { params })
 export const fetchEquipmentDetail = (id) => http.get(`/equipment/${id}`)
 export const fetchLocations = () => http.get('/equipment/locations')
+export const fetchEquipmentFavorites = () => http.get('/equipment/favorites')
+export const toggleEquipmentFavorite = (id) => http.post(`/equipment/${id}/favorite`)
 
 // ---------- 借阅 ----------
 export const applyBorrow = (data) => http.post('/borrows', data)
@@ -46,6 +48,7 @@ export const fetchMyBorrows = (params) => http.get('/borrows/mine', { params })
 export const fetchMyBorrowStats = () => http.get('/borrows/mine/stats')
 export const cancelBorrow = (id) => http.post(`/borrows/${id}/cancel`)
 export const requestReturn = (id) => http.post(`/borrows/${id}/return`)
+export const renewBorrow = (id) => http.post(`/borrows/${id}/renew`)
 
 // ---------- 个人中心 / 技能 / 通知 ----------
 export const fetchDashboard = () => http.get('/dashboard')

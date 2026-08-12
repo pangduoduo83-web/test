@@ -55,6 +55,9 @@
             @click="activeCategory = activeCategory === c.name ? '' : c.name">
         <component :is="c.icon" :size="14" /> {{ c.name }} <span class="pill-count">{{ c.count }}</span>
       </span>
+      <span class="pill wish-pill" :class="{ active: onlyWish }" @click="onlyWish = !onlyWish">
+        <Heart :size="14" :fill="onlyWish ? '#fff' : 'none'" /> 心愿单 <span class="pill-count">{{ wishlist.size }}</span>
+      </span>
     </div>
 
     <!-- 设备卡片 -->
@@ -265,7 +268,9 @@ import {
   CheckCircle, CircuitBoard, Eye, FileText, Folder, Gauge, Heart, LayoutGrid,
   MapPin, Radio, Search, SlidersHorizontal, Star, Thermometer, Wrench
 } from 'lucide-vue-next'
-import { applyBorrow, fetchEquipment, fetchLocations } from '../../api'
+import {
+  applyBorrow, fetchEquipment, fetchEquipmentFavorites, fetchLocations, toggleEquipmentFavorite
+} from '../../api'
 import { useAuthStore } from '../../stores/auth'
 
 const route = useRoute()
@@ -281,8 +286,29 @@ const agreementVisible = ref(false)
 const page = ref(1)
 const pageSize = 9
 
-// 心愿单:仅本地保存的收藏标记
-const wishlist = ref(new Set(JSON.parse(localStorage.getItem('ioedu_wishlist') || '[]')))
+// 心愿单:服务端保存,跨端同步(网页/小程序)
+const wishlist = ref(new Set())
+const onlyWish = ref(false)
+
+const loadWishlist = async () => {
+  try {
+    const ids = await fetchEquipmentFavorites()
+    wishlist.value = new Set(ids)
+    // 迁移旧版浏览器本地心愿单(仅执行一次)
+    const legacy = JSON.parse(localStorage.getItem('ioedu_wishlist') || '[]')
+    if (legacy.length) {
+      for (const id of legacy) {
+        if (!wishlist.value.has(id)) {
+          try {
+            await toggleEquipmentFavorite(id)
+            wishlist.value.add(id)
+          } catch (e) { /* 设备可能已删除,忽略 */ }
+        }
+      }
+      localStorage.removeItem('ioedu_wishlist')
+    }
+  } catch (e) { /* 心愿单加载失败不阻塞页面 */ }
+}
 
 const detailVisible = ref(false)
 const borrowVisible = ref(false)
@@ -320,18 +346,23 @@ const categories = computed(() => {
   }))
 })
 
-const filtered = computed(() => items.value.filter((e) =>
-  !activeCategory.value || e.category === activeCategory.value))
+const filtered = computed(() => items.value.filter((e) => {
+  if (activeCategory.value && e.category !== activeCategory.value) return false
+  if (onlyWish.value && !wishlist.value.has(e.id)) return false
+  return true
+}))
 
 const pageItems = computed(() =>
   filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 
-watch([activeCategory, items], () => { page.value = 1 })
+watch([activeCategory, items, onlyWish], () => { page.value = 1 })
 
-const toggleWish = (e) => {
-  if (wishlist.value.has(e.id)) wishlist.value.delete(e.id)
-  else wishlist.value.add(e.id)
-  localStorage.setItem('ioedu_wishlist', JSON.stringify([...wishlist.value]))
+const toggleWish = async (e) => {
+  try {
+    const { favorited } = await toggleEquipmentFavorite(e.id)
+    if (favorited) wishlist.value.add(e.id)
+    else wishlist.value.delete(e.id)
+  } catch (err) { /* 已提示 */ }
 }
 
 const load = async () => {
@@ -384,6 +415,7 @@ const doSubmit = async () => {
 onMounted(async () => {
   await load()
   locations.value = await fetchLocations()
+  loadWishlist()
 })
 </script>
 

@@ -75,6 +75,10 @@ public class BorrowRequest {
     @Column(nullable = false)
     private Boolean reminderSent = false;
 
+    /** 是否已续借(每单仅可续借一次,续借后重置到期提醒) */
+    @Column(nullable = false)
+    private Boolean renewed = false;
+
     @Column(nullable = false)
     private LocalDateTime appliedAt = LocalDateTime.now();
 

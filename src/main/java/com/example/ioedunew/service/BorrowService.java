@@ -114,6 +114,38 @@ public class BorrowService {
         borrowRepository.save(br);
     }
 
+    /**
+     * 续借:借用中且距到期不足 3 天(未逾期)可续借一次,
+     * 延长原借期天数(单次最长 14 天),并重置到期提醒。
+     */
+    @Transactional
+    public BorrowRequest renew(Long userId, Long requestId) {
+        BorrowRequest br = getOwned(userId, requestId);
+        if (!"APPROVED".equals(br.getStatus())) {
+            throw new BusinessException("仅借用中的记录可以续借");
+        }
+        if (Boolean.TRUE.equals(br.getRenewed())) {
+            throw new BusinessException("该借阅单已续借过一次,到期请归还");
+        }
+        java.time.LocalDate dueDate = br.getStartDate().plusDays(br.getDurationDays());
+        long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), dueDate);
+        if (daysLeft > 3) {
+            throw new BusinessException("距到期还有 " + daysLeft + " 天,到期前 3 天内才可续借");
+        }
+        if (daysLeft < 0) {
+            throw new BusinessException("该借阅单已逾期,请尽快归还后重新申请");
+        }
+        int extendDays = Math.min(br.getDurationDays(), 14);
+        br.setDurationDays(br.getDurationDays() + extendDays);
+        br.setRenewed(true);
+        br.setReminderSent(false);
+        borrowRepository.save(br);
+        notificationService.create(userId, "borrow", "续借成功",
+                "《" + br.getEquipmentName() + "》已续借 " + extendDays + " 天,新的到期日为 "
+                        + br.getStartDate().plusDays(br.getDurationDays()) + ",请按时归还。");
+        return br;
+    }
+
     // ---------- 管理端 ----------
 
     public List<BorrowRequest> listAll(String status) {

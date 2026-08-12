@@ -62,7 +62,7 @@ public class AuthService {
             s.setScore(30);
             skillScoreRepository.save(s);
         }
-        notificationService.create(user.getId(), "system", "欢迎加入设备图书馆",
+        notificationService.create(user.getId(), "system", "欢迎加入AI未来实践中心",
                 "完成一次能力测评,开启你的项目驱动学习之旅吧!");
         return new AuthDtos.AuthResponse(jwtUtil.createToken(user.getId(), user.getRole()), user);
     }

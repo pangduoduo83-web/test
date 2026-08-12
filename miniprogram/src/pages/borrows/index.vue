@@ -49,7 +49,10 @@
       <view v-for="b in filtered" :key="b.id" class="card borrow-card">
         <view class="bc-head">
           <text class="bc-no">{{ b.requestNo }}</text>
-          <text class="badge" :class="statusMeta(b.status).badge">{{ statusMeta(b.status).text }}</text>
+          <view class="bc-badges">
+            <text v-if="b.renewed" class="badge badge-gray">已续借</text>
+            <text class="badge" :class="statusMeta(b.status).badge">{{ statusMeta(b.status).text }}</text>
+          </view>
         </view>
         <view class="bc-title-row">
           <text class="bc-equip">{{ b.equipmentName }}</text>
@@ -65,9 +68,15 @@
         <view v-if="b.status === 'REJECTED' && b.rejectReason" class="reject-box">
           拒绝原因:{{ b.rejectReason }}
         </view>
+        <view v-if="b.status === 'APPROVED'" class="due-box" :class="{ overdue: daysLeft(b) < 0 }">
+          {{ daysLeft(b) < 0 ? `已逾期 ${-daysLeft(b)} 天,请尽快归还` : `${dueDate(b)} 到期 · 剩 ${daysLeft(b)} 天` }}
+        </view>
         <view v-if="b.status === 'PENDING' || b.status === 'APPROVED' || b.status === 'RETURN_REQUESTED'" class="bc-actions">
           <button v-if="b.status === 'PENDING'" class="action-btn cancel" @click="onCancel(b)">撤销申请</button>
-          <button v-else-if="b.status === 'APPROVED'" class="action-btn return" @click="onReturn(b)">申请归还</button>
+          <template v-else-if="b.status === 'APPROVED'">
+            <button v-if="canRenew(b)" class="action-btn renew" @click="onRenew(b)">续借</button>
+            <button class="action-btn return" @click="onReturn(b)">申请归还</button>
+          </template>
           <text v-else class="waiting muted">已提交归还,等待管理员验收</text>
         </view>
       </view>
@@ -79,8 +88,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
-import { fetchMyBorrows, cancelBorrow, requestReturn } from '@/api'
-import { relativeTime } from '@/utils/format'
+import { fetchMyBorrows, cancelBorrow, requestReturn, renewBorrow } from '@/api'
+import { relativeTime, formatDate } from '@/utils/format'
 import { getToken } from '@/utils/auth'
 
 const tabs = [
@@ -142,6 +151,41 @@ const onCancel = (b) => {
       try {
         await cancelBorrow(b.id)
         uni.showToast({ title: '已撤销', icon: 'success' })
+        load()
+      } catch (e) {
+        // 已提示
+      }
+    }
+  })
+}
+
+// ---------- 续借:到期前 3 天内可续借一次 ----------
+const dueDate = (b) => {
+  const d = new Date(String(b.startDate).replace(/-/g, '/'))
+  d.setDate(d.getDate() + b.durationDays)
+  return formatDate(d)
+}
+
+const daysLeft = (b) => {
+  const due = new Date(String(b.startDate).replace(/-/g, '/'))
+  due.setDate(due.getDate() + b.durationDays)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.round((due - today) / 86400000)
+}
+
+const canRenew = (b) => b.status === 'APPROVED' && !b.renewed && daysLeft(b) >= 0 && daysLeft(b) <= 3
+
+const onRenew = (b) => {
+  const extend = Math.min(b.durationDays, 14)
+  uni.showModal({
+    title: '续借',
+    content: `确认续借「${b.equipmentName}」?将延长 ${extend} 天,每单仅可续借一次`,
+    success: async (res) => {
+      if (!res.confirm) return
+      try {
+        await renewBorrow(b.id)
+        uni.showToast({ title: '续借成功', icon: 'success' })
         load()
       } catch (e) {
         // 已提示
@@ -300,6 +344,26 @@ onPullDownRefresh(async () => {
   padding: 14rpx 20rpx;
 }
 
+.bc-badges {
+  display: flex;
+  gap: 10rpx;
+}
+
+.due-box {
+  margin-top: 16rpx;
+  background: $yellow-bg;
+  color: $yellow;
+  font-size: 24rpx;
+  border-radius: 12rpx;
+  padding: 14rpx 20rpx;
+
+  &.overdue {
+    background: $red-bg;
+    color: $red;
+    font-weight: 600;
+  }
+}
+
 .bc-actions {
   margin-top: 20rpx;
   padding-top: 20rpx;
@@ -328,6 +392,11 @@ onPullDownRefresh(async () => {
   &.return {
     background: linear-gradient(90deg, #2563eb, #9333ea);
     color: #fff;
+  }
+
+  &.renew {
+    background: $blue-bg;
+    color: $blue;
   }
 }
 

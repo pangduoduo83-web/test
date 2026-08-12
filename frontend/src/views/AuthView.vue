@@ -99,12 +99,6 @@
           <a @click="isLogin = !isLogin">{{ isLogin ? '立即注册' : '立即登录' }}</a>
         </div>
 
-        <div class="divider"><span>其他登录方式</span></div>
-        <div class="third-party">
-          <span class="tp-btn tp-wechat" title="微信登录" @click="onThirdParty('微信')">微</span>
-          <span class="tp-btn tp-qq" title="QQ登录" @click="onThirdParty('QQ')">Q</span>
-          <span class="tp-btn tp-school" title="学校统一认证" @click="onThirdParty('学校统一认证')">学</span>
-        </div>
       </div>
     </div>
   </div>
@@ -165,10 +159,6 @@ const onForgot = () => {
     '忘记密码',
     { confirmButtonText: '知道了' }
   )
-}
-
-const onThirdParty = (name) => {
-  ElMessage.info(`${name}登录暂未开通,请使用邮箱账号登录`)
 }
 
 const submit = async () => {
@@ -317,25 +307,6 @@ const submit = async () => {
 
 .switch-line { text-align: center; margin-top: 18px; color: var(--text-secondary); font-size: 13px; }
 .switch-line a { color: var(--brand-blue); cursor: pointer; margin-left: 4px; font-weight: 500; }
-
-.divider {
-  display: flex; align-items: center; gap: 12px;
-  color: #9ca3af; font-size: 12px; margin: 24px 0 16px;
-}
-.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-
-.third-party { display: flex; justify-content: center; gap: 16px; }
-.tp-btn {
-  width: 42px; height: 42px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 14px; font-weight: 700; color: #fff;
-  box-shadow: 0 10px 15px -3px rgba(0,0,0,.15);
-  transition: transform .15s;
-}
-.tp-btn:hover { transform: scale(1.08); }
-.tp-wechat { background: #22c55e; }
-.tp-qq { background: #3b82f6; }
-.tp-school { background: #ef4444; }
 
 @media (max-width: 960px) {
   .brand-panel { display: none; }

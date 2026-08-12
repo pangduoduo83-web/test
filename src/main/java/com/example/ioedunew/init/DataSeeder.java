@@ -97,7 +97,7 @@ public class DataSeeder implements CommandLineRunner {
         seedEquipment();
         seedProjects();
 
-        notificationService.create(student.getId(), "system", "欢迎加入设备图书馆",
+        notificationService.create(student.getId(), "system", "欢迎加入AI未来实践中心",
                 "完成一次能力测评,开启你的项目驱动学习之旅吧!");
         notificationService.create(student.getId(), "project", "新项目上线:ESP32-S3 AI开发板",
                 "边缘 AI + 语音识别挑战项目已上线,快去项目中心看看!");

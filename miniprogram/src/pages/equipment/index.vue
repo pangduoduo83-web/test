@@ -39,6 +39,9 @@
       <view class="pill" :class="{ active: minRating > 0 }" @click="toggleRating">
         ★ {{ minRating > 0 ? minRating + '+' : '评分' }}
       </view>
+      <view class="pill" :class="{ active: onlyWish }" @click="onlyWish = !onlyWish">
+        {{ onlyWish ? '♥' : '♡' }} 心愿({{ wishIds.length }})
+      </view>
     </view>
 
     <scroll-view v-if="categories.length > 1" scroll-x class="cate-scroll" :show-scrollbar="false">
@@ -78,6 +81,11 @@
             <text class="thumb-icon">{{ e.icon || '🔧' }}</text>
           </view>
           <text class="badge status-badge" :class="statusBadge(e)">{{ statusText(e) }}</text>
+          <view class="wish-btn" @click.stop="onToggleWish(e)">
+            <text class="wish-icon" :class="{ wished: wishIds.includes(e.id) }">
+              {{ wishIds.includes(e.id) ? '♥' : '♡' }}
+            </text>
+          </view>
         </view>
         <view class="body">
           <view class="name-row">
@@ -116,7 +124,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
-import { fetchEquipment, fetchLocations } from '@/api'
+import { fetchEquipment, fetchLocations, fetchEquipmentFavorites, toggleEquipmentFavorite } from '@/api'
 import { fullUrl } from '@/config'
 import { asList } from '@/utils/format'
 import { getToken } from '@/utils/auth'
@@ -137,6 +145,8 @@ const items = ref([])
 const locations = ref([])
 const loading = ref(true)
 const failedImgs = ref({})
+const wishIds = ref([])
+const onlyWish = ref(false)
 let loadedOnce = false
 
 const locationRange = computed(() => ['全部位置', ...locations.value])
@@ -147,7 +157,11 @@ const categories = computed(() => {
 })
 
 const filtered = computed(() =>
-  items.value.filter((e) => (category.value === '全部' ? true : e.category === category.value))
+  items.value.filter((e) => {
+    if (category.value !== '全部' && e.category !== category.value) return false
+    if (onlyWish.value && !wishIds.value.includes(e.id)) return false
+    return true
+  })
 )
 
 const availableTotal = computed(() =>
@@ -208,6 +222,27 @@ const goApply = (e) => {
   uni.navigateTo({ url: `/pages/borrow-apply/index?equipmentId=${e.id}` })
 }
 
+const loadWishlist = () => {
+  fetchEquipmentFavorites()
+    .then((ids) => {
+      wishIds.value = ids || []
+    })
+    .catch(() => {})
+}
+
+const onToggleWish = async (e) => {
+  try {
+    const d = await toggleEquipmentFavorite(e.id)
+    if (d.favorited) {
+      wishIds.value = [...wishIds.value, e.id]
+    } else {
+      wishIds.value = wishIds.value.filter((id) => id !== e.id)
+    }
+  } catch (err) {
+    // 已提示
+  }
+}
+
 onShow(() => {
   if (!getToken()) {
     uni.reLaunch({ url: '/pages/auth/index' })
@@ -216,6 +251,7 @@ onShow(() => {
   if (!loadedOnce) {
     loadedOnce = true
     load()
+    loadWishlist()
     fetchLocations()
       .then((d) => {
         locations.value = d || []
@@ -353,6 +389,29 @@ onPullDownRefresh(async () => {
   position: absolute;
   top: 16rpx;
   left: 16rpx;
+}
+
+.wish-btn {
+  position: absolute;
+  bottom: 12rpx;
+  left: 12rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wish-icon {
+  font-size: 32rpx;
+  color: $text-light;
+  line-height: 1;
+
+  &.wished {
+    color: #ef4444;
+  }
 }
 
 .body {

@@ -88,7 +88,12 @@
           <div v-if="b.rejectReason" class="bi-reject">拒绝原因: {{ b.rejectReason }}</div>
         </div>
         <div class="bi-actions">
+          <span v-if="b.status === 'APPROVED'" class="bi-due" :class="{ overdue: daysLeft(b) < 0 }">
+            {{ daysLeft(b) < 0 ? `已逾期 ${-daysLeft(b)} 天` : `${dueDate(b)} 到期(剩 ${daysLeft(b)} 天)` }}
+            <el-tag v-if="b.renewed" size="small" type="info">已续借</el-tag>
+          </span>
           <el-button v-if="b.status === 'PENDING'" @click="doCancel(b)">撤销申请</el-button>
+          <el-button v-if="canRenew(b)" @click="doRenew(b)">续借</el-button>
           <el-button v-if="b.status === 'APPROVED'" type="primary" @click="doReturn(b)">申请归还</el-button>
           <span v-if="b.status === 'RETURN_REQUESTED'" class="bi-wait">等待归还验收...</span>
         </div>
@@ -116,7 +121,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CheckCircle, ClipboardList, Clock, Inbox, Package } from 'lucide-vue-next'
-import { cancelBorrow, fetchMyBorrows, requestReturn } from '../../api'
+import { cancelBorrow, fetchMyBorrows, renewBorrow, requestReturn } from '../../api'
 
 const tab = ref('ALL')
 const items = ref([])
@@ -179,6 +184,33 @@ const doReturn = async (b) => {
   await load()
 }
 
+// ---------- 续借:到期前 3 天内可续借一次 ----------
+const dueDate = (b) => {
+  const d = new Date(String(b.startDate).replace(/-/g, '/'))
+  d.setDate(d.getDate() + b.durationDays)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const daysLeft = (b) => {
+  const due = new Date(String(b.startDate).replace(/-/g, '/'))
+  due.setDate(due.getDate() + b.durationDays)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.round((due - today) / 86400000)
+}
+
+const canRenew = (b) =>
+  b.status === 'APPROVED' && !b.renewed && daysLeft(b) >= 0 && daysLeft(b) <= 3
+
+const doRenew = async (b) => {
+  const extend = Math.min(b.durationDays, 14)
+  await ElMessageBox.confirm(
+    `确认续借《${b.equipmentName}》?将延长 ${extend} 天,每单仅可续借一次。`, '续借')
+  await renewBorrow(b.id)
+  ElMessage.success('续借成功,注意新的到期时间')
+  await load()
+}
+
 onMounted(load)
 </script>
 
@@ -214,8 +246,10 @@ onMounted(load)
 .bi-cell-value { font-size: 13px; color: #374151; }
 .bi-cell-value.strong { font-weight: 600; color: #111827; }
 .bi-reject { font-size: 12px; color: #dc2626; margin-top: 8px; }
-.bi-actions { flex-shrink: 0; }
+.bi-actions { flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
 .bi-wait { font-size: 12px; color: var(--text-secondary); }
+.bi-due { font-size: 12px; color: #ca8a04; display: inline-flex; align-items: center; gap: 6px; }
+.bi-due.overdue { color: #dc2626; font-weight: 600; }
 
 .cta-banner {
   margin-top: 16px;

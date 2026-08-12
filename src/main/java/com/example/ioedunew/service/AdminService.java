@@ -10,6 +10,7 @@ import com.example.ioedunew.entity.SkillScore;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.BorrowRequestRepository;
 import com.example.ioedunew.repository.DiscussionRepository;
+import com.example.ioedunew.repository.EquipmentFavoriteRepository;
 import com.example.ioedunew.repository.EquipmentRepository;
 import com.example.ioedunew.repository.EnrollmentRepository;
 import com.example.ioedunew.repository.FavoriteRepository;
@@ -48,6 +49,7 @@ public class AdminService {
     private final DiscussionRepository discussionRepository;
     private final SkillScoreRepository skillScoreRepository;
     private final NotificationRepository notificationRepository;
+    private final EquipmentFavoriteRepository equipmentFavoriteRepository;
     private final ProjectService projectService;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
@@ -62,6 +64,7 @@ public class AdminService {
                         DiscussionRepository discussionRepository,
                         SkillScoreRepository skillScoreRepository,
                         NotificationRepository notificationRepository,
+                        EquipmentFavoriteRepository equipmentFavoriteRepository,
                         ProjectService projectService,
                         NotificationService notificationService,
                         ObjectMapper objectMapper) {
@@ -75,6 +78,7 @@ public class AdminService {
         this.discussionRepository = discussionRepository;
         this.skillScoreRepository = skillScoreRepository;
         this.notificationRepository = notificationRepository;
+        this.equipmentFavoriteRepository = equipmentFavoriteRepository;
         this.projectService = projectService;
         this.notificationService = notificationService;
         this.objectMapper = objectMapper;
@@ -108,6 +112,7 @@ public class AdminService {
         if (hasActive) {
             throw new BusinessException("该设备存在进行中的借阅,不能删除");
         }
+        equipmentFavoriteRepository.deleteByEquipmentId(id);
         equipmentRepository.deleteById(id);
     }
 
@@ -246,6 +251,7 @@ public class AdminService {
             throw new BusinessException(409, "该用户存在借阅、报名、成果或导师项目等核心关联,请改为禁用账号");
         }
         favoriteRepository.deleteByUserId(id);
+        equipmentFavoriteRepository.deleteByUserId(id);
         discussionRepository.deleteByUserId(id);
         skillScoreRepository.deleteByUserId(id);
         notificationRepository.deleteByUserId(id);

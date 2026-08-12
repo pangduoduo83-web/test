@@ -87,6 +87,10 @@
 
     <!-- 底部操作 -->
     <view class="action-bar">
+      <view class="fav-btn" @click="onToggleWish">
+        <text class="fav-icon" :class="{ faved: wished }">{{ wished ? '♥' : '♡' }}</text>
+        <text class="fav-text">{{ wished ? '已心愿' : '心愿' }}</text>
+      </view>
       <view class="stock-info">
         <text class="stock-num" :class="{ 'text-red': !canBorrow }">
           {{ canBorrow ? `可借 ${equip.availableCount} 台` : statusText }}
@@ -108,12 +112,13 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { fetchEquipmentDetail } from '@/api'
+import { fetchEquipmentDetail, fetchEquipmentFavorites, toggleEquipmentFavorite } from '@/api'
 import { fullUrl } from '@/config'
 import { asList } from '@/utils/format'
 
 const equip = ref(null)
 const imgFailed = ref(false)
+const wished = ref(false)
 
 const canBorrow = computed(
   () => equip.value && equip.value.status === 'AVAILABLE' && equip.value.availableCount > 0
@@ -133,7 +138,22 @@ const statusBadge = computed(() => {
 
 onLoad(async (options) => {
   equip.value = await fetchEquipmentDetail(options.id)
+  fetchEquipmentFavorites()
+    .then((ids) => {
+      wished.value = (ids || []).includes(equip.value.id)
+    })
+    .catch(() => {})
 })
+
+const onToggleWish = async () => {
+  try {
+    const d = await toggleEquipmentFavorite(equip.value.id)
+    wished.value = !!d.favorited
+    uni.showToast({ title: wished.value ? '已加入心愿单' : '已移出心愿单', icon: 'none' })
+  } catch (e) {
+    // 已提示
+  }
+}
 
 const goApply = () => {
   uni.navigateTo({ url: `/pages/borrow-apply/index?equipmentId=${equip.value.id}` })
@@ -350,10 +370,33 @@ const goApply = () => {
   box-shadow: 0 -4rpx 20rpx rgba(17, 24, 39, 0.06);
 }
 
+.fav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 90rpx;
+  flex-shrink: 0;
+}
+
+.fav-icon {
+  font-size: 44rpx;
+  line-height: 1.2;
+  color: $text-light;
+
+  &.faved {
+    color: #ef4444;
+  }
+}
+
+.fav-text {
+  font-size: 20rpx;
+  color: $text-sub;
+}
+
 .stock-info {
   display: flex;
   flex-direction: column;
-  width: 220rpx;
+  width: 200rpx;
 }
 
 .stock-num {

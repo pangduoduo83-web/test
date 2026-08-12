@@ -60,6 +60,12 @@ public class BorrowController {
         return ApiResponse.ok();
     }
 
+    /** 续借:到期前 3 天内可续借一次 */
+    @PostMapping("/{id}/renew")
+    public ApiResponse<BorrowRequest> renew(@PathVariable Long id, HttpServletRequest request) {
+        return ApiResponse.ok(borrowService.renew(auth(request).getId(), id));
+    }
+
     private AuthUser auth(HttpServletRequest request) {
         return (AuthUser) request.getAttribute(AuthUser.REQUEST_ATTR);
     }

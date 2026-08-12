@@ -25,12 +25,15 @@ export const fetchMySubmission = (id) => get(`/projects/${id}/submissions/mine`,
 export const fetchEquipment = (params) => get('/equipment', params)
 export const fetchEquipmentDetail = (id) => get(`/equipment/${id}`)
 export const fetchLocations = () => get('/equipment/locations', null, { silent: true })
+export const fetchEquipmentFavorites = () => get('/equipment/favorites', null, { silent: true })
+export const toggleEquipmentFavorite = (id) => post(`/equipment/${id}/favorite`)
 
 // ---------- 借阅 ----------
 export const applyBorrow = (data) => post('/borrows', data)
 export const fetchMyBorrows = (params) => get('/borrows/mine', params)
 export const cancelBorrow = (id) => post(`/borrows/${id}/cancel`)
 export const requestReturn = (id) => post(`/borrows/${id}/return`)
+export const renewBorrow = (id) => post(`/borrows/${id}/renew`)
 
 // ---------- 个人中心 / 技能 / 通知 ----------
 export const fetchDashboard = () => get('/dashboard')
