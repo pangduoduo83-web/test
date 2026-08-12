@@ -48,8 +48,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Bell, ClipboardCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Rocket,
-  ShieldCheck, UserRoundCheck, Users, Wrench
+  Bell, ClipboardCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
+  MessageSquareText, Rocket, ShieldCheck, UserRoundCheck, Users, Wrench
 } from 'lucide-vue-next'
 import { adminStats } from '../../api'
 import { useAuthStore } from '../../stores/auth'
@@ -67,6 +67,7 @@ const menus = [
   { path: '/admin/enrollments', icon: UserRoundCheck, title: '报名进度' },
   { path: '/admin/submissions', icon: ClipboardCheck, title: '成果评审' },
   { path: '/admin/notifications', icon: Bell, title: '通知管理' },
+  { path: '/admin/discussions', icon: MessageSquareText, title: '讨论管理' },
   { path: '/admin/users', icon: Users, title: '用户管理' }
 ]
 

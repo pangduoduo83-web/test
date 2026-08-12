@@ -10,5 +10,9 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
 
     List<Discussion> findByProjectIdOrderByCreatedAtDesc(Long projectId);
 
+    List<Discussion> findAllByOrderByCreatedAtDesc();
+
+    List<Discussion> findByParentId(Long parentId);
+
     void deleteByUserId(Long userId);
 }

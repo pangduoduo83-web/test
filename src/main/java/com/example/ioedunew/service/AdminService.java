@@ -2,6 +2,7 @@ package com.example.ioedunew.service;
 
 import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.dto.AdminDtos;
+import com.example.ioedunew.entity.Discussion;
 import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.Equipment;
 import com.example.ioedunew.entity.Project;
@@ -407,6 +408,33 @@ public class AdminService {
 
     private String cleanNullable(String value) {
         return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    // ---------- 讨论管理 ----------
+
+    public List<Discussion> listDiscussions(Long projectId, String keyword) {
+        String kw = keyword == null ? "" : keyword.trim().toLowerCase();
+        return discussionRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(d -> projectId == null || projectId.equals(d.getProjectId()))
+                .filter(d -> kw.isEmpty() || contains(d.getContent(), kw) || contains(d.getUserName(), kw))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 删除讨论:删除主题帖时级联删除其全部回复,返回实际删除的条数。
+     */
+    @Transactional
+    public int deleteDiscussion(Long id) {
+        Discussion discussion = discussionRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(404, "讨论不存在"));
+        int removed = 1;
+        if (discussion.getParentId() == null) {
+            List<Discussion> replies = discussionRepository.findByParentId(discussion.getId());
+            removed += replies.size();
+            discussionRepository.deleteAll(replies);
+        }
+        discussionRepository.delete(discussion);
+        return removed;
     }
 
     private boolean contains(String value, String keyword) {

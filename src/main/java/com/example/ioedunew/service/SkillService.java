@@ -20,9 +20,11 @@ import java.util.Map;
 public class SkillService {
 
     private final SkillScoreRepository skillScoreRepository;
+    private final AiPlanService aiPlanService;
 
-    public SkillService(SkillScoreRepository skillScoreRepository) {
+    public SkillService(SkillScoreRepository skillScoreRepository, AiPlanService aiPlanService) {
         this.skillScoreRepository = skillScoreRepository;
+        this.aiPlanService = aiPlanService;
     }
 
     public Map<String, Object> summary(Long userId) {
@@ -58,6 +60,8 @@ public class SkillService {
             s.setUpdatedAt(LocalDateTime.now());
             skillScoreRepository.save(s);
         }
+        // 技能画像变化后,AI 学习计划缓存立即失效
+        aiPlanService.evict(userId);
         return summary(userId);
     }
 

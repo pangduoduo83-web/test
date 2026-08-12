@@ -94,3 +94,10 @@ export const adminDeleteUser = (id) => http.delete(`/admin/users/${id}`)
 export const adminListNotifications = (params) => http.get('/admin/notifications', { params })
 export const adminSendNotification = (data) => http.post('/admin/notifications', data)
 export const adminDeleteNotification = (id) => http.delete(`/admin/notifications/${id}`)
+export const adminListDiscussions = (params) => http.get('/admin/discussions', { params })
+export const adminDeleteDiscussion = (id) => http.delete(`/admin/discussions/${id}`)
+export const adminAiReview = (id) => http.post(`/admin/submissions/${id}/ai-review`)
+
+// ---------- AI 学习规划师 ----------
+export const fetchAiPlan = () => http.get('/ai/learning-plan')
+export const generateAiPlan = (data) => http.post('/ai/learning-plan/generate', data)

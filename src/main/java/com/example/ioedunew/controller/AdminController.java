@@ -6,6 +6,7 @@ import com.example.ioedunew.dto.AdminDtos;
 import com.example.ioedunew.dto.BorrowDtos;
 import com.example.ioedunew.dto.MiscDtos;
 import com.example.ioedunew.entity.BorrowRequest;
+import com.example.ioedunew.entity.Discussion;
 import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.Equipment;
 import com.example.ioedunew.entity.Notification;
@@ -14,6 +15,7 @@ import com.example.ioedunew.entity.Submission;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.ProjectRepository;
 import com.example.ioedunew.service.AdminService;
+import com.example.ioedunew.service.AiReviewService;
 import com.example.ioedunew.service.AuthService;
 import com.example.ioedunew.service.BorrowService;
 import com.example.ioedunew.service.NotificationService;
@@ -51,13 +53,16 @@ public class AdminController {
     private final TeacherService teacherService;
     private final NotificationService notificationService;
 
+    private final AiReviewService aiReviewService;
+
     public AdminController(AdminService adminService,
                            BorrowService borrowService,
                            AuthService authService,
                            ProjectRepository projectRepository,
                            SubmissionService submissionService,
                            TeacherService teacherService,
-                           NotificationService notificationService) {
+                           NotificationService notificationService,
+                           AiReviewService aiReviewService) {
         this.adminService = adminService;
         this.borrowService = borrowService;
         this.authService = authService;
@@ -65,6 +70,7 @@ public class AdminController {
         this.submissionService = submissionService;
         this.teacherService = teacherService;
         this.notificationService = notificationService;
+        this.aiReviewService = aiReviewService;
     }
 
     // ---------- 数据看板 ----------
@@ -86,6 +92,12 @@ public class AdminController {
                                                       @RequestParam(required = false) Long userId,
                                                       @RequestParam(required = false) Long projectId) {
         return ApiResponse.ok(submissionService.listAll(status, userId, projectId));
+    }
+
+    /** AI 预评审:给出建议分与评语草稿,仅供教师参考 */
+    @PostMapping("/submissions/{id}/ai-review")
+    public ApiResponse<Map<String, Object>> aiReview(@PathVariable Long id) {
+        return ApiResponse.ok(aiReviewService.review(id));
     }
 
     @PostMapping("/submissions/{id}/grade")
@@ -231,6 +243,19 @@ public class AdminController {
                                         @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
         adminService.deleteUser(id, user.getId());
         return ApiResponse.ok();
+    }
+
+    // ---------- 讨论管理 ----------
+
+    @GetMapping("/discussions")
+    public ApiResponse<List<Discussion>> discussions(@RequestParam(required = false) Long projectId,
+                                                     @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(adminService.listDiscussions(projectId, keyword));
+    }
+
+    @DeleteMapping("/discussions/{id}")
+    public ApiResponse<Integer> deleteDiscussion(@PathVariable Long id) {
+        return ApiResponse.ok(adminService.deleteDiscussion(id));
     }
 
     // ---------- 通知管理 ----------

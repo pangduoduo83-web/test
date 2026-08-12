@@ -76,6 +76,18 @@
         <el-descriptions-item label="项目">{{ grading?.projectTitle }}</el-descriptions-item>
         <el-descriptions-item label="成果">{{ grading?.content }}</el-descriptions-item>
       </el-descriptions>
+      <div class="ai-review-bar">
+        <el-button size="small" :loading="aiReviewing" @click="runAiReview">
+          ✨ AI 预评审(生成建议分+评语草稿)
+        </el-button>
+        <span v-if="aiResult" class="ai-review-tip">建议 {{ aiResult.suggestedScore }} 分,已填入下方,可修改</span>
+      </div>
+      <div v-if="aiResult" class="ai-review-box">
+        <div class="ai-review-summary">{{ aiResult.summary }}</div>
+        <div v-if="aiResult.strengths?.length" class="ai-review-line good">✓ {{ aiResult.strengths.join(';') }}</div>
+        <div v-if="aiResult.weaknesses?.length" class="ai-review-line bad">△ {{ aiResult.weaknesses.join(';') }}</div>
+        <div class="ai-review-note">{{ aiResult.note }}</div>
+      </div>
       <el-form :model="gradeForm" label-width="70px">
         <el-form-item label="分数">
           <el-input-number v-model="gradeForm.score" :min="0" :max="100" />
@@ -96,7 +108,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  adminGradeSubmission, adminListProjects, adminListSubmissions, adminListUsers
+  adminAiReview, adminGradeSubmission, adminListProjects, adminListSubmissions, adminListUsers
 } from '../../api'
 
 const items = ref([])
@@ -107,6 +119,21 @@ const gradeVisible = ref(false)
 const grading = ref(null)
 const gradeForm = reactive({ score: 80, feedback: '' })
 const saving = ref(false)
+const aiReviewing = ref(false)
+const aiResult = ref(null)
+
+const runAiReview = async () => {
+  aiReviewing.value = true
+  try {
+    const res = await adminAiReview(grading.value.id)
+    aiResult.value = res
+    gradeForm.score = res.suggestedScore
+    if (res.feedbackDraft) gradeForm.feedback = res.feedbackDraft
+    ElMessage.success('AI 预评审完成,建议已填入,可自行调整')
+  } catch (e) { /* 已提示 */ } finally {
+    aiReviewing.value = false
+  }
+}
 const page = ref(1)
 const pageSize = 10
 
@@ -130,6 +157,7 @@ const openGrade = (row) => {
   grading.value = row
   gradeForm.score = 80
   gradeForm.feedback = ''
+  aiResult.value = null
   gradeVisible.value = true
 }
 
@@ -163,4 +191,16 @@ onMounted(async () => {
 .ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pager { display: flex; justify-content: flex-end; margin-top: 14px; }
 .submission-info { margin-bottom: 20px; }
+.ai-review-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ai-review-tip { font-size: 12px; color: #9333ea; }
+.ai-review-box {
+  background: linear-gradient(to right, #faf5ff, #eff6ff);
+  border: 1px solid #e9d5ff; border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 14px; font-size: 13px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ai-review-summary { color: #6b21a8; }
+.ai-review-line.good { color: #16a34a; }
+.ai-review-line.bad { color: #ca8a04; }
+.ai-review-note { font-size: 11px; color: #9ca3af; }
 </style>

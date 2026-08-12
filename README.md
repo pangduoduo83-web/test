@@ -8,13 +8,34 @@
 |---|---|
 | 后端 | Spring Boot 2.6.13 + Java 8 + MySQL 8 + Spring Data JPA + JWT |
 | 前端 | Vue 3 + Vite 5 + Element Plus + Pinia + Vue Router 4 + ECharts |
+| 小程序端 | uni-app (Vue 3 + Vite) 微信小程序,学生/教师/管理员三端,复用同一套后端接口 |
 
 ## 功能
 
-- **学生端** `/app`:个人中心(实践统计/学习趋势/成就)、项目中心(浏览/报名/收藏/进度)、设备图书馆(筛选/详情/三步借阅申请)、借阅管理(撤销/归还)、技能评估(雷达图/测评/学习建议)、站内通知
+- **学生端** `/app`:个人中心(实践统计/学习趋势/成就)、项目中心(浏览/报名/收藏/进度)、成果提交(截图上传/查看评分评语)、设备图书馆(筛选/详情/三步借阅申请)、借阅管理(撤销/归还)、技能评估(雷达图/测评/学习建议)、站内通知
 - **教师端** `/teacher`:教学工作台(名下项目统计)、教学资源管理(真实附件上传,学生端可直接下载)、更换项目封面、学生报名进度查看
-- **管理员端** `/admin`:数据看板(趋势图/设备利用率)、设备管理 CRUD、借阅审批(批准/拒绝/归还验收,联动库存)、项目管理 CRUD(指派讲师)、用户管理(禁用/三级角色)
+- **管理员端** `/admin`:数据看板(趋势图/设备利用率)、设备管理 CRUD、借阅审批(批准/拒绝/归还验收,联动库存)、项目管理 CRUD(指派讲师)、报名进度管理、成果评审、通知管理(群发/删除)、讨论管理(删帖级联回复)、用户管理(新建/重置密码/禁用/删除/三级角色)
 - **落地页** `/` 与登录注册 `/auth`
+
+## AI 功能(网页端与小程序端同步支持)
+
+- **AI 学习规划师**(技能评估页):基于六维技能画像与项目库,后端先确定性计算项目匹配分,大模型在候选内生成学习画像总结、重点提升维度与「基础补强 → 综合实践 → 挑战提升」三阶段项目路线;AI 不可用时自动降级为智能匹配结果
+- **AI 成果预评审**(管理端评分弹窗):AI 阅读学生成果说明,给出建议分、亮点/不足与评语草稿,自动填入评分表单,最终由教师确认修改
+- **稳定性**:服务端代理调用(密钥不出后端)、结果结构校验与项目 ID 白名单、每用户限流(3次/小时)、10 分钟缓存、超时+熔断+规则降级
+
+### 配置(不配则 AI 自动降级,平台其余功能不受影响)
+
+```bash
+# 本地开发:设置环境变量后启动后端
+IOEDU_AI_API_KEY=sk-xxx                        # 必填,DeepSeek 或通义千问的 API Key
+IOEDU_AI_BASE_URL=https://api.deepseek.com     # 选填,默认 DeepSeek
+IOEDU_AI_MODEL=deepseek-chat                   # 选填,默认 deepseek-chat
+
+# Docker 部署:项目根目录 .env 文件写 AI_API_KEY=sk-xxx(可选 AI_BASE_URL / AI_MODEL)
+```
+
+通义千问填法:`IOEDU_AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode`、`IOEDU_AI_MODEL=qwen-plus`。
+本地联调可不买 Key:先 `node scripts/mock-ai-server.mjs` 起模拟模型,再以 `IOEDU_AI_BASE_URL=http://localhost:9281`、`IOEDU_AI_API_KEY=mock-key` 启动后端。
 
 ## 快速启动
 
@@ -43,6 +64,16 @@ npm run dev
 ```
 
 浏览器访问 http://localhost:5173 ,开发代理已把 `/api` 转发到 8080。
+
+### 4. 微信小程序端(可选)
+
+```bash
+cd miniprogram
+npm install
+npm run dev:mp-weixin
+```
+
+微信开发者工具导入 `miniprogram/dist/dev/mp-weixin`,本地设置勾选「不校验合法域名」即可联调,详见 `miniprogram/README.md`。
 
 ## Docker 一键部署(生产)
 
@@ -86,6 +117,7 @@ IOEDU-New/
 │   ├── application.properties
 │   └── seed/         # 项目与设备种子 JSON
 ├── frontend/         # Vue 3 前端(学生端 + 管理端)
+├── miniprogram/      # uni-app 微信小程序端(学生/教师/管理员)
 └── IoeduFront/       # 旧 Vue2 脚手架(已废弃,可删除)
 ```
 

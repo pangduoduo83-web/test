@@ -114,6 +114,42 @@
       <el-progress :percentage="detail.enrollment.progress" :stroke-width="10" color="#3b82f6" />
     </div>
 
+    <!-- 项目成果(已报名时) -->
+    <div v-if="detail.enrollment" class="card submission-card">
+      <div class="pg-head">
+        <b>项目成果</b>
+        <span v-if="mySubmission" class="badge"
+              :class="mySubmission.status === 'GRADED' ? (mySubmission.score >= 60 ? 'badge-green' : 'badge-red') : 'badge-yellow'">
+          {{ mySubmission.status === 'GRADED' ? `已评分 ${mySubmission.score} 分` : '评审中' }}
+        </span>
+        <span v-else class="pg-meta">完成项目后提交成果,评分 ≥60 分自动判定项目完成并获得经验值</span>
+      </div>
+
+      <div v-if="mySubmission" class="sub-last">
+        <div class="sub-content">{{ mySubmission.content }}</div>
+        <img v-if="mySubmission.attachmentUrl" :src="mySubmission.attachmentUrl" class="sub-shot" alt="成果截图" />
+        <div v-if="mySubmission.status === 'GRADED'" class="sub-grade" :class="{ pass: mySubmission.score >= 60 }">
+          <b>{{ mySubmission.score >= 60 ? '评审通过,项目判定完成!' : '未达标,可修改后再次提交。' }}</b>
+          <template v-if="mySubmission.feedback">评语: {{ mySubmission.feedback }}</template>
+          <span class="sub-meta">{{ mySubmission.graderName }} 评于 {{ fmtTime(mySubmission.gradedAt) }}</span>
+        </div>
+        <div v-else class="sub-waiting">已提交,等待管理员评审 · {{ fmtTime(mySubmission.submittedAt) }}</div>
+      </div>
+
+      <div v-if="canSubmitWork" class="sub-form">
+        <el-input v-model="workContent" type="textarea" :rows="3" maxlength="1000" show-word-limit
+                  :placeholder="mySubmission ? '修改完善后可再次提交...' : '描述你的实现思路、完成情况与心得...'" />
+        <div class="sub-form-row">
+          <div class="sub-uploader">
+            <ImageUploader v-model="workShot" />
+          </div>
+          <el-button type="primary" :loading="submittingWork" class="sub-submit" @click="doSubmitWork">
+            {{ mySubmission ? '再次提交成果' : '提交成果' }}
+          </el-button>
+        </div>
+      </div>
+    </div>
+
     <!-- 内容 tabs -->
     <div class="card">
       <el-tabs v-model="tab">
@@ -274,7 +310,11 @@ import {
   ArrowLeft, Check, ClipboardList, Clock, DollarSign, Download, Eye, FileText,
   GitFork, Heart, Pin, Share2, Star, Target, User, Users, Wrench, Zap
 } from 'lucide-vue-next'
-import { enrollProject, fetchDiscussions, fetchProjectDetail, fetchSkills, postDiscussion, toggleFavorite } from '../../api'
+import {
+  enrollProject, fetchDiscussions, fetchMySubmission, fetchProjectDetail, fetchSkills,
+  postDiscussion, submitWork, toggleFavorite
+} from '../../api'
+import ImageUploader from '../../components/ImageUploader.vue'
 
 const route = useRoute()
 const detail = ref({ project: null, enrolled: false, favorited: false, enrollment: null })
@@ -287,6 +327,10 @@ const newTopic = ref('')
 const replyTarget = ref(null)
 const replyContent = ref('')
 const posting = ref(false)
+const mySubmission = ref(null)
+const workContent = ref('')
+const workShot = ref('')
+const submittingWork = ref(false)
 
 const fmtTime = (t) => (t || '').replace('T', ' ').slice(0, 16)
 const fmtNum = (n) => {
@@ -303,6 +347,36 @@ const mySkill = (name) => {
   return s ? s.score : 0
 }
 
+const canSubmitWork = computed(() =>
+  detail.value.enrollment && (!mySubmission.value || mySubmission.value.status === 'GRADED'))
+
+const loadSubmission = async () => {
+  if (!detail.value.enrolled) return
+  try {
+    mySubmission.value = await fetchMySubmission(route.params.id)
+  } catch (e) { /* 成果加载失败不阻塞详情 */ }
+}
+
+const doSubmitWork = async () => {
+  if (!workContent.value.trim()) {
+    ElMessage.warning('请填写成果说明')
+    return
+  }
+  submittingWork.value = true
+  try {
+    await submitWork(route.params.id, {
+      content: workContent.value.trim(),
+      attachmentUrl: workShot.value || undefined
+    })
+    ElMessage.success('提交成功,等待管理员评审')
+    workContent.value = ''
+    workShot.value = ''
+    await loadSubmission()
+  } catch (e) { /* 已提示 */ } finally {
+    submittingWork.value = false
+  }
+}
+
 const load = async () => {
   detail.value = await fetchProjectDetail(route.params.id)
   try {
@@ -312,6 +386,7 @@ const load = async () => {
   try {
     topics.value = await fetchDiscussions(route.params.id)
   } catch (e) { /* 讨论加载失败不阻塞详情 */ }
+  loadSubmission()
 }
 
 const submitTopic = async () => {
@@ -466,6 +541,25 @@ onMounted(load)
 .progress-bar-card { padding: 16px 20px; margin-bottom: 16px; }
 .pg-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 14px; }
 .pg-meta { font-size: 12px; color: var(--text-secondary); }
+
+.submission-card { padding: 16px 20px; margin-bottom: 16px; }
+.sub-last { margin-bottom: 14px; }
+.sub-content {
+  background: #f9fafb; border-radius: 10px; padding: 12px 14px;
+  font-size: 13px; line-height: 1.7; white-space: pre-wrap;
+}
+.sub-shot { max-width: 320px; border-radius: 10px; margin-top: 10px; display: block; }
+.sub-grade {
+  margin-top: 10px; padding: 10px 14px; border-radius: 10px;
+  background: #fee2e2; font-size: 13px; display: flex; flex-direction: column; gap: 4px;
+}
+.sub-grade.pass { background: #dcfce7; }
+.sub-meta { font-size: 12px; color: var(--text-secondary); }
+.sub-waiting { margin-top: 10px; font-size: 13px; color: #ca8a04; }
+.sub-form { display: flex; flex-direction: column; gap: 12px; }
+.sub-form-row { display: flex; gap: 14px; align-items: flex-start; }
+.sub-uploader { width: 220px; flex-shrink: 0; }
+.sub-submit { margin-left: auto; }
 
 h4 { margin: 20px 0 10px; font-size: 15px; }
 h4:first-child { margin-top: 6px; }

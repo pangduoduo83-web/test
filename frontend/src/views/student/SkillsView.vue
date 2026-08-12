@@ -72,6 +72,72 @@
       </div>
     </div>
 
+    <!-- AI 学习规划师 -->
+    <div class="card ai-card">
+      <div class="ai-head">
+        <h3 class="suggest-head"><Sparkles :size="17" color="#9333ea" /> AI 学习规划师</h3>
+        <div class="ai-form">
+          <el-input v-model="aiGoal" placeholder="学习目标(选填),如:想做一个物联网作品" maxlength="100"
+                    style="width:280px" size="small" />
+          <el-select v-model="aiHours" size="small" style="width:132px">
+            <el-option v-for="h in [4, 6, 8, 10, 15]" :key="h" :label="`每周 ${h} 小时`" :value="h" />
+          </el-select>
+          <el-button type="primary" size="small" :loading="aiLoading" @click="genPlan">
+            {{ plan ? '重新生成' : '生成 AI 学习路线' }}
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="!plan && !aiLoading" class="ai-empty">
+        基于你的六维技能画像与全部实战项目,AI 将为你规划「基础补强 → 综合实践 → 挑战提升」三阶段学习路线
+      </div>
+      <div v-else-if="aiLoading" class="ai-empty">正在分析技能画像与项目库,大约需要 10~20 秒...</div>
+
+      <template v-if="plan && !aiLoading">
+        <div class="ai-summary">{{ plan.summary }}</div>
+
+        <div v-if="plan.focusSkills?.length" class="ai-focus-row">
+          <div v-for="f in plan.focusSkills" :key="f.name" class="ai-focus">
+            <div class="ai-focus-top">
+              <b>{{ f.name }}</b>
+              <span class="ai-focus-score">{{ f.currentScore }} → {{ f.targetScore }}</span>
+            </div>
+            <span class="ai-focus-reason">{{ f.reason }}</span>
+          </div>
+        </div>
+
+        <div class="ai-stages">
+          <div v-for="p in plan.recommendedProjects" :key="p.projectId" class="ai-stage">
+            <div class="ai-stage-rail">
+              <span class="ai-stage-dot">{{ p.stage }}</span>
+              <span class="ai-stage-line" />
+            </div>
+            <div class="ai-proj">
+              <div class="ai-proj-head">
+                <span class="ai-stage-name">{{ stageName(p.stage) }}</span>
+                <b class="ai-proj-title">{{ p.title }}</b>
+                <span class="badge" :class="diffBadge(p.difficulty)">{{ p.difficulty }}</span>
+                <span class="ai-match">匹配度 {{ p.matchScore }}%</span>
+              </div>
+              <ul class="ai-reasons">
+                <li v-for="(r, i) in p.reasons" :key="i">{{ r }}</li>
+              </ul>
+              <div v-if="p.skillGaps?.length" class="ai-gaps">待补齐: {{ p.skillGaps.join(' / ') }}</div>
+              <div class="ai-next">
+                <span class="ai-next-text">下一步: {{ p.nextAction }}</span>
+                <el-button size="small" type="primary" plain @click="goProject(p.projectId)">查看项目</el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ai-meta">
+          {{ plan.source === 'AI' ? '✨ 由 AI 结合智能匹配生成' : '⚙️ AI 服务未启用,已使用智能匹配结果' }}
+          · {{ plan.generatedAt }}{{ plan.cached ? ' (缓存)' : '' }} · 结果仅供学习参考
+        </div>
+      </template>
+    </div>
+
     <!-- 测评弹窗 -->
     <el-dialog v-model="assessVisible" title="能力测评" width="520px">
       <p class="assess-tip">请根据你的实际情况,拖动滑块自评各项技能掌握程度(0-100)。</p>
@@ -89,13 +155,15 @@
 
 <script setup>
 import { nextTick, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import {
-  Activity, BookOpen, CircuitBoard, Code, Cpu, Radio, Target, Wrench, Zap
+  Activity, BookOpen, CircuitBoard, Code, Cpu, Radio, Sparkles, Target, Wrench, Zap
 } from 'lucide-vue-next'
-import { fetchSkills, submitAssessment } from '../../api'
+import { fetchAiPlan, fetchSkills, generateAiPlan, submitAssessment } from '../../api'
 
+const router = useRouter()
 const data = reactive({ skills: [], overall: 0, suggestions: [] })
 const radarRef = ref(null)
 const lineRef = ref(null)
@@ -104,6 +172,38 @@ const submitting = ref(false)
 const assessForm = reactive({})
 let radarChart = null
 let lineChart = null
+
+// AI 学习规划师
+const plan = ref(null)
+const aiGoal = ref('')
+const aiHours = ref(6)
+const aiLoading = ref(false)
+
+const stageName = (s) => (s === 1 ? '基础补强' : s === 2 ? '综合实践' : '挑战提升')
+const diffBadge = (d) => (d === '入门' ? 'badge-green' : d === '进阶' ? 'badge-purple' : 'badge-red')
+
+const goProject = (id) => router.push(`/app/projects/${id}`)
+
+const loadPlan = async () => {
+  try {
+    plan.value = await fetchAiPlan()
+  } catch (e) { /* 静默 */ }
+}
+
+const genPlan = async () => {
+  aiLoading.value = true
+  try {
+    plan.value = await generateAiPlan({
+      goal: aiGoal.value.trim() || undefined,
+      weeklyHours: aiHours.value
+    })
+    if (plan.value?.source === 'RULE_FALLBACK') {
+      ElMessage.info('AI 服务未启用或繁忙,已使用智能匹配结果')
+    }
+  } catch (e) { /* 已提示 */ } finally {
+    aiLoading.value = false
+  }
+}
 
 // 技能维度静态元数据:图标 / 说明 / 子技能拆解
 const skillMeta = {
@@ -230,13 +330,17 @@ const submitAssess = async () => {
     Object.assign(data, res)
     renderCharts()
     assessVisible.value = false
-    ElMessage.success('测评完成,技能画像已更新!')
+    plan.value = null
+    ElMessage.success('测评完成,技能画像已更新!可重新生成 AI 学习路线')
   } catch (e) { /* 已提示 */ } finally {
     submitting.value = false
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadPlan()
+})
 window.addEventListener('resize', () => { radarChart?.resize(); lineChart?.resize() })
 </script>
 
@@ -306,6 +410,53 @@ window.addEventListener('resize', () => { radarChart?.resize(); lineChart?.resiz
   border: 1px solid #dbeafe;
   border-radius: 12px; padding: 14px 16px; font-size: 14px; color: #1e40af;
 }
+
+.ai-card { margin-top: 16px; }
+.ai-card h3 { margin: 0; }
+.ai-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.ai-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ai-empty {
+  background: linear-gradient(to right, #faf5ff, #eff6ff);
+  border: 1px dashed #e9d5ff;
+  border-radius: 12px; padding: 18px; font-size: 13px; color: #7e22ce; text-align: center;
+}
+.ai-summary {
+  background: linear-gradient(to right, #faf5ff, #eff6ff);
+  border: 1px solid #e9d5ff;
+  border-radius: 12px; padding: 14px 16px; font-size: 14px; color: #6b21a8; line-height: 1.7;
+}
+.ai-focus-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.ai-focus {
+  flex: 1; min-width: 200px; background: #f9fafb; border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px; font-size: 13px;
+}
+.ai-focus-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.ai-focus-score { color: #9333ea; font-weight: 700; }
+.ai-focus-reason { color: var(--text-secondary); font-size: 12px; }
+.ai-stages { margin-top: 16px; display: flex; flex-direction: column; }
+.ai-stage { display: flex; gap: 14px; }
+.ai-stage-rail { display: flex; flex-direction: column; align-items: center; }
+.ai-stage-dot {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #2563eb, #9333ea); color: #fff;
+  font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.ai-stage-line { width: 2px; flex: 1; background: var(--border); margin: 4px 0; }
+.ai-stage:last-child .ai-stage-line { display: none; }
+.ai-proj { flex: 1; padding-bottom: 18px; }
+.ai-proj-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ai-stage-name { font-size: 12px; color: #9333ea; font-weight: 600; }
+.ai-proj-title { font-size: 15px; }
+.ai-match { font-size: 12px; color: var(--brand-blue); font-weight: 600; margin-left: auto; }
+.ai-reasons { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: #374151; }
+.ai-reasons li { margin-bottom: 2px; }
+.ai-gaps {
+  margin-top: 8px; font-size: 12px; color: #ca8a04;
+  background: #fefce8; border-radius: 8px; padding: 6px 10px; display: inline-block;
+}
+.ai-next { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.ai-next-text { font-size: 13px; color: var(--text-secondary); flex: 1; }
+.ai-meta { margin-top: 8px; font-size: 12px; color: #9ca3af; text-align: right; }
 
 .assess-tip { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
 .assess-row { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }

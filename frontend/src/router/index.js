@@ -43,6 +43,7 @@ const router = createRouter({
         { path: 'enrollments', name: 'admin-enrollments', component: () => import('../views/admin/AdminEnrollments.vue') },
         { path: 'submissions', name: 'admin-submissions', component: () => import('../views/admin/AdminSubmissions.vue') },
         { path: 'notifications', name: 'admin-notifications', component: () => import('../views/admin/AdminNotifications.vue') },
+        { path: 'discussions', name: 'admin-discussions', component: () => import('../views/admin/AdminDiscussions.vue') },
         { path: 'users', name: 'admin-users', component: () => import('../views/admin/AdminUsers.vue') }
       ]
     }
