@@ -1,0 +1,227 @@
+{
+  "pages": [
+    {
+      "path": "pages/auth/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/projects/index",
+      "style": {
+        "navigationBarTitleText": "项目中心",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/equipment/index",
+      "style": {
+        "navigationBarTitleText": "设备图书馆",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/borrows/index",
+      "style": {
+        "navigationBarTitleText": "借阅管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/mine/index",
+      "style": {
+        "navigationBarTitleText": "个人中心",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/project-detail/index",
+      "style": {
+        "navigationBarTitleText": "项目详情"
+      }
+    },
+    {
+      "path": "pages/equipment-detail/index",
+      "style": {
+        "navigationBarTitleText": "设备详情"
+      }
+    },
+    {
+      "path": "pages/borrow-apply/index",
+      "style": {
+        "navigationBarTitleText": "借阅申请"
+      }
+    },
+    {
+      "path": "pages/skills/index",
+      "style": {
+        "navigationBarTitleText": "技能评估"
+      }
+    },
+    {
+      "path": "pages/skills/assess",
+      "style": {
+        "navigationBarTitleText": "能力测评"
+      }
+    },
+    {
+      "path": "pages/notifications/index",
+      "style": {
+        "navigationBarTitleText": "站内通知",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/profile/index",
+      "style": {
+        "navigationBarTitleText": "编辑资料"
+      }
+    },
+    {
+      "path": "pages/profile/password",
+      "style": {
+        "navigationBarTitleText": "修改密码"
+      }
+    },
+    {
+      "path": "pages/submission/index",
+      "style": {
+        "navigationBarTitleText": "项目成果"
+      }
+    },
+    {
+      "path": "pages/teacher/workbench",
+      "style": {
+        "navigationBarTitleText": "教学工作台",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/teacher/students",
+      "style": {
+        "navigationBarTitleText": "学生进度",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/teacher/resources",
+      "style": {
+        "navigationBarTitleText": "教学资源管理"
+      }
+    },
+    {
+      "path": "pages/admin/dashboard",
+      "style": {
+        "navigationBarTitleText": "数据看板",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/admin/borrows",
+      "style": {
+        "navigationBarTitleText": "借阅审批",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/admin/submissions",
+      "style": {
+        "navigationBarTitleText": "成果评分",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/admin/equipment",
+      "style": {
+        "navigationBarTitleText": "设备管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/admin/equipment-edit",
+      "style": {
+        "navigationBarTitleText": "编辑设备"
+      }
+    },
+    {
+      "path": "pages/admin/projects",
+      "style": {
+        "navigationBarTitleText": "项目管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/admin/project-edit",
+      "style": {
+        "navigationBarTitleText": "编辑项目"
+      }
+    },
+    {
+      "path": "pages/admin/users",
+      "style": {
+        "navigationBarTitleText": "用户管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/admin/enrollments",
+      "style": {
+        "navigationBarTitleText": "报名管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/admin/notifications",
+      "style": {
+        "navigationBarTitleText": "通知管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/admin/discussions",
+      "style": {
+        "navigationBarTitleText": "讨论管理",
+        "enablePullDownRefresh": true
+      }
+    }
+  ],
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#2563eb",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/projects/index",
+        "text": "项目",
+        "iconPath": "static/tab/project.png",
+        "selectedIconPath": "static/tab/project-active.png"
+      },
+      {
+        "pagePath": "pages/equipment/index",
+        "text": "设备",
+        "iconPath": "static/tab/equipment.png",
+        "selectedIconPath": "static/tab/equipment-active.png"
+      },
+      {
+        "pagePath": "pages/borrows/index",
+        "text": "借阅",
+        "iconPath": "static/tab/borrow.png",
+        "selectedIconPath": "static/tab/borrow-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "static/tab/mine.png",
+        "selectedIconPath": "static/tab/mine-active.png"
+      }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "AI未来实践中心",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f9fafb"
+  }
+}
