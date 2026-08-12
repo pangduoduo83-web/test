@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,15 +13,17 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 /**
  * OpenAI 兼容协议的大模型客户端(DeepSeek / 通义千问等)。
+ * 配置来自 AiConfigService(管理后台可改,即时生效,无需重启)。
  * 稳定性策略:全局并发上限、连接/读取超时、连续失败短路熔断;
- * api-key 未配置视为"未启用",由调用方走规则降级。
+ * 未配置或已停用时由调用方走规则降级。
  */
 @Component
 public class AiClient {
@@ -38,39 +39,17 @@ public class AiClient {
     private volatile int consecutiveFailures = 0;
     private volatile long circuitOpenUntil = 0L;
 
-    @Value("${ioedu.ai.base-url}")
-    private String baseUrl;
-
-    @Value("${ioedu.ai.api-key}")
-    private String apiKey;
-
-    @Value("${ioedu.ai.model}")
-    private String model;
-
-    @Value("${ioedu.ai.connect-timeout-ms}")
-    private int connectTimeoutMs;
-
-    @Value("${ioedu.ai.read-timeout-ms}")
-    private int readTimeoutMs;
-
+    private final AiConfigService configService;
     private final ObjectMapper objectMapper;
-    private RestTemplate restTemplate;
 
-    public AiClient(ObjectMapper objectMapper) {
+    public AiClient(AiConfigService configService, ObjectMapper objectMapper) {
+        this.configService = configService;
         this.objectMapper = objectMapper;
     }
 
-    @PostConstruct
-    void init() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(connectTimeoutMs);
-        factory.setReadTimeout(readTimeoutMs);
-        this.restTemplate = new RestTemplate(factory);
-    }
-
-    /** api-key 是否已配置(未配置时调用方应直接走规则降级) */
+    /** 是否已配置且启用(未就绪时调用方应直接走规则降级) */
     public boolean isConfigured() {
-        return apiKey != null && !apiKey.trim().isEmpty();
+        return configService.effective().isReady();
     }
 
     /**
@@ -78,8 +57,9 @@ public class AiClient {
      * 任何失败(未配置/熔断/超时/响应异常)都抛 AiUnavailableException。
      */
     public String chatJson(String systemPrompt, String userPrompt, int maxTokens) {
-        if (!isConfigured()) {
-            throw new AiUnavailableException("AI 服务未配置");
+        AiConfigService.AiConfig cfg = configService.effective();
+        if (!cfg.isReady()) {
+            throw new AiUnavailableException("AI 服务未配置或已停用");
         }
         if (System.currentTimeMillis() < circuitOpenUntil) {
             throw new AiUnavailableException("AI 服务熔断中");
@@ -91,9 +71,9 @@ public class AiClient {
                 throw new AiUnavailableException("AI 服务繁忙");
             }
             long start = System.currentTimeMillis();
-            String content = doCall(systemPrompt, userPrompt, maxTokens);
+            String content = doCall(cfg, systemPrompt, userPrompt, Math.min(maxTokens, cfg.maxTokens));
             consecutiveFailures = 0;
-            log.info("AI 调用成功 model={} 耗时={}ms 输出={}字", model, System.currentTimeMillis() - start, content.length());
+            log.info("AI 调用成功 model={} 耗时={}ms 输出={}字", cfg.model, System.currentTimeMillis() - start, content.length());
             return content;
         } catch (AiUnavailableException e) {
             throw e;
@@ -111,10 +91,40 @@ public class AiClient {
         }
     }
 
-    private String doCall(String systemPrompt, String userPrompt, int maxTokens) throws Exception {
+    /** 连接测试:发一个极小请求,返回延迟与模型信息(供管理后台"测试连接") */
+    public Map<String, Object> ping() {
+        AiConfigService.AiConfig cfg = configService.effective();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("model", cfg.model);
+        result.put("baseUrl", cfg.baseUrl);
+        if (!cfg.isReady()) {
+            result.put("ok", false);
+            result.put("error", cfg.enabled ? "尚未配置 API Key" : "AI 功能已停用");
+            return result;
+        }
+        long start = System.currentTimeMillis();
+        try {
+            String content = doCall(cfg,
+                    "你是连接测试助手,只输出 JSON:{\"pong\":true}",
+                    "{\"ping\":true}", 30);
+            consecutiveFailures = 0;
+            circuitOpenUntil = 0L;
+            result.put("ok", true);
+            result.put("latencyMs", System.currentTimeMillis() - start);
+            result.put("reply", content.length() > 60 ? content.substring(0, 60) : content);
+        } catch (Exception e) {
+            result.put("ok", false);
+            result.put("latencyMs", System.currentTimeMillis() - start);
+            result.put("error", e.getMessage());
+        }
+        return result;
+    }
+
+    private String doCall(AiConfigService.AiConfig cfg, String systemPrompt, String userPrompt,
+                          int maxTokens) throws Exception {
         ObjectNode body = objectMapper.createObjectNode();
-        body.put("model", model);
-        body.put("temperature", 0.4);
+        body.put("model", cfg.model);
+        body.put("temperature", cfg.temperature);
         body.put("max_tokens", maxTokens);
         body.put("stream", false);
         body.putObject("response_format").put("type", "json_object");
@@ -124,9 +134,14 @@ public class AiClient {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
-        headers.set("Authorization", "Bearer " + apiKey.trim());
+        headers.set("Authorization", "Bearer " + cfg.apiKey.trim());
 
-        String url = baseUrl.replaceAll("/+$", "") + "/chat/completions";
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(cfg.connectTimeoutMs);
+        factory.setReadTimeout(cfg.readTimeoutMs);
+        RestTemplate restTemplate = new RestTemplate(factory);
+
+        String url = cfg.baseUrl.replaceAll("/+$", "") + "/chat/completions";
         String response = restTemplate.postForObject(url,
                 new HttpEntity<>(objectMapper.writeValueAsString(body), headers), String.class);
 

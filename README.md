@@ -25,17 +25,21 @@
 
 ### 配置(不配则 AI 自动降级,平台其余功能不受影响)
 
+**推荐方式:管理后台在线配置(免重启)** —— 管理员登录 → 「AI 设置」页,填接口地址/模型/API Key,可调输出 Token 上限、温度、超时,支持 DeepSeek/通义千问一键预设与**连接测试**,保存后立即生效。配置存数据库,优先级高于环境变量。
+
+环境变量方式(作为默认值,适合初始部署):
+
 ```bash
 # 本地开发:设置环境变量后启动后端
-IOEDU_AI_API_KEY=sk-xxx                        # 必填,DeepSeek 或通义千问的 API Key
+IOEDU_AI_API_KEY=sk-xxx                        # DeepSeek 或通义千问的 API Key
 IOEDU_AI_BASE_URL=https://api.deepseek.com     # 选填,默认 DeepSeek
 IOEDU_AI_MODEL=deepseek-chat                   # 选填,默认 deepseek-chat
 
 # Docker 部署:项目根目录 .env 文件写 AI_API_KEY=sk-xxx(可选 AI_BASE_URL / AI_MODEL)
 ```
 
-通义千问填法:`IOEDU_AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode`、`IOEDU_AI_MODEL=qwen-plus`。
-本地联调可不买 Key:先 `node scripts/mock-ai-server.mjs` 起模拟模型,再以 `IOEDU_AI_BASE_URL=http://localhost:9281`、`IOEDU_AI_API_KEY=mock-key` 启动后端。
+通义千问填法:`https://dashscope.aliyuncs.com/compatible-mode` + `qwen-plus`。
+本地联调可不买 Key:先 `node scripts/mock-ai-server.mjs` 起模拟模型,再在 AI 设置页填 `http://localhost:9281` + 任意 Key。
 
 ## 快速启动
 

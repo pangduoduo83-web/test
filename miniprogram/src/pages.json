@@ -184,6 +184,12 @@
         "navigationBarTitleText": "讨论管理",
         "enablePullDownRefresh": true
       }
+    },
+    {
+      "path": "pages/admin/ai-settings",
+      "style": {
+        "navigationBarTitleText": "AI 设置"
+      }
     }
   ],
   "tabBar": {

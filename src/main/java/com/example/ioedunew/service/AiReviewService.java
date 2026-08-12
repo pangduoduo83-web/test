@@ -53,7 +53,7 @@ public class AiReviewService {
         Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new BusinessException(404, "提交记录不存在"));
         if (!aiClient.isConfigured()) {
-            throw new BusinessException("AI 服务未配置,请在服务端设置 IOEDU_AI_API_KEY 后使用");
+            throw new BusinessException("AI 服务未配置,请在「管理控制台 → AI 设置」中配置 API Key");
         }
         Project project = projectRepository.findById(submission.getProjectId()).orElse(null);
 

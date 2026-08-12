@@ -168,6 +168,11 @@
         <text class="menu-text">讨论管理</text>
         <text class="menu-arrow">›</text>
       </view>
+      <view class="menu-item" @click="goPage('/pages/admin/ai-settings')">
+        <text class="menu-icon">✨</text>
+        <text class="menu-text">AI 设置</text>
+        <text class="menu-arrow">›</text>
+      </view>
       <view class="menu-item" @click="goPage('/pages/admin/equipment')">
         <text class="menu-icon">🔧</text>
         <text class="menu-text">设备管理</text>

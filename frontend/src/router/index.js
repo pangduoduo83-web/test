@@ -44,6 +44,7 @@ const router = createRouter({
         { path: 'submissions', name: 'admin-submissions', component: () => import('../views/admin/AdminSubmissions.vue') },
         { path: 'notifications', name: 'admin-notifications', component: () => import('../views/admin/AdminNotifications.vue') },
         { path: 'discussions', name: 'admin-discussions', component: () => import('../views/admin/AdminDiscussions.vue') },
+        { path: 'ai-settings', name: 'admin-ai-settings', component: () => import('../views/admin/AdminAiSettings.vue') },
         { path: 'users', name: 'admin-users', component: () => import('../views/admin/AdminUsers.vue') }
       ]
     }

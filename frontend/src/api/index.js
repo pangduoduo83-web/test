@@ -101,3 +101,8 @@ export const adminAiReview = (id) => http.post(`/admin/submissions/${id}/ai-revi
 // ---------- AI 学习规划师 ----------
 export const fetchAiPlan = () => http.get('/ai/learning-plan')
 export const generateAiPlan = (data) => http.post('/ai/learning-plan/generate', data)
+
+// ---------- AI 设置(管理端) ----------
+export const adminGetAiSettings = () => http.get('/admin/ai-settings')
+export const adminUpdateAiSettings = (data) => http.put('/admin/ai-settings', data)
+export const adminTestAiSettings = () => http.post('/admin/ai-settings/test')

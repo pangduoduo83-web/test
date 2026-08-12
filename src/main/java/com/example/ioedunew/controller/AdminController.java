@@ -15,6 +15,8 @@ import com.example.ioedunew.entity.Submission;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.ProjectRepository;
 import com.example.ioedunew.service.AdminService;
+import com.example.ioedunew.service.AiClient;
+import com.example.ioedunew.service.AiConfigService;
 import com.example.ioedunew.service.AiReviewService;
 import com.example.ioedunew.service.AuthService;
 import com.example.ioedunew.service.BorrowService;
@@ -54,6 +56,8 @@ public class AdminController {
     private final NotificationService notificationService;
 
     private final AiReviewService aiReviewService;
+    private final AiConfigService aiConfigService;
+    private final AiClient aiClient;
 
     public AdminController(AdminService adminService,
                            BorrowService borrowService,
@@ -62,7 +66,9 @@ public class AdminController {
                            SubmissionService submissionService,
                            TeacherService teacherService,
                            NotificationService notificationService,
-                           AiReviewService aiReviewService) {
+                           AiReviewService aiReviewService,
+                           AiConfigService aiConfigService,
+                           AiClient aiClient) {
         this.adminService = adminService;
         this.borrowService = borrowService;
         this.authService = authService;
@@ -71,6 +77,8 @@ public class AdminController {
         this.teacherService = teacherService;
         this.notificationService = notificationService;
         this.aiReviewService = aiReviewService;
+        this.aiConfigService = aiConfigService;
+        this.aiClient = aiClient;
     }
 
     // ---------- 数据看板 ----------
@@ -243,6 +251,24 @@ public class AdminController {
                                         @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
         adminService.deleteUser(id, user.getId());
         return ApiResponse.ok();
+    }
+
+    // ---------- AI 设置 ----------
+
+    @GetMapping("/ai-settings")
+    public ApiResponse<Map<String, Object>> aiSettings() {
+        return ApiResponse.ok(aiConfigService.view());
+    }
+
+    @PutMapping("/ai-settings")
+    public ApiResponse<Map<String, Object>> updateAiSettings(@RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(aiConfigService.update(body));
+    }
+
+    /** 连接测试:用当前配置发一个极小请求 */
+    @PostMapping("/ai-settings/test")
+    public ApiResponse<Map<String, Object>> testAiSettings() {
+        return ApiResponse.ok(aiClient.ping());
     }
 
     // ---------- 讨论管理 ----------
