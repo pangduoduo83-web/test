@@ -344,7 +344,7 @@ const bomTotal = computed(() =>
 const diffBadge = (d) => (d === '入门' ? 'badge-green' : d === '进阶' ? 'badge-purple' : 'badge-red')
 
 const resIcon = (type) =>
-  ({ 文档: '📄', 视频: '🎬', 代码: '💻', 手册: '📖' }[type] || '📎')
+  ({ 文档: '📄', 视频: '🎬', 代码: '💻', 手册: '📖', 原理图: '📐', LAYOUT: '🧩', '3D图': '🧊' }[type] || '📎')
 
 const mySkill = (name) => {
   const s = mySkills.value.find((x) => x.skillName === name)
@@ -432,7 +432,7 @@ const goSubmission = () => {
 
 const openResource = (r) => {
   if (!r.url) {
-    uni.showToast({ title: '资源准备中,敬请期待', icon: 'none' })
+    uni.showToast({ title: '附件待教师上传,上传后即可下载', icon: 'none' })
     return
   }
   const url = fullUrl(r.url)

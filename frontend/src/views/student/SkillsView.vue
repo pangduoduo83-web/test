@@ -88,8 +88,14 @@
         </div>
       </div>
 
+      <div class="ai-chips">
+        <span class="ai-chips-label">快捷目标:</span>
+        <span v-for="k in goalChips" :key="k" class="goal-chip" @click="addGoalChip(k)">{{ k }}</span>
+      </div>
+
       <div v-if="!plan && !aiLoading" class="ai-empty">
-        基于你的六维技能画像与全部实战项目,AI 将为你规划「基础补强 → 综合实践 → 挑战提升」三阶段学习路线
+        基于你的六维技能画像与全部实战项目,AI 将为你规划「基础补强 → 综合实践 → 挑战提升」三阶段学习路线。
+        推荐依据:技能短板覆盖、能力匹配度、难度递进、报名状态与你的学习目标。
       </div>
       <div v-else-if="aiLoading" class="ai-empty">正在分析技能画像与项目库,大约需要 10~20 秒...</div>
 
@@ -178,6 +184,13 @@ const plan = ref(null)
 const aiGoal = ref('')
 const aiHours = ref(6)
 const aiLoading = ref(false)
+
+const goalChips = ['嵌入式开发', 'PCB设计', '物联网作品', '边缘AI应用', '信号处理', '备战电赛']
+
+const addGoalChip = (k) => {
+  if (aiGoal.value.includes(k)) return
+  aiGoal.value = aiGoal.value ? `${aiGoal.value}、${k}` : `想提升${k}`
+}
 
 const stageName = (s) => (s === 1 ? '基础补强' : s === 2 ? '综合实践' : '挑战提升')
 const diffBadge = (d) => (d === '入门' ? 'badge-green' : d === '进阶' ? 'badge-purple' : 'badge-red')
@@ -420,6 +433,13 @@ window.addEventListener('resize', () => { radarChart?.resize(); lineChart?.resiz
   border: 1px dashed #e9d5ff;
   border-radius: 12px; padding: 18px; font-size: 13px; color: #7e22ce; text-align: center;
 }
+.ai-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.ai-chips-label { font-size: 12px; color: var(--text-secondary); }
+.goal-chip {
+  font-size: 12px; color: #6b21a8; background: #faf5ff; border: 1px solid #e9d5ff;
+  border-radius: 999px; padding: 3px 12px; cursor: pointer; transition: all .15s;
+}
+.goal-chip:hover { background: #9333ea; color: #fff; }
 .ai-summary {
   background: linear-gradient(to right, #faf5ff, #eff6ff);
   border: 1px solid #e9d5ff;

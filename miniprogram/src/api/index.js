@@ -2,6 +2,7 @@ import { get, post, put, request } from '@/utils/request'
 
 // ---------- 公开 ----------
 export const fetchPublicStats = () => get('/public/stats', null, { silent: true })
+export const fetchSiteConfig = () => get('/public/site-config', null, { silent: true })
 
 // ---------- 认证 ----------
 export const login = (data) => post('/auth/login', data)

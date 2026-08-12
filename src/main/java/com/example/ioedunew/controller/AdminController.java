@@ -21,6 +21,7 @@ import com.example.ioedunew.service.AiReviewService;
 import com.example.ioedunew.service.AuthService;
 import com.example.ioedunew.service.BorrowService;
 import com.example.ioedunew.service.NotificationService;
+import com.example.ioedunew.service.SiteConfigService;
 import com.example.ioedunew.service.SubmissionService;
 import com.example.ioedunew.service.TeacherService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -58,6 +59,7 @@ public class AdminController {
     private final AiReviewService aiReviewService;
     private final AiConfigService aiConfigService;
     private final AiClient aiClient;
+    private final SiteConfigService siteConfigService;
 
     public AdminController(AdminService adminService,
                            BorrowService borrowService,
@@ -68,7 +70,8 @@ public class AdminController {
                            NotificationService notificationService,
                            AiReviewService aiReviewService,
                            AiConfigService aiConfigService,
-                           AiClient aiClient) {
+                           AiClient aiClient,
+                           SiteConfigService siteConfigService) {
         this.adminService = adminService;
         this.borrowService = borrowService;
         this.authService = authService;
@@ -79,6 +82,7 @@ public class AdminController {
         this.aiReviewService = aiReviewService;
         this.aiConfigService = aiConfigService;
         this.aiClient = aiClient;
+        this.siteConfigService = siteConfigService;
     }
 
     // ---------- 数据看板 ----------
@@ -251,6 +255,18 @@ public class AdminController {
                                         @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
         adminService.deleteUser(id, user.getId());
         return ApiResponse.ok();
+    }
+
+    // ---------- 站点设置 ----------
+
+    @GetMapping("/site-settings")
+    public ApiResponse<Map<String, Object>> siteSettings() {
+        return ApiResponse.ok(siteConfigService.publicConfig());
+    }
+
+    @PutMapping("/site-settings")
+    public ApiResponse<Map<String, Object>> updateSiteSettings(@RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(siteConfigService.update(body));
     }
 
     // ---------- AI 设置 ----------

@@ -3,10 +3,13 @@
     <!-- 顶部导航 -->
     <header class="topbar">
       <div class="top-brand" @click="$router.push('/app/dashboard')">
-        <span class="logo"><GraduationCap :size="22" color="#fff" /></span>
+        <span class="logo">
+          <img v-if="site.logoUrl" :src="site.logoUrl" class="logo-img" alt="LOGO" />
+          <GraduationCap v-else :size="22" color="#fff" />
+        </span>
         <div>
-          <div class="brand-name">项目驱动式教学平台</div>
-          <div class="brand-sub">电子信息创新实验室</div>
+          <div class="brand-name">{{ site.title }}</div>
+          <div class="brand-sub">项目驱动教学实验平台</div>
         </div>
       </div>
 
@@ -171,6 +174,7 @@
       <!-- 内容区 -->
       <main class="content">
         <router-view />
+        <div v-if="site.footerText" class="site-footer">{{ site.footerText }}</div>
       </main>
     </div>
 
@@ -219,6 +223,7 @@ import {
   markAllNotificationsRead, markNotificationRead, updateProfile
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
+import { loadSiteConfig, siteConfig as site } from '../../utils/siteConfig'
 
 const route = useRoute()
 const router = useRouter()
@@ -364,6 +369,7 @@ const savePassword = async () => {
 }
 
 onMounted(async () => {
+  loadSiteConfig()
   loadNotifications()
   loadWeekStats()
   // 准实时:每 60 秒轮询一次通知
@@ -397,8 +403,12 @@ onUnmounted(() => {
   z-index: 50;
 }
 .top-brand { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.logo-img { width: 100%; height: 100%; object-fit: cover; }
+.site-footer {
+  text-align: center; padding: 22px 0 6px; font-size: 12px; color: #9ca3af; white-space: pre-wrap;
+}
 .logo {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 40px; height: 40px; border-radius: 10px; overflow: hidden;
   background: linear-gradient(135deg, #3b82f6, #9333ea);
   display: flex; align-items: center; justify-content: center; font-size: 20px;
   box-shadow: var(--shadow-card);

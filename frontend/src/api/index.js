@@ -2,6 +2,7 @@ import http from './http'
 
 // ---------- 公开 ----------
 export const fetchPublicStats = () => http.get('/public/stats')
+export const fetchSiteConfig = () => http.get('/public/site-config')
 
 // ---------- 图片上传(返回 {url}) ----------
 export const uploadImage = (file) => {
@@ -109,3 +110,7 @@ export const generateAiPlan = (data) => http.post('/ai/learning-plan/generate', 
 export const adminGetAiSettings = () => http.get('/admin/ai-settings')
 export const adminUpdateAiSettings = (data) => http.put('/admin/ai-settings', data)
 export const adminTestAiSettings = () => http.post('/admin/ai-settings/test')
+
+// ---------- 站点设置(管理端) ----------
+export const adminGetSiteSettings = () => http.get('/admin/site-settings')
+export const adminUpdateSiteSettings = (data) => http.put('/admin/site-settings', data)

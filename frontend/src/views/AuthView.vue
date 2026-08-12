@@ -10,10 +10,11 @@
       <div class="brand-inner">
         <div class="brand-head">
           <div class="brand-logo">
-            <BookOpen :size="30" color="#4f46e5" :stroke-width="2.2" />
+            <img v-if="site.logoUrl" :src="site.logoUrl" class="brand-logo-img" alt="LOGO" />
+            <BookOpen v-else :size="30" color="#4f46e5" :stroke-width="2.2" />
           </div>
           <div>
-            <h1 class="brand-title">AI未来实践中心</h1>
+            <h1 class="brand-title">{{ site.title }}</h1>
             <div class="brand-sub">项目驱动教学实验平台</div>
           </div>
         </div>
@@ -94,10 +95,12 @@
           </button>
         </el-form>
 
-        <div class="switch-line">
+        <div v-if="site.allowRegister" class="switch-line">
           {{ isLogin ? '还没有账号？' : '已有账号？' }}
           <a @click="isLogin = !isLogin">{{ isLogin ? '立即注册' : '立即登录' }}</a>
         </div>
+        <div v-else class="switch-line">平台已关闭自助注册,账号请联系管理员开通</div>
+        <div v-if="site.footerText" class="site-footer">{{ site.footerText }}</div>
 
       </div>
     </div>
@@ -111,6 +114,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Award, BookOpen, Hash, Lock, Mail, Monitor, User, Users, Wrench } from 'lucide-vue-next'
 import { fetchPublicStats, login, register } from '../api'
 import { useAuthStore } from '../stores/auth'
+import { loadSiteConfig, siteConfig as site } from '../utils/siteConfig'
 
 const route = useRoute()
 const router = useRouter()
@@ -148,6 +152,7 @@ onMounted(async () => {
     router.replace(role === 'ADMIN' ? '/admin' : role === 'TEACHER' ? '/teacher' : '/app/dashboard')
     return
   }
+  loadSiteConfig()
   try {
     Object.assign(stats, await fetchPublicStats())
   } catch (e) { /* 后端未启动时展示默认数字 */ }
@@ -216,6 +221,7 @@ const submit = async () => {
   width: 58px; height: 58px; border-radius: 14px;
   background: #fff;
   display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
   box-shadow: 0 20px 25px -5px rgba(0,0,0,.25);
   flex-shrink: 0;
 }
@@ -307,6 +313,8 @@ const submit = async () => {
 
 .switch-line { text-align: center; margin-top: 18px; color: var(--text-secondary); font-size: 13px; }
 .switch-line a { color: var(--brand-blue); cursor: pointer; margin-left: 4px; font-weight: 500; }
+.brand-logo-img { width: 100%; height: 100%; object-fit: cover; }
+.site-footer { text-align: center; margin-top: 14px; font-size: 12px; color: #9ca3af; white-space: pre-wrap; }
 
 @media (max-width: 960px) {
   .brand-panel { display: none; }

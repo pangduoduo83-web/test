@@ -87,7 +87,12 @@
             <el-form-item label="项目特性"><el-input v-model="form.featuresText" placeholder="逗号分隔" /></el-form-item>
             <el-form-item label="学习目标"><el-input v-model="form.goalsText" type="textarea" :rows="2" placeholder="逗号分隔" /></el-form-item>
             <el-form-item label="前置要求"><el-input v-model="form.prereqText" type="textarea" :rows="2" placeholder="逗号分隔" /></el-form-item>
-            <el-form-item label="所需设备"><el-input v-model="form.equipText" placeholder="逗号分隔的设备名称" /></el-form-item>
+            <el-form-item label="所需设备">
+              <el-select v-model="form.equipNames" multiple filterable allow-create default-first-option
+                         placeholder="从设备库选择,也可输入自定义名称" style="width:100%">
+                <el-option v-for="name in equipmentOptions" :key="name" :label="name" :value="name" />
+              </el-select>
+            </el-form-item>
           </el-form>
         </el-tab-pane>
 
@@ -129,7 +134,13 @@
           <div class="adv-section">
             <div class="adv-head">
               <h4>BOM 清单</h4>
-              <el-button size="small" plain @click="bomRows.push({ ref: '', name: '', qty: 1, footprint: '', price: 0 })">+ 添加元件</el-button>
+              <div class="bom-btns">
+                <el-button size="small" plain @click="downloadBomTemplate">下载CSV模板</el-button>
+                <el-upload :show-file-list="false" accept=".csv" :http-request="importBomCsv">
+                  <el-button size="small" type="primary" plain>导入CSV</el-button>
+                </el-upload>
+                <el-button size="small" plain @click="bomRows.push({ ref: '', name: '', qty: 1, footprint: '', price: 0 })">+ 添加元件</el-button>
+              </div>
             </div>
             <div v-for="(b, i) in bomRows" :key="i" class="adv-row">
               <el-input v-model="b.ref" placeholder="位号" class="w-80" />
@@ -180,9 +191,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   adminCreateProject, adminDeleteProject, adminListProjects, adminListUsers,
-  adminUpdateProject, uploadDocFile
+  adminUpdateProject, fetchEquipment, uploadDocFile
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
+import { loadSiteConfig, siteConfig as site } from '../../utils/siteConfig'
 
 const router = useRouter()
 const items = ref([])
@@ -196,18 +208,17 @@ const pageSize = 10
 const pageItems = computed(() =>
   items.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 
-const categoryOptions = [
-  '开发板/评估板', '物联网应用', '电源管理', '电机控制',
-  '测量仪器', '通信模块', 'FPGA/EDA', '消费电子'
-]
+// 分类来自「站点设置」,可在后台自定义(下拉仍支持临时自建)
+const categoryOptions = computed(() => site.projectCategories || [])
+const equipmentOptions = ref([])
 
-const resourceTypes = ['文档', '视频', '代码', '手册', '工具', '课件']
+const resourceTypes = ['文档', '视频', '代码', '手册', '工具', '课件', '原理图', 'LAYOUT', '3D图']
 
 const emptyForm = {
   id: null, title: '', summary: '', description: '', difficulty: '入门', duration: '2周',
   teamSize: '1人', category: '', icon: '🔌', coverUrl: '', mentorId: null, author: '', license: 'GPL-3.0',
   layers: 2, pcbSize: '', cost: 0, rating: 5.0, verified: false, status: 'PUBLISHED',
-  tagsText: '', featuresText: '', goalsText: '', prereqText: '', equipText: ''
+  tagsText: '', featuresText: '', goalsText: '', prereqText: '', equipNames: []
 }
 const form = reactive({ ...emptyForm })
 
@@ -257,7 +268,7 @@ const openEdit = (row) => {
       rating: row.rating, verified: !!row.verified, status: row.status,
       tagsText: joinArr(row.tags), featuresText: joinArr(row.features),
       goalsText: joinArr(row.learningGoals), prereqText: joinArr(row.prerequisites),
-      equipText: joinArr(row.equipmentNames)
+      equipNames: [...arr(row.equipmentNames)]
     })
   }
   editVisible.value = true
@@ -274,6 +285,44 @@ const doUploadRes = async (opt, row) => {
   } catch (e) { /* 错误已提示 */ } finally {
     row.uploading = false
   }
+}
+
+// ---------- BOM CSV 模板导入 ----------
+const downloadBomTemplate = () => {
+  const csv = '\ufeff位号,元件名称,数量,封装,单价\r\nU1,STM32F103C8T6,1,LQFP-48,11.5\r\nC1,100nF电容,4,0603,0.05\r\nR1,10K电阻,4,0603,0.02'
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'BOM导入模板.csv'
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+const importBomCsv = (opt) => {
+  const reader = new FileReader()
+  reader.onload = () => {
+    const lines = String(reader.result).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    const rows = []
+    for (const line of lines) {
+      const cells = line.split(/[,，\t]/).map((c) => c.trim().replace(/^"|"$/g, ''))
+      if (/位号|名称|ref|name/i.test(cells[0] + (cells[1] || ''))
+          && !Number.isFinite(Number(cells[2]))) {
+        continue // 表头行
+      }
+      if (!(cells[1] || '').trim()) continue
+      rows.push({
+        ref: cells[0] || '', name: cells[1], qty: num(cells[2], 1),
+        footprint: cells[3] || '', price: num(cells[4])
+      })
+    }
+    if (!rows.length) {
+      ElMessage.warning('未解析到有效行,请使用「下载CSV模板」的格式(UTF-8 编码)')
+      return
+    }
+    bomRows.value = rows
+    ElMessage.success(`已导入 ${rows.length} 行 BOM,保存后生效`)
+  }
+  reader.readAsText(opt.file, 'utf-8')
 }
 
 const buildSkills = () => skillRows.value
@@ -318,7 +367,7 @@ const save = async () => {
       features: JSON.stringify(splitText(form.featuresText)),
       learningGoals: JSON.stringify(splitText(form.goalsText)),
       prerequisites: JSON.stringify(splitText(form.prereqText)),
-      equipmentNames: JSON.stringify(splitText(form.equipText)),
+      equipmentNames: JSON.stringify(form.equipNames.filter(Boolean)),
       skillRequirements: JSON.stringify(buildSkills()),
       syllabus: JSON.stringify(buildSyllabus()),
       bom: JSON.stringify(buildBom()),
@@ -346,8 +395,14 @@ const viewStudents = (row) => {
 }
 
 onMounted(() => {
+  loadSiteConfig()
   load()
   loadTeachers()
+  fetchEquipment({})
+    .then((list) => {
+      equipmentOptions.value = list.map((e) => e.name)
+    })
+    .catch(() => {})
 })
 </script>
 
@@ -364,6 +419,7 @@ onMounted(() => {
 .adv-section { margin-bottom: 20px; }
 .adv-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .adv-head h4 { margin: 0; font-size: 14px; }
+.bom-btns { display: flex; gap: 8px; align-items: center; }
 .adv-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .adv-row .grow { flex: 1; }
 .adv-row .w-80 { width: 80px; flex-shrink: 0; }

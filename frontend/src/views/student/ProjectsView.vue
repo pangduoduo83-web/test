@@ -4,7 +4,7 @@
     <div class="head-row">
       <div>
         <h2 class="page-title">开源硬件项目中心</h2>
-        <p class="page-subtitle">参考嘉立创EDA平台，从原理图到PCB的完整工程实践</p>
+        <p class="page-subtitle">从原理图到 PCB 的完整工程实践</p>
       </div>
       <div class="head-right">
         <span class="head-count">开源项目: <b>{{ filtered.length.toLocaleString() }}</b> 个</span>
@@ -182,13 +182,14 @@ import {
   Star, Users, Wifi, Zap
 } from 'lucide-vue-next'
 import { fetchProjects } from '../../api'
+import { loadSiteConfig, siteConfig as site } from '../../utils/siteConfig'
 
 const route = useRoute()
 const keyword = ref(route.query.keyword || '')
 const sort = ref('popular')
 const items = ref([])
 const page = ref(1)
-const pageSize = 9
+const pageSize = computed(() => site.projectPageSize || 9)
 const viewMode = ref('grid')
 const advancedOpen = ref(false)
 const difficulty = ref('全部')
@@ -247,7 +248,7 @@ const filtered = computed(() => items.value.filter((p) => {
 }))
 
 const pageItems = computed(() =>
-  filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+  filtered.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
 
 watch([difficulty, onlyVerified, activeTag, activeCategory], () => { page.value = 1 })
 
@@ -259,7 +260,10 @@ const load = async () => {
   page.value = 1
 }
 
-onMounted(load)
+onMounted(() => {
+  loadSiteConfig()
+  load()
+})
 </script>
 
 <style scoped>

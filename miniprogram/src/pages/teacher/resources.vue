@@ -74,7 +74,7 @@ import { fetchProjectDetail, teacherUpdateResources } from '@/api'
 import { uploadDocFile, uploadImage } from '@/utils/request'
 import { asList } from '@/utils/format'
 
-const types = ['文档', '视频', '代码', '手册', '其他']
+const types = ['文档', '视频', '代码', '手册', '原理图', 'LAYOUT', '3D图', '其他']
 
 const projectId = ref(null)
 const title = ref('')
@@ -83,7 +83,8 @@ const saving = ref(false)
 const addVisible = ref(false)
 const draft = reactive({ type: '文档', name: '', url: '' })
 
-const resIcon = (type) => ({ 文档: '📄', 视频: '🎬', 代码: '💻', 手册: '📖' }[type] || '📎')
+const resIcon = (type) =>
+  ({ 文档: '📄', 视频: '🎬', 代码: '💻', 手册: '📖', 原理图: '📐', LAYOUT: '🧩', '3D图': '🧊' }[type] || '📎')
 
 onLoad(async (options) => {
   projectId.value = options.projectId

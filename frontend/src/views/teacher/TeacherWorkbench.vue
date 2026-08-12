@@ -84,7 +84,7 @@
       <p class="res-tip">为每条资源上传附件后,学生端「学习资源」将出现真实下载链接;未上传附件的资源学生端会提示联系导师。</p>
       <div v-for="(r, i) in resRows" :key="i" class="res-edit-row">
         <el-select v-model="r.type" class="res-type-sel">
-          <el-option v-for="t in ['文档', '视频', '代码', '手册', '工具', '课件']" :key="t" :label="t" :value="t" />
+          <el-option v-for="t in ['文档', '视频', '代码', '手册', '工具', '课件', '原理图', 'LAYOUT', '3D图']" :key="t" :label="t" :value="t" />
         </el-select>
         <el-input v-model="r.name" placeholder="资源名称,如: 项目开发指南.pdf" class="res-name-input" />
         <el-upload :show-file-list="false" :http-request="(opt) => doUploadRes(opt, r)" accept="*">

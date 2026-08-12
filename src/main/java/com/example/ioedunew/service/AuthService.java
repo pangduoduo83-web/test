@@ -29,19 +29,25 @@ public class AuthService {
     private final SkillScoreRepository skillScoreRepository;
     private final NotificationService notificationService;
     private final JwtUtil jwtUtil;
+    private final SiteConfigService siteConfigService;
 
     public AuthService(UserRepository userRepository,
                        SkillScoreRepository skillScoreRepository,
                        NotificationService notificationService,
-                       JwtUtil jwtUtil) {
+                       JwtUtil jwtUtil,
+                       SiteConfigService siteConfigService) {
         this.userRepository = userRepository;
         this.skillScoreRepository = skillScoreRepository;
         this.notificationService = notificationService;
         this.jwtUtil = jwtUtil;
+        this.siteConfigService = siteConfigService;
     }
 
     @Transactional
     public AuthDtos.AuthResponse register(AuthDtos.RegisterRequest req) {
+        if (!siteConfigService.registerAllowed()) {
+            throw new BusinessException("平台已关闭自助注册,请联系管理员开通账号");
+        }
         if (userRepository.existsByEmail(req.getEmail())) {
             throw new BusinessException("该邮箱已注册");
         }

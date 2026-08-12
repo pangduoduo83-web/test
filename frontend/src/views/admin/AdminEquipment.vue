@@ -49,8 +49,8 @@
           <el-form-item label="名称" required><el-input v-model="form.name" /></el-form-item>
           <el-form-item label="型号"><el-input v-model="form.model" /></el-form-item>
           <el-form-item label="分类">
-            <el-select v-model="form.category">
-              <el-option v-for="c in ['开发板', '测试仪表', '通信模块', '传感器', '工具']" :key="c" :label="c" :value="c" />
+            <el-select v-model="form.category" filterable allow-create default-first-option>
+              <el-option v-for="c in categoryOptions" :key="c" :label="c" :value="c" />
             </el-select>
           </el-form-item>
           <el-form-item label="位置"><el-input v-model="form.location" placeholder="如:A栋3楼" /></el-form-item>
@@ -79,7 +79,19 @@
           <el-input v-model="form.tagsText" placeholder="逗号分隔,如: 调试,测量" />
         </el-form-item>
         <el-form-item label="参考文档">
-          <el-input v-model="form.docsText" placeholder="逗号分隔,如: 用户手册" />
+          <div class="doc-rows">
+            <div v-for="(d, i) in docRows" :key="i" class="doc-row">
+              <el-input v-model="d.name" placeholder="文档名称,如: 用户手册.pdf" class="grow" />
+              <el-upload :show-file-list="false" :http-request="(opt) => doUploadDoc(opt, d)" accept="*">
+                <el-button size="small" :type="d.url ? 'success' : 'primary'" plain :loading="d.uploading">
+                  {{ d.url ? '已上传' : '上传附件' }}
+                </el-button>
+              </el-upload>
+              <el-button size="small" text type="danger" @click="docRows.splice(i, 1)">删除</el-button>
+            </div>
+            <el-button size="small" plain @click="docRows.push({ name: '', url: '', uploading: false })">+ 添加文档</el-button>
+            <span class="doc-hint">上传附件后学生端可直接下载;不上传则显示"到馆查阅"</span>
+          </div>
         </el-form-item>
         <el-form-item label="适用项目">
           <el-input v-model="form.projectsText" placeholder="逗号分隔的项目名称" />
@@ -96,8 +108,11 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminCreateEquipment, adminDeleteEquipment, adminUpdateEquipment, fetchEquipment } from '../../api'
+import {
+  adminCreateEquipment, adminDeleteEquipment, adminUpdateEquipment, fetchEquipment, uploadDocFile
+} from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
+import { loadSiteConfig, siteConfig as site } from '../../utils/siteConfig'
 
 const items = ref([])
 const keyword = ref('')
@@ -105,6 +120,22 @@ const editVisible = ref(false)
 const saving = ref(false)
 const page = ref(1)
 const pageSize = 10
+
+// 分类来自「站点设置」;参考文档支持上传附件(学生端可下载)
+const categoryOptions = computed(() => site.equipmentCategories || [])
+const docRows = ref([])
+
+const doUploadDoc = async (opt, row) => {
+  row.uploading = true
+  try {
+    const { url, name } = await uploadDocFile(opt.file)
+    row.url = url
+    if (!row.name) row.name = name
+    ElMessage.success(`附件上传成功: ${name}`)
+  } catch (e) { /* 已提示 */ } finally {
+    row.uploading = false
+  }
+}
 
 const pageItems = computed(() =>
   items.value.slice((page.value - 1) * pageSize, page.value * pageSize))
@@ -127,6 +158,11 @@ const load = async () => {
 
 const openEdit = (row) => {
   Object.assign(form, emptyForm)
+  // 参考文档:兼容旧的字符串数组与新的 {name,url} 对象数组
+  docRows.value = (Array.isArray(row?.docs) ? row.docs : []).map((d) =>
+    typeof d === 'string'
+      ? { name: d, url: '', uploading: false }
+      : { name: d?.name || '', url: d?.url || '', uploading: false })
   if (row) {
     Object.assign(form, {
       id: row.id, name: row.name, model: row.model, category: row.category,
@@ -134,7 +170,7 @@ const openEdit = (row) => {
       totalCount: row.totalCount, availableCount: row.availableCount,
       price: row.price, rating: row.rating, status: row.status, description: row.description,
       specsText: joinArr(row.specs), tagsText: joinArr(row.tags),
-      docsText: joinArr(row.docs), projectsText: joinArr(row.suitableProjects)
+      projectsText: joinArr(row.suitableProjects)
     })
   }
   editVisible.value = true
@@ -155,7 +191,9 @@ const save = async () => {
       status: form.status, description: form.description,
       specs: JSON.stringify(splitText(form.specsText)),
       tags: JSON.stringify(splitText(form.tagsText)),
-      docs: JSON.stringify(splitText(form.docsText)),
+      docs: JSON.stringify(docRows.value
+        .filter((d) => (d.name || '').trim())
+        .map((d) => ({ name: d.name.trim(), url: d.url || '' }))),
       suitableProjects: JSON.stringify(splitText(form.projectsText))
     }
     if (form.id) await adminUpdateEquipment(form.id, payload)
@@ -175,7 +213,10 @@ const remove = async (row) => {
   await load()
 }
 
-onMounted(load)
+onMounted(() => {
+  loadSiteConfig()
+  load()
+})
 </script>
 
 <style scoped>
@@ -184,4 +225,8 @@ onMounted(load)
 .pager { display: flex; justify-content: flex-end; margin-top: 14px; }
 .form-2col { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
 :deep(.el-select) { width: 100%; }
+.doc-rows { width: 100%; }
+.doc-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.doc-row .grow { flex: 1; }
+.doc-hint { font-size: 12px; color: #9ca3af; margin-left: 10px; }
 </style>

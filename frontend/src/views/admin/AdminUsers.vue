@@ -16,7 +16,13 @@
           </el-select>
           <el-button @click="load">查询</el-button>
         </div>
-        <el-button type="primary" @click="openEdit()">+ 新增用户</el-button>
+        <div class="toolbar-right">
+          <el-button plain @click="downloadUserTemplate">下载导入模板</el-button>
+          <el-upload :show-file-list="false" accept=".csv" :http-request="importUsersCsv">
+            <el-button plain type="primary" :loading="importing">批量导入</el-button>
+          </el-upload>
+          <el-button type="primary" @click="openEdit()">+ 新增用户</el-button>
+        </div>
       </div>
 
       <el-table :data="pageItems" stripe>
@@ -114,6 +120,61 @@ import {
 import ImageUploader from '../../components/ImageUploader.vue'
 import { useAuthStore } from '../../stores/auth'
 
+// ---------- 用户 CSV 批量导入 ----------
+const importing = ref(false)
+
+const downloadUserTemplate = () => {
+  const csv = '\ufeff姓名,邮箱,初始密码,角色(STUDENT/TEACHER/ADMIN),学号,专业,年级\r\n'
+    + '李小明,lixm@stu.ioedu.cn,123456,STUDENT,2026101,电子信息工程,大一\r\n'
+    + '王老师,wanglaoshi@ioedu.cn,123456,TEACHER,,,'
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = '用户导入模板.csv'
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+const importUsersCsv = (opt) => {
+  const reader = new FileReader()
+  reader.onload = async () => {
+    const lines = String(reader.result).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    const rows = []
+    for (const line of lines) {
+      const c = line.split(/[,，\t]/).map((v) => v.trim().replace(/^"|"$/g, ''))
+      if (/姓名|name/i.test(c[0]) || !c[0] || !(c[1] || '').includes('@')) continue
+      rows.push({
+        name: c[0], email: c[1], password: c[2] || '123456',
+        role: ['STUDENT', 'TEACHER', 'ADMIN'].includes((c[3] || '').toUpperCase()) ? c[3].toUpperCase() : 'STUDENT',
+        studentNo: c[4] || undefined, major: c[5] || undefined, grade: c[6] || undefined
+      })
+    }
+    if (!rows.length) {
+      ElMessage.warning('未解析到有效行,请使用「下载导入模板」的格式(UTF-8 编码)')
+      return
+    }
+    importing.value = true
+    let ok = 0
+    const failed = []
+    for (const row of rows) {
+      try {
+        await adminCreateUser(row)
+        ok++
+      } catch (e) {
+        failed.push(row.email)
+      }
+    }
+    importing.value = false
+    await load()
+    if (failed.length) {
+      ElMessageBox.alert(`成功 ${ok} 人,失败 ${failed.length} 人(多为邮箱已存在):\n${failed.join('、')}`, '导入结果')
+    } else {
+      ElMessage.success(`批量导入完成,共创建 ${ok} 个账号`)
+    }
+  }
+  reader.readAsText(opt.file, 'utf-8')
+}
+
 const authStore = useAuthStore()
 const items = ref([])
 const filters = reactive({ keyword: '', role: '', enabled: null })
@@ -203,6 +264,7 @@ onMounted(load)
 
 <style scoped>
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+.toolbar-right { display: flex; align-items: center; gap: 10px; }
 .filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .user-cell { display: flex; align-items: center; gap: 10px; }
 .sub-text { font-size: 12px; color: var(--text-secondary); }

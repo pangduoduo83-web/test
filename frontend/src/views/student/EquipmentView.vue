@@ -135,8 +135,10 @@
         <div><span v-for="p in arr(current.suitableProjects)" :key="p" class="chip">{{ p }}</span></div>
         <h4>参考文档</h4>
         <div class="dd-docs">
-          <div v-for="d in arr(current.docs)" :key="d" class="dd-doc-row">
-            <FileText :size="14" /> {{ d }}
+          <div v-for="(d, i) in arr(current.docs)" :key="i" class="dd-doc-row">
+            <FileText :size="14" /> {{ docName(d) }}
+            <a v-if="docUrl(d)" :href="docUrl(d)" :download="docName(d)" target="_blank" class="dd-doc-dl">下载</a>
+            <span v-else class="dd-doc-tip">到馆查阅</span>
           </div>
         </div>
       </template>
@@ -272,6 +274,7 @@ import {
   applyBorrow, fetchEquipment, fetchEquipmentFavorites, fetchLocations, toggleEquipmentFavorite
 } from '../../api'
 import { useAuthStore } from '../../stores/auth'
+import { loadSiteConfig, siteConfig as site } from '../../utils/siteConfig'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -284,7 +287,7 @@ const activeCategory = ref('')
 const failedImages = ref(new Set())
 const agreementVisible = ref(false)
 const page = ref(1)
-const pageSize = 9
+const pageSize = computed(() => site.equipmentPageSize || 9)
 
 // 心愿单:服务端保存,跨端同步(网页/小程序)
 const wishlist = ref(new Set())
@@ -328,6 +331,10 @@ const categoryIcons = {
 
 const arr = (v) => Array.isArray(v) ? v : []
 
+// 参考文档兼容旧字符串与新 {name,url} 结构
+const docName = (d) => (typeof d === 'string' ? d : d?.name || '')
+const docUrl = (d) => (typeof d === 'object' && d?.url ? d.url : '')
+
 const statusText = (e) => e.status === 'MAINTENANCE' ? '维护中'
   : e.availableCount > 0 ? `可借阅 (${e.availableCount}件)` : '已借完'
 const statusColor = (e) => e.status === 'MAINTENANCE' ? 'yellow' : e.availableCount > 0 ? 'green' : 'red'
@@ -353,7 +360,7 @@ const filtered = computed(() => items.value.filter((e) => {
 }))
 
 const pageItems = computed(() =>
-  filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+  filtered.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
 
 watch([activeCategory, items, onlyWish], () => { page.value = 1 })
 
@@ -413,6 +420,7 @@ const doSubmit = async () => {
 }
 
 onMounted(async () => {
+  loadSiteConfig()
   await load()
   locations.value = await fetchLocations()
   loadWishlist()
@@ -509,6 +517,8 @@ onMounted(async () => {
 h4 { margin: 14px 0 8px; font-size: 14px; }
 .dd-docs { font-size: 13px; color: #374151; display: grid; gap: 6px; }
 .dd-doc-row { display: flex; align-items: center; gap: 6px; }
+.dd-doc-dl { color: var(--brand-blue); margin-left: 6px; }
+.dd-doc-tip { color: #9ca3af; font-size: 12px; margin-left: 6px; }
 
 .steps { margin-bottom: 22px; }
 .form-row { display: flex; gap: 14px; }

@@ -76,10 +76,11 @@
     <!-- 相关文档 -->
     <view v-if="asList(equip.docs).length" class="card block">
       <text class="section-title">📚 相关文档</text>
-      <view v-for="(d, i) in asList(equip.docs)" :key="i" class="doc-row">
+      <view v-for="(d, i) in asList(equip.docs)" :key="i" class="doc-row" @click="openDoc(d)">
         <text class="doc-icon">📄</text>
-        <text class="doc-name">{{ d }}</text>
-        <text class="doc-tip muted">到馆查阅</text>
+        <text class="doc-name">{{ docName(d) }}</text>
+        <text v-if="docUrl(d)" class="doc-dl">下载</text>
+        <text v-else class="doc-tip muted">到馆查阅</text>
       </view>
     </view>
 
@@ -144,6 +145,36 @@ onLoad(async (options) => {
     })
     .catch(() => {})
 })
+
+// 参考文档兼容旧字符串与新 {name,url} 结构
+const docName = (d) => (typeof d === 'string' ? d : (d && d.name) || '')
+const docUrl = (d) => (d && typeof d === 'object' && d.url ? d.url : '')
+
+const openDoc = (d) => {
+  const url = docUrl(d)
+  if (!url) {
+    uni.showToast({ title: '该文档未上传附件,请到馆查阅', icon: 'none' })
+    return
+  }
+  const full = fullUrl(url)
+  const ext = (full.split('.').pop() || '').toLowerCase()
+  if (['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+    uni.showLoading({ title: '下载中...' })
+    uni.downloadFile({
+      url: full,
+      success: (res) => {
+        uni.hideLoading()
+        uni.openDocument({ filePath: res.tempFilePath, showMenu: true })
+      },
+      fail: () => {
+        uni.hideLoading()
+        uni.setClipboardData({ data: full, success: () => uni.showToast({ title: '链接已复制', icon: 'none' }) })
+      }
+    })
+  } else {
+    uni.setClipboardData({ data: full, success: () => uni.showToast({ title: '链接已复制,可在浏览器打开', icon: 'none' }) })
+  }
+}
 
 const onToggleWish = async () => {
   try {
@@ -351,6 +382,11 @@ const goApply = () => {
 
 .doc-tip {
   font-size: 22rpx;
+}
+
+.doc-dl {
+  color: $brand-blue;
+  font-size: 25rpx;
 }
 
 .bottom-gap {

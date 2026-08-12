@@ -3,9 +3,10 @@
     <!-- 顶部渐变横幅 -->
     <view class="hero" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="brand">
-        <view class="brand-logo">AI</view>
+        <image v-if="site.logoUrl" :src="fullUrl(site.logoUrl)" class="brand-logo-img" mode="aspectFill" />
+        <view v-else class="brand-logo">AI</view>
         <view class="brand-text">
-          <text class="brand-name">AI未来实践中心</text>
+          <text class="brand-name">{{ site.title }}</text>
           <text class="brand-slogan">项目驱动教学实验平台</text>
         </view>
       </view>
@@ -29,7 +30,7 @@
     <view class="form-card card">
       <view class="mode-tabs">
         <view class="mode-tab" :class="{ active: mode === 'login' }" @click="switchMode('login')">登录</view>
-        <view class="mode-tab" :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</view>
+        <view v-if="site.allowRegister" class="mode-tab" :class="{ active: mode === 'register' }" @click="switchMode('register')">注册</view>
       </view>
 
       <template v-if="mode === 'register'">
@@ -89,15 +90,17 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { login, register, fetchPublicStats } from '@/api'
+import { login, register, fetchPublicStats, fetchSiteConfig } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { getToken } from '@/utils/auth'
+import { fullUrl } from '@/config'
 
 const authStore = useAuthStore()
 const statusBarHeight = ref(20)
 const mode = ref('login')
 const submitting = ref(false)
 const stats = reactive({ equipmentCount: 128, studentCount: 3200, projectCount: 56 })
+const site = reactive({ title: 'AI未来实践中心', logoUrl: '', allowRegister: true })
 
 const majors = ['电子信息工程', '通信工程', '自动化', '计算机科学', '物联网工程']
 const grades = ['大一', '大二', '大三', '大四', '研究生']
@@ -122,6 +125,12 @@ onLoad(() => {
   }
   fetchPublicStats()
     .then((d) => Object.assign(stats, d))
+    .catch(() => {})
+  fetchSiteConfig()
+    .then((d) => {
+      Object.assign(site, d)
+      if (!site.allowRegister && mode.value === 'register') mode.value = 'login'
+    })
     .catch(() => {})
 })
 
@@ -217,6 +226,13 @@ const submit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.brand-logo-img {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 28rpx;
+  background: #fff;
 }
 
 .brand-text {

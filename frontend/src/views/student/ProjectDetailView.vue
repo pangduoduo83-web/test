@@ -114,41 +114,6 @@
       <el-progress :percentage="detail.enrollment.progress" :stroke-width="10" color="#3b82f6" />
     </div>
 
-    <!-- 项目成果(已报名时) -->
-    <div v-if="detail.enrollment" class="card submission-card">
-      <div class="pg-head">
-        <b>项目成果</b>
-        <span v-if="mySubmission" class="badge"
-              :class="mySubmission.status === 'GRADED' ? (mySubmission.score >= 60 ? 'badge-green' : 'badge-red') : 'badge-yellow'">
-          {{ mySubmission.status === 'GRADED' ? `已评分 ${mySubmission.score} 分` : '评审中' }}
-        </span>
-        <span v-else class="pg-meta">完成项目后提交成果,评分 ≥60 分自动判定项目完成并获得经验值</span>
-      </div>
-
-      <div v-if="mySubmission" class="sub-last">
-        <div class="sub-content">{{ mySubmission.content }}</div>
-        <img v-if="mySubmission.attachmentUrl" :src="mySubmission.attachmentUrl" class="sub-shot" alt="成果截图" />
-        <div v-if="mySubmission.status === 'GRADED'" class="sub-grade" :class="{ pass: mySubmission.score >= 60 }">
-          <b>{{ mySubmission.score >= 60 ? '评审通过,项目判定完成!' : '未达标,可修改后再次提交。' }}</b>
-          <template v-if="mySubmission.feedback">评语: {{ mySubmission.feedback }}</template>
-          <span class="sub-meta">{{ mySubmission.graderName }} 评于 {{ fmtTime(mySubmission.gradedAt) }}</span>
-        </div>
-        <div v-else class="sub-waiting">已提交,等待管理员评审 · {{ fmtTime(mySubmission.submittedAt) }}</div>
-      </div>
-
-      <div v-if="canSubmitWork" class="sub-form">
-        <el-input v-model="workContent" type="textarea" :rows="3" maxlength="1000" show-word-limit
-                  :placeholder="mySubmission ? '修改完善后可再次提交...' : '描述你的实现思路、完成情况与心得...'" />
-        <div class="sub-form-row">
-          <div class="sub-uploader">
-            <ImageUploader v-model="workShot" />
-          </div>
-          <el-button type="primary" :loading="submittingWork" class="sub-submit" @click="doSubmitWork">
-            {{ mySubmission ? '再次提交成果' : '提交成果' }}
-          </el-button>
-        </div>
-      </div>
-    </div>
 
     <!-- 内容 tabs -->
     <div class="card">
@@ -260,7 +225,7 @@
             <a v-if="r.url" :href="r.url" :download="r.name" target="_blank" class="res-download">
               <Download :size="13" /> 下载
             </a>
-            <el-button v-else size="small" text type="primary" @click="downloadResource(r)">下载</el-button>
+            <el-button v-else size="small" text type="info" @click="downloadResource(r)">待上传</el-button>
           </div>
           <h4>推荐阅读</h4>
           <div class="book-row">《嵌入式系统设计》 王田苗 著 <span class="badge badge-gray">图书馆藏书中</span></div>
@@ -269,7 +234,7 @@
 
         <el-tab-pane :label="`项目讨论(${topics.length})`" name="discussions">
           <div class="disc-post">
-            <el-input v-model="newTopic" type="textarea" :rows="2" placeholder="发起讨论,分享你的经验或问题..." />
+            <el-input v-model="newTopic" type="textarea" :rows="4" placeholder="发起讨论,分享你的经验或问题..." />
             <el-button type="primary" :loading="posting" @click="submitTopic">发起讨论</el-button>
           </div>
           <el-empty v-if="topics.length === 0" description="还没有讨论,来发第一帖吧!" />
@@ -296,6 +261,44 @@
               <el-button size="small" type="primary" @click="submitReply(t.item.id)">发送</el-button>
             </div>
           </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="项目成果" name="submission">
+          <el-empty v-if="!detail.enrollment" description="报名参与项目后,可在这里提交成果并查看评审结果" />
+          <template v-else>
+            <div class="pg-head">
+              <b>我的成果</b>
+              <span v-if="mySubmission" class="badge"
+                    :class="mySubmission.status === 'GRADED' ? (mySubmission.score >= 60 ? 'badge-green' : 'badge-red') : 'badge-yellow'">
+                {{ mySubmission.status === 'GRADED' ? `已评分 ${mySubmission.score} 分` : '评审中' }}
+              </span>
+              <span v-else class="pg-meta">完成项目后提交成果,评分 ≥60 分自动判定项目完成并获得经验值</span>
+            </div>
+
+            <div v-if="mySubmission" class="sub-last">
+              <div class="sub-content">{{ mySubmission.content }}</div>
+              <img v-if="mySubmission.attachmentUrl" :src="mySubmission.attachmentUrl" class="sub-shot" alt="成果截图" />
+              <div v-if="mySubmission.status === 'GRADED'" class="sub-grade" :class="{ pass: mySubmission.score >= 60 }">
+                <b>{{ mySubmission.score >= 60 ? '评审通过,项目判定完成!' : '未达标,可修改后再次提交。' }}</b>
+                <template v-if="mySubmission.feedback">评语: {{ mySubmission.feedback }}</template>
+                <span class="sub-meta">{{ mySubmission.graderName }} 评于 {{ fmtTime(mySubmission.gradedAt) }}</span>
+              </div>
+              <div v-else class="sub-waiting">已提交,等待管理员评审 · {{ fmtTime(mySubmission.submittedAt) }}</div>
+            </div>
+
+            <div v-if="canSubmitWork" class="sub-form">
+              <el-input v-model="workContent" type="textarea" :rows="3" maxlength="1000" show-word-limit
+                        :placeholder="mySubmission ? '修改完善后可再次提交...' : '描述你的实现思路、完成情况与心得...'" />
+              <div class="sub-form-row">
+                <div class="sub-uploader">
+                  <ImageUploader v-model="workShot" />
+                </div>
+                <el-button type="primary" :loading="submittingWork" class="sub-submit" @click="doSubmitWork">
+                  {{ mySubmission ? '再次提交成果' : '提交成果' }}
+                </el-button>
+              </div>
+            </div>
+          </template>
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -465,7 +468,7 @@ const downloadGerber = () => {
 }
 
 const downloadResource = (r) => {
-  ElMessage.info(`《${r.name}》暂未上传附件,请在项目讨论区联系导师获取`)
+  ElMessage.info(`《${r.name}》暂未上传附件,教师在「教学资源管理」上传后这里即可直接下载`)
 }
 
 onMounted(load)
@@ -496,7 +499,10 @@ onMounted(load)
 .hero-content { position: absolute; left: 28px; right: 28px; bottom: 22px; color: #fff; }
 .hero-badges { display: flex; gap: 8px; margin-bottom: 10px; }
 .hero-title { margin: 0 0 8px; font-size: 30px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.4); }
-.hero-summary { margin: 0; font-size: 14px; color: rgba(255,255,255,.85); max-width: 720px; }
+.hero-summary {
+  margin: 0; font-size: 14px; color: rgba(255,255,255,.85); max-width: 720px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 
 /* 元信息条 */
 .meta-bar {

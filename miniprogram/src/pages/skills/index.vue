@@ -46,8 +46,12 @@
         </picker>
       </view>
 
+      <view class="ai-chips">
+        <text v-for="k in goalChips" :key="k" class="goal-chip" @click="addGoalChip(k)">{{ k }}</text>
+      </view>
+
       <view v-if="!plan && !aiLoading" class="ai-empty muted">
-        基于六维技能画像与全部实战项目,AI 将规划「基础补强 → 综合实践 → 挑战提升」三阶段路线
+        基于六维技能画像与全部实战项目,AI 将规划「基础补强 → 综合实践 → 挑战提升」三阶段路线。推荐依据:技能短板覆盖、能力匹配、难度递进与学习目标
       </view>
       <view v-else-if="aiLoading" class="ai-empty muted">正在分析技能画像与项目库,大约需要 10~20 秒...</view>
 
@@ -141,6 +145,13 @@ const aiLoading = ref(false)
 const hourValues = [4, 6, 8, 10, 15]
 const hourLabels = hourValues.map((h) => `每周 ${h} 小时`)
 let planLoaded = false
+
+const goalChips = ['嵌入式开发', 'PCB设计', '物联网作品', '边缘AI应用', '信号处理', '备战电赛']
+
+const addGoalChip = (k) => {
+  if (aiGoal.value.includes(k)) return
+  aiGoal.value = aiGoal.value ? `${aiGoal.value}、${k}` : `想提升${k}`
+}
 
 const stageName = (s) => (s === 1 ? '基础补强' : s === 2 ? '综合实践' : '挑战提升')
 const diffBadge = (d) => (d === '入门' ? 'badge-green' : d === '进阶' ? 'badge-purple' : 'badge-red')
@@ -474,6 +485,22 @@ onShow(() => {
   text-align: center;
   margin-top: 20rpx;
   line-height: 1.7;
+}
+
+.ai-chips {
+  display: flex;
+  gap: 12rpx;
+  flex-wrap: wrap;
+  margin-top: 16rpx;
+}
+
+.goal-chip {
+  font-size: 22rpx;
+  color: #6b21a8;
+  background: #faf5ff;
+  border: 2rpx solid #e9d5ff;
+  border-radius: $radius-pill;
+  padding: 6rpx 20rpx;
 }
 
 .ai-summary {
