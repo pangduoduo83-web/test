@@ -46,13 +46,6 @@
       </div>
     </div>
 
-    <!-- 完整项目描述:后台「详细描述」优先,避免只出现在下方 Tab 里被当成缺失 -->
-    <div v-if="project.description || project.summary" class="card desc-panel">
-      <h4 class="sec-head"><ClipboardList :size="16" color="#2563eb" /> 项目描述</h4>
-      <div v-if="isRich(project.description)" class="intro-box rich-content" v-html="project.description"></div>
-      <div v-else class="intro-box intro-plain">{{ project.description || project.summary }}</div>
-    </div>
-
     <!-- 统计卡 -->
     <div class="stat-grid">
       <div class="ref-stat-card">
@@ -126,6 +119,10 @@
     <div class="card">
       <el-tabs v-model="tab">
         <el-tab-pane label="项目概览" name="overview">
+          <h4 class="sec-head"><ClipboardList :size="16" color="#2563eb" /> 项目描述</h4>
+          <div v-if="isRich(project.description)" class="intro-box rich-content" v-html="project.description"></div>
+          <div v-else class="intro-box intro-plain">{{ project.description || project.summary || '暂无详细描述' }}</div>
+
           <h4 class="sec-head"><Zap :size="16" color="#f59e0b" /> 项目特性</h4>
           <div class="tag-wrap">
             <span v-for="f in arr(project.features)" :key="f" class="chip">{{ f }}</span>
@@ -602,8 +599,6 @@ onMounted(load)
   margin: 0; font-size: 14px; color: rgba(255,255,255,.85); max-width: 720px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.desc-panel { padding: 18px 20px; margin-bottom: 16px; }
-.desc-panel .sec-head { margin-top: 0; }
 
 /* 元信息条 */
 .meta-bar {

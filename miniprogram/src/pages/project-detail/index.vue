@@ -23,13 +23,6 @@
     <view class="card head-card">
       <text class="title">{{ project.title }}</text>
       <text v-if="project.summary" class="summary">{{ project.summary }}</text>
-      <view v-if="richDesc" class="desc-block">
-        <template v-for="(seg, i) in richDesc" :key="i">
-          <rich-text v-if="seg.type === 'html'" class="rich-html" :nodes="seg.content" />
-          <video v-else class="rich-video" :src="seg.src" controls />
-        </template>
-      </view>
-      <text v-else-if="project.description" class="full-desc">{{ project.description }}</text>
       <view class="quick-stats">
         <view class="qs-item">
           <text class="qs-num">{{ project.duration }}</text>
@@ -99,10 +92,17 @@
 
       <!-- 概览 -->
       <view v-if="activeTab === 'overview'" class="tab-body">
-        <view v-if="!features.length && !learningGoals.length && !prerequisites.length" class="empty-box">
-          <text>项目介绍见上方描述</text>
+        <view class="desc-block">
+          <text class="sub-title">项目描述</text>
+          <template v-if="richDesc">
+            <template v-for="(seg, i) in richDesc" :key="i">
+              <rich-text v-if="seg.type === 'html'" class="rich-html" :nodes="seg.content" />
+              <video v-else class="rich-video" :src="seg.src" controls />
+            </template>
+          </template>
+          <text v-else class="full-desc">{{ project.description || project.summary || '暂无详细描述' }}</text>
         </view>
-        <view v-if="features.length" class="sub-block first-block">
+        <view v-if="features.length" class="sub-block">
           <text class="sub-title">项目特性</text>
           <view class="tags">
             <text v-for="f in features" :key="f" class="chip chip-blue">{{ f }}</text>
@@ -566,11 +566,11 @@ const sendDiscussion = async () => {
   margin-top: 12rpx;
 }
 .desc-block {
-  margin-top: 20rpx;
+  margin-top: 0;
 }
 .full-desc {
   display: block;
-  margin-top: 20rpx;
+  margin-top: 0;
   font-size: 28rpx;
   color: $text-main;
   line-height: 1.8;
@@ -742,9 +742,6 @@ const sendDiscussion = async () => {
 
 .sub-block {
   margin-top: 36rpx;
-}
-.first-block {
-  margin-top: 0;
 }
 
 .sub-title {
