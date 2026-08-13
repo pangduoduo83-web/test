@@ -83,6 +83,7 @@ function uploadTo(path, filePath) {
       url: `${BASE_URL}${path}`,
       filePath,
       name: 'file',
+      timeout: 180000,
       header: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
       success: (res) => {
         let body = {}

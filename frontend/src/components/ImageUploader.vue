@@ -10,7 +10,7 @@
     <div v-else class="drop" @click="pick">
       <span class="drop-icon"><ImagePlus :size="26" color="#9ca3af" /></span>
       <span class="drop-text">{{ uploading ? '上传中...' : '点击上传图片' }}</span>
-      <span class="drop-hint">支持 png / jpg / gif / webp,最大 10MB</span>
+      <span class="drop-hint">支持 png / jpg / gif / webp,最大 30MB</span>
     </div>
     <input ref="inputRef" type="file" accept="image/*" class="hidden-input" @change="onChange" />
   </div>
@@ -34,8 +34,8 @@ const onChange = async (e) => {
   const file = e.target.files?.[0]
   e.target.value = ''
   if (!file) return
-  if (file.size > 10 * 1024 * 1024) {
-    ElMessage.warning('图片不能超过 10MB')
+  if (file.size > 30 * 1024 * 1024) {
+    ElMessage.warning('图片不能超过 30MB')
     return
   }
   uploading.value = true

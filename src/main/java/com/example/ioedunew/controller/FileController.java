@@ -28,7 +28,7 @@ import java.util.UUID;
  * 安全边界:
  * - /api/upload 仅允许常见图片扩展名,登录用户可用(头像/封面);
  * - /api/upload/file 允许教学资料类扩展名,仅教师/管理员可用;
- * - 大小上限由 multipart 配置控制(10MB)。
+ * - 大小上限由 multipart 配置控制(30MB)。
  */
 @RestController
 @RequestMapping("/api/upload")

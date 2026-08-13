@@ -127,6 +127,10 @@ const categoryOptions = computed(() => site.equipmentCategories || [])
 const docRows = ref([])
 
 const doUploadDoc = async (opt, row) => {
+  if (opt.file.size > 30 * 1024 * 1024) {
+    ElMessage.warning('附件不能超过 30MB')
+    return
+  }
   row.uploading = true
   try {
     const { url, name } = await uploadDocFile(opt.file)

@@ -110,6 +110,10 @@ const pickFile = () => {
     type: 'file',
     success: async (res) => {
       const f = res.tempFiles[0]
+      if (f.size > 30 * 1024 * 1024) {
+        uni.showToast({ title: '附件不能超过 30MB', icon: 'none' })
+        return
+      }
       uni.showLoading({ title: '上传中...' })
       try {
         const d = await uploadDocFile(f.path)

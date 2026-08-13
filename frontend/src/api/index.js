@@ -8,14 +8,14 @@ export const fetchSiteConfig = () => http.get('/public/site-config')
 export const uploadImage = (file) => {
   const form = new FormData()
   form.append('file', file)
-  return http.post('/upload', form)
+  return http.post('/upload', form, { timeout: 180000 })
 }
 
 // ---------- 教学资料上传(教师/管理员,返回 {url, name}) ----------
 export const uploadDocFile = (file) => {
   const form = new FormData()
   form.append('file', file)
-  return http.post('/upload/file', form)
+  return http.post('/upload/file', form, { timeout: 180000 })
 }
 
 // ---------- 认证 ----------

@@ -38,8 +38,8 @@ const editorConfig = {
   MENU_CONF: {
     uploadImage: {
       async customUpload(file, insertFn) {
-        if (file.size > 10 * 1024 * 1024) {
-          ElMessage.warning('图片不能超过 10MB')
+        if (file.size > 30 * 1024 * 1024) {
+          ElMessage.warning('图片不能超过 30MB')
           return
         }
         try {
@@ -50,8 +50,8 @@ const editorConfig = {
     },
     uploadVideo: {
       async customUpload(file, insertFn) {
-        if (file.size > 10 * 1024 * 1024) {
-          ElMessage.warning('视频不能超过 10MB,建议压缩后上传')
+        if (file.size > 30 * 1024 * 1024) {
+          ElMessage.warning('视频不能超过 30MB,建议压缩后上传')
           return
         }
         try {

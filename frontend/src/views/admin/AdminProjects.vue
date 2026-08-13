@@ -312,6 +312,10 @@ const openEdit = (row) => {
 
 // el-upload 自定义上传:走 /api/upload/file,成功后把 url 写回该行(与教师端一致)
 const doUploadRes = async (opt, row) => {
+  if (opt.file.size > 30 * 1024 * 1024) {
+    ElMessage.warning('附件不能超过 30MB')
+    return
+  }
   row.uploading = true
   try {
     const { url, name } = await uploadDocFile(opt.file)

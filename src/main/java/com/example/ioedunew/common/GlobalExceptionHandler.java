@@ -39,7 +39,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleUploadTooLarge(MaxUploadSizeExceededException e) {
-        return ApiResponse.error(400, "文件过大,最大支持 10MB");
+        return ApiResponse.error(400, "文件过大,最大支持 30MB");
     }
 
     @ExceptionHandler(Exception.class)
