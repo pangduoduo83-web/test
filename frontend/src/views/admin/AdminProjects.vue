@@ -40,7 +40,8 @@
     </div>
 
     <!-- 编辑弹窗:基础信息 + 高级内容(结构化行编辑) -->
-    <el-dialog v-model="editVisible" :title="form.id ? '编辑项目' : '新增项目'" width="860px" top="4vh">
+    <el-dialog v-model="editVisible" :title="form.id ? '编辑项目' : '新增项目'" width="860px" top="4vh"
+               destroy-on-close>
       <el-tabs v-model="editTab">
         <el-tab-pane label="基础信息" name="basic">
           <el-form :model="form" label-width="90px">
@@ -48,9 +49,13 @@
             <el-form-item label="封面图">
               <ImageUploader v-model="form.coverUrl" />
             </el-form-item>
-            <el-form-item label="简介"><el-input v-model="form.summary" type="textarea" :rows="2" /></el-form-item>
+            <el-form-item label="简介">
+              <el-input v-model="form.summary" type="textarea" :rows="2" maxlength="300" show-word-limit
+                        placeholder="列表卡片上展示的一句话介绍,建议 80 字以内" />
+            </el-form-item>
             <el-form-item label="详细描述">
               <RichEditor v-model="form.description" />
+              <div class="field-tip">会完整显示在前台项目详情页,支持换行、图片和视频</div>
             </el-form-item>
             <div class="form-2col">
               <el-form-item label="难度">
@@ -452,6 +457,7 @@ onMounted(() => {
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .hint { color: var(--text-secondary); font-size: 13px; }
 .sub-text { font-size: 12px; color: var(--text-secondary); }
+.field-tip { margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
 .form-2col { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
 :deep(.el-select) { width: 100%; }
 .json-tip { font-size: 12px; color: #1d4ed8; background: #eff6ff; padding: 8px 12px; border-radius: 8px; }

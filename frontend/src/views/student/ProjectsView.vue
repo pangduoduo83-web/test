@@ -85,7 +85,7 @@
 
         <div class="pc-body">
           <h3 class="pc-title">{{ p.title }}</h3>
-          <p class="pc-summary">{{ p.summary }}</p>
+          <p class="pc-summary">{{ cardSummary(p) }}</p>
           <div class="pc-tags">
             <span v-for="t in arr(p.tags).slice(0, 3)" :key="t" class="chip">{{ t }}</span>
             <span v-if="arr(p.tags).length > 3" class="chip">+{{ arr(p.tags).length - 3 }}</span>
@@ -149,7 +149,7 @@
             <span class="badge" :class="diffBadge(p.difficulty)">{{ p.difficulty }}</span>
             <span v-if="p.verified" class="badge badge-blue"><BadgeCheck :size="12" /> 已验证</span>
           </div>
-          <p class="pc-summary">{{ p.summary }}</p>
+          <p class="pc-summary">{{ cardSummary(p) }}</p>
           <div class="pc-stats">
             <span><Eye :size="13" /> {{ fmtNum(p.views) }}</span>
             <span><Star :size="13" /> {{ fmtNum(p.favoriteCount) }}</span>
@@ -204,6 +204,13 @@ const categoryIcons = {
 }
 
 const arr = (v) => Array.isArray(v) ? v : []
+
+const stripHtml = (v) => {
+  if (!v) return ''
+  const t = String(v).includes('<') ? v.replace(/<[^>]+>/g, ' ') : String(v)
+  return t.replace(/\s+/g, ' ').trim()
+}
+const cardSummary = (p) => stripHtml(p.summary) || stripHtml(p.description)
 
 const fmtNum = (n) => {
   const v = n || 0
@@ -327,11 +334,27 @@ onMounted(() => {
 .pc-cover-fallback.small span { font-size: 32px; }
 
 .pc-body { padding: 16px 18px 18px; display: flex; flex-direction: column; flex: 1; }
-.pc-title { margin: 0 0 6px; font-size: 16px; color: #111827; }
+.pc-title {
+  margin: 0 0 8px; font-size: 16px; color: #111827; line-height: 1.4;
+}
+.project-card .pc-title {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: break-word;
+}
 .pc-summary {
-  margin: 0 0 10px; font-size: 13px; color: var(--text-secondary);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  min-height: 38px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  height: calc(13px * 1.6 * 2);
 }
 .pc-tags { margin-bottom: 6px; }
 

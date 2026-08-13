@@ -43,7 +43,7 @@
     </div>
 
     <!-- 编辑弹窗 -->
-    <el-dialog v-model="editVisible" :title="form.id ? '编辑设备' : '新增设备'" width="640px">
+    <el-dialog v-model="editVisible" :title="form.id ? '编辑设备' : '新增设备'" width="640px" destroy-on-close>
       <el-form :model="form" label-width="90px">
         <div class="form-2col">
           <el-form-item label="名称" required><el-input v-model="form.name" /></el-form-item>

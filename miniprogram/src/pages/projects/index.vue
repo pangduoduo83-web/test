@@ -81,7 +81,7 @@
             <text class="title ellipsis">{{ p.title }}</text>
             <text v-if="p.verified" class="badge badge-blue verified">✓ 已验证</text>
           </view>
-          <text class="summary ellipsis-2">{{ p.summary }}</text>
+          <text class="summary ellipsis-2">{{ stripHtml(p.summary) || stripHtml(p.description) }}</text>
           <view class="tags">
             <text v-for="t in asList(p.tags).slice(0, 3)" :key="t" class="chip">{{ t }}</text>
           </view>
@@ -109,6 +109,7 @@ import { fetchProjects } from '@/api'
 import { fullUrl } from '@/config'
 import { asList, shortNum } from '@/utils/format'
 import { getToken } from '@/utils/auth'
+import { stripHtml } from '@/utils/rich'
 
 const sorts = [
   { label: '综合热度', value: 'popular' },
@@ -317,7 +318,9 @@ onPullDownRefresh(async () => {
   display: block;
   color: $text-sub;
   font-size: 26rpx;
+  line-height: 1.5;
   margin-top: 12rpx;
+  height: calc(26rpx * 1.5 * 2);
 }
 
 .tags {

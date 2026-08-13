@@ -17,7 +17,7 @@
           <span class="cover-badge green" style="position:static">开源</span>
         </div>
         <h1 class="hero-title">{{ project.title }}</h1>
-        <p class="hero-summary">{{ project.summary }}</p>
+        <p v-if="project.summary" class="hero-summary">{{ project.summary }}</p>
       </div>
     </div>
 
@@ -44,6 +44,13 @@
           {{ detail.enrolled ? '✓ 已报名' : enrolling ? '处理中...' : '立即报名' }}
         </button>
       </div>
+    </div>
+
+    <!-- 完整项目描述:后台「详细描述」优先,避免只出现在下方 Tab 里被当成缺失 -->
+    <div v-if="project.description || project.summary" class="card desc-panel">
+      <h4 class="sec-head"><ClipboardList :size="16" color="#2563eb" /> 项目描述</h4>
+      <div v-if="isRich(project.description)" class="intro-box rich-content" v-html="project.description"></div>
+      <div v-else class="intro-box intro-plain">{{ project.description || project.summary }}</div>
     </div>
 
     <!-- 统计卡 -->
@@ -119,10 +126,6 @@
     <div class="card">
       <el-tabs v-model="tab">
         <el-tab-pane label="项目概览" name="overview">
-          <h4 class="sec-head"><ClipboardList :size="16" color="#2563eb" /> 项目简介</h4>
-          <div v-if="isRich(project.description)" class="intro-box rich-content" v-html="project.description"></div>
-          <div v-else class="intro-box">{{ project.description || project.summary || '暂无详细描述' }}</div>
-
           <h4 class="sec-head"><Zap :size="16" color="#f59e0b" /> 项目特性</h4>
           <div class="tag-wrap">
             <span v-for="f in arr(project.features)" :key="f" class="chip">{{ f }}</span>
@@ -402,8 +405,12 @@ const diffColor = (d) => d === '入门' ? 'green' : d === '进阶' ? 'blue' : 'r
 
 const project = computed(() => detail.value.project)
 const arr = (v) => Array.isArray(v) ? v : []
-// 富文本描述(后端已消毒);旧数据为纯文本
-const isRich = (v) => typeof v === 'string' && v.includes('<')
+// 富文本描述(后端已消毒);旧数据为纯文本。空编辑器占位 <p><br></p> 不当作有内容。
+const isRich = (v) => {
+  if (typeof v !== 'string' || !v.includes('<')) return false
+  const t = v.replace(/<p><br\s*\/?><\/p>/gi, '').replace(/<[^>]+>/g, '').trim()
+  return t.length > 0 || /<(img|video|table|ul|ol)\b/i.test(v)
+}
 
 const mySkill = (name) => {
   const s = skills.value.find((x) => x.skillName === name)
@@ -593,8 +600,10 @@ onMounted(load)
 .hero-title { margin: 0 0 8px; font-size: 30px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.4); }
 .hero-summary {
   margin: 0; font-size: 14px; color: rgba(255,255,255,.85); max-width: 720px;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.desc-panel { padding: 18px 20px; margin-bottom: 16px; }
+.desc-panel .sec-head { margin-top: 0; }
 
 /* 元信息条 */
 .meta-bar {
@@ -693,6 +702,7 @@ h4:first-child { margin-top: 6px; }
   padding: 16px 18px;
   color: #1e3a5f; line-height: 1.9; font-size: 14px;
 }
+.intro-plain { white-space: pre-wrap; word-break: break-word; }
 
 .tag-wrap { display: flex; flex-wrap: wrap; }
 

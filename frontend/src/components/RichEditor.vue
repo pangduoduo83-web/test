@@ -13,16 +13,17 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, shallowRef } from 'vue'
+import { onBeforeUnmount, shallowRef, watch } from 'vue'
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
 import { ElMessage } from 'element-plus'
 import { uploadDocFile, uploadImage } from '../api'
 import '@wangeditor/editor/dist/css/style.css'
 
-defineProps({ modelValue: { type: String, default: '' } })
+const props = defineProps({ modelValue: { type: String, default: '' } })
 const emit = defineEmits(['update:modelValue'])
 
 const editorRef = shallowRef(null)
+let ready = false
 
 const toolbarConfig = {
   toolbarKeys: [
@@ -64,12 +65,25 @@ const editorConfig = {
 
 const onCreated = (editor) => {
   editorRef.value = editor
+  const html = props.modelValue || ''
+  if (html) editor.setHtml(html)
+  ready = true
 }
 
 const onChange = (editor) => {
+  if (!ready) return
   const html = editor.getHtml()
-  emit('update:modelValue', html === '<p><br></p>' ? '' : html)
+  const next = html === '<p><br></p>' ? '' : html
+  if (next !== (props.modelValue || '')) emit('update:modelValue', next)
 }
+
+watch(() => props.modelValue, (v) => {
+  const editor = editorRef.value
+  if (!editor || !ready) return
+  const next = v || ''
+  const cur = editor.getHtml() === '<p><br></p>' ? '' : editor.getHtml()
+  if (cur !== next) editor.setHtml(next)
+})
 
 onBeforeUnmount(() => {
   editorRef.value?.destroy()

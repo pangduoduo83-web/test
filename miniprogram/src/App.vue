@@ -165,5 +165,7 @@ page {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  word-break: break-word;
+  text-overflow: ellipsis;
 }
 </style>
