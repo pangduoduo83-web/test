@@ -22,11 +22,11 @@
 
     <!-- 项目列表 -->
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="projects.length === 0" class="empty-box">
-      <text class="empty-icon">📚</text>
+      <uni-icons type="folder-add" size="40" color="#d1d5db" />
       <text>暂无名下项目,请联系管理员指派</text>
     </view>
     <view v-else class="list">
@@ -56,9 +56,9 @@
           </view>
         </view>
         <view class="pc-actions">
-          <view class="act-btn" @click="goStudents(p)">👨‍🎓 学生进度</view>
-          <view class="act-btn" @click="goResources(p)">📂 教学资源</view>
-          <view class="act-btn" @click="changeCover(p)">🖼 更换封面</view>
+          <view class="act-btn" @click="goStudents(p)">学生进度</view>
+          <view class="act-btn" @click="goResources(p)">教学资源</view>
+          <view class="act-btn" @click="changeCover(p)">更换封面</view>
         </view>
       </view>
     </view>

@@ -9,7 +9,7 @@
     <template v-if="assessments.length">
       <view class="card block">
         <view class="last-head">
-          <text class="section-title">🧮 分阶段考核({{ assessments.length }} 项)</text>
+          <text class="section-title">分阶段考核({{ assessments.length }} 项)</text>
           <text v-if="overallScore !== null" class="badge" :class="overallScore >= 60 ? 'badge-green' : 'badge-red'">
             综合 {{ overallScore }} 分
           </text>
@@ -65,7 +65,7 @@
     <!-- 最近一次提交 -->
     <view v-if="!assessments.length && last" class="card block">
       <view class="last-head">
-        <text class="section-title">📄 最近一次提交</text>
+        <text class="section-title">最近一次提交</text>
         <text class="badge" :class="last.status === 'GRADED' ? 'badge-green' : 'badge-yellow'">
           {{ last.status === 'GRADED' ? '已评分' : '评审中' }}
         </text>
@@ -93,7 +93,7 @@
 
     <!-- 提交表单(整体单一成果模式) -->
     <view v-if="!assessments.length && canSubmit" class="card block">
-      <text class="section-title">✍️ {{ last ? '再次提交' : '提交成果' }}</text>
+      <text class="section-title">{{ last ? '再次提交' : '提交成果' }}</text>
       <textarea
         v-model="content"
         class="field-textarea"
@@ -117,7 +117,7 @@
     </view>
 
     <view v-else-if="!assessments.length && last && last.status === 'SUBMITTED'" class="card block waiting-card">
-      <text class="waiting-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="36" color="#d1d5db" />
       <text class="waiting-text">成果评审中,请耐心等待管理员评分</text>
       <text class="muted">评分结果将通过站内通知告知</text>
     </view>
@@ -465,10 +465,6 @@ const submit = async (assessName) => {
 
 .assess-form {
   margin-top: 16rpx;
-}
-
-.waiting-icon {
-  font-size: 64rpx;
 }
 
 .waiting-text {

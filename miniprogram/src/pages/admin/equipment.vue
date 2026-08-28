@@ -1,12 +1,12 @@
 <template>
   <view class="page">
     <view class="search-box">
-      <text class="search-icon">⌕</text>
+      <uni-icons type="search" size="17" color="#9ca3af" />
       <input v-model="keyword" class="search-input" placeholder="搜索设备名称、型号..." placeholder-class="ph" />
     </view>
 
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else class="list">
@@ -27,12 +27,12 @@
           </view>
         </view>
         <view class="ec-actions">
-          <view class="act-btn" @click="goEdit(e.id)">✏️ 编辑</view>
-          <view class="act-btn danger" @click="onDelete(e)">🗑 删除</view>
+          <view class="act-btn" @click="goEdit(e.id)">编辑</view>
+          <view class="act-btn danger" @click="onDelete(e)">删除</view>
         </view>
       </view>
       <view v-if="filtered.length === 0" class="empty-box">
-        <text class="empty-icon">🔍</text>
+        <uni-icons type="search" size="40" color="#d1d5db" />
         <text>没有匹配的设备</text>
       </view>
     </view>
@@ -113,12 +113,6 @@ onPullDownRefresh(async () => {
   padding: 16rpx 28rpx;
   gap: 16rpx;
   box-shadow: 0 2rpx 12rpx rgba(17, 24, 39, 0.04);
-}
-
-.search-icon {
-  color: $text-light;
-  font-size: 34rpx;
-  font-weight: 700;
 }
 
 .search-input {

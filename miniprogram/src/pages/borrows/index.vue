@@ -2,7 +2,7 @@
   <view class="page">
     <!-- 游客提示:借阅记录为登录后功能,不强制登录 -->
     <view v-if="!loggedIn" class="empty-box guest-box">
-      <text class="empty-icon">🔐</text>
+      <uni-icons type="locked" size="40" color="#d1d5db" />
       <text>登录后可查看和管理你的借阅记录</text>
       <button class="btn-gradient go-btn" @click="goLogin">去登录</button>
       <button class="btn-plain go-btn" @click="goEquipment">先去设备馆逛逛</button>
@@ -46,11 +46,11 @@
 
     <!-- 列表 -->
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="filtered.length === 0" class="empty-box">
-      <text class="empty-icon">📋</text>
+      <uni-icons type="list" size="40" color="#d1d5db" />
       <text>暂无相关借阅记录</text>
       <button class="btn-gradient go-btn" @click="goEquipment">去设备馆逛逛</button>
     </view>

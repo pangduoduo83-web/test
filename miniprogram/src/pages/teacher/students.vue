@@ -6,11 +6,11 @@
     </view>
 
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="items.length === 0" class="empty-box">
-      <text class="empty-icon">👨‍🎓</text>
+      <uni-icons type="contact" size="40" color="#d1d5db" />
       <text>还没有学生报名该项目</text>
     </view>
     <view v-else class="list">

@@ -6,11 +6,11 @@
         <text class="hb-title">设备图书馆</text>
         <text class="hb-sub">当前可借 {{ availableTotal }} 台 · 共 {{ items.length }} 种设备</text>
       </view>
-      <text class="hb-icon">🔬</text>
+      <uni-icons type="gear-filled" size="36" color="rgba(255,255,255,0.85)" />
     </view>
 
     <view class="search-box">
-      <text class="search-icon">⌕</text>
+      <uni-icons type="search" size="17" color="#9ca3af" />
       <input
         v-model="keyword"
         class="search-input"
@@ -34,7 +34,7 @@
         {{ s.label }}
       </view>
       <picker mode="selector" :range="locationRange" @change="changeLocation($event.detail.value)">
-        <view class="pill" :class="{ active: !!location }">📍 {{ location || '全部位置' }}</view>
+        <view class="pill" :class="{ active: !!location }">{{ location || '全部位置' }}</view>
       </picker>
       <view class="pill" :class="{ active: minRating > 0 }" @click="toggleRating">
         ★ {{ minRating > 0 ? minRating + '+' : '评分' }}
@@ -60,11 +60,11 @@
 
     <!-- 设备列表 -->
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="filtered.length === 0" class="empty-box">
-      <text class="empty-icon">🔍</text>
+      <uni-icons type="search" size="40" color="#d1d5db" />
       <text>没有找到符合条件的设备</text>
     </view>
     <view v-else class="list">
@@ -101,8 +101,14 @@
           </view>
           <view class="foot-row">
             <view class="foot-meta">
-              <text class="meta">📍 {{ e.location }}</text>
-              <text class="meta">★ {{ e.rating }}</text>
+              <view class="meta">
+                <uni-icons type="location" size="12" color="#9ca3af" />
+                <text>{{ e.location }}</text>
+              </view>
+              <view class="meta">
+                <uni-icons type="star-filled" size="12" color="#f59e0b" />
+                <text>{{ e.rating }}</text>
+              </view>
               <text class="meta">{{ e.borrowCount }}次借出</text>
             </view>
             <button
@@ -299,10 +305,6 @@ onPullDownRefresh(async () => {
   margin-top: 8rpx;
 }
 
-.hb-icon {
-  font-size: 72rpx;
-}
-
 .search-box {
   display: flex;
   align-items: center;
@@ -311,12 +313,6 @@ onPullDownRefresh(async () => {
   padding: 16rpx 28rpx;
   gap: 16rpx;
   box-shadow: 0 2rpx 12rpx rgba(17, 24, 39, 0.04);
-}
-
-.search-icon {
-  color: $text-light;
-  font-size: 34rpx;
-  font-weight: 700;
 }
 
 .search-input {
@@ -484,6 +480,9 @@ onPullDownRefresh(async () => {
 .meta {
   font-size: 22rpx;
   color: $text-light;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
 }
 
 .borrow-btn {

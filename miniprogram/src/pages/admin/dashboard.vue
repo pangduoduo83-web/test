@@ -33,7 +33,7 @@
     <!-- 最新待审批 -->
     <view v-if="recentPending.length" class="card block">
       <view class="block-head">
-        <text class="section-title">⏰ 最新待审批</text>
+        <text class="section-title">最新待审批</text>
         <text class="more" @click="goBorrows">去审批 ›</text>
       </view>
       <view v-for="b in recentPending" :key="b.id" class="pending-row" @click="goBorrows">
@@ -48,7 +48,7 @@
     <!-- 30天趋势 -->
     <view class="card block">
       <view class="block-head">
-        <text class="section-title">📈 近30天借阅趋势</text>
+        <text class="section-title">近30天借阅趋势</text>
         <view class="seg-group">
           <view class="seg" :class="{ active: series === 'applied' }" @click="series = 'applied'">申请</view>
           <view class="seg" :class="{ active: series === 'returned' }" @click="series = 'returned'">归还</view>
@@ -68,7 +68,7 @@
 
     <!-- 设备利用率 -->
     <view class="card block">
-      <text class="section-title">🔥 设备利用率 Top{{ utilization.length }}</text>
+      <text class="section-title">设备利用率 Top{{ utilization.length }}</text>
       <view v-for="u in utilization" :key="u.name" class="util-item">
         <view class="util-head">
           <text class="util-name ellipsis">{{ u.name }}</text>
@@ -80,7 +80,7 @@
         <text class="util-borrow muted">累计借出 {{ u.borrowCount }} 次</text>
       </view>
       <view v-if="utilization.length === 0" class="empty-box small-empty">
-        <text class="empty-icon">📊</text>
+        <uni-icons type="bars" size="40" color="#d1d5db" />
         <text>暂无数据</text>
       </view>
     </view>

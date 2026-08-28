@@ -96,7 +96,7 @@
       <view class="cf-row"><text class="cf-label">备注</text><text class="cf-value">{{ form.remark || '-' }}</text></view>
 
       <view class="tips-box">
-        <text class="tips-title">📌 温馨提示</text>
+        <text class="tips-title">温馨提示</text>
         <text class="tips-item">· 请在使用前检查设备完整性</text>
         <text class="tips-item">· 开发板类设备借用期限为2周</text>
         <text class="tips-item">· 精密仪器需在老师指导下使用</text>

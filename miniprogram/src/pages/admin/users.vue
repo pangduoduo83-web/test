@@ -1,8 +1,8 @@
 <template>
   <view class="page">
     <view class="search-box">
-      <text class="search-icon">⌕</text>
-      <input v-model="keyword" class="search-input" placeholder="搜索姓名、邮箱、学号..." placeholder-class="ph" />
+      <uni-icons type="search" size="17" color="#9ca3af" />
+      <input v-model="keyword" class="search-input" placeholder="搜索姓名、邮箱、手机号、学号..." placeholder-class="ph" />
     </view>
 
     <view class="tab-row">
@@ -18,7 +18,7 @@
     </view>
 
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else class="list">
@@ -38,17 +38,17 @@
           </view>
         </view>
         <view v-if="u.id !== myId" class="uc-actions">
-          <view class="act-btn" @click="changeRole(u)">🎭 角色</view>
-          <view class="act-btn" @click="resetPassword(u)">🔑 重置密码</view>
+          <view class="act-btn" @click="changeRole(u)">角色</view>
+          <view class="act-btn" @click="resetPassword(u)">重置密码</view>
           <view class="act-btn" :class="u.enabled === false ? 'ok' : 'danger'" @click="toggleEnabled(u)">
-            {{ u.enabled === false ? '✓ 启用' : '⛔ 禁用' }}
+            {{ u.enabled === false ? '启用' : '禁用' }}
           </view>
-          <view class="act-btn danger" @click="onDelete(u)">🗑</view>
+          <view class="act-btn danger" @click="onDelete(u)">删除</view>
         </view>
         <view v-else class="self-tip muted">当前登录账号</view>
       </view>
       <view v-if="filtered.length === 0" class="empty-box">
-        <text class="empty-icon">👥</text>
+        <uni-icons type="staff" size="40" color="#d1d5db" />
         <text>没有匹配的用户</text>
       </view>
       <view class="list-end muted">共 {{ filtered.length }} 人</view>
@@ -143,6 +143,7 @@ const filtered = computed(() => {
     return (
       (u.name || '').toLowerCase().includes(k) ||
       (u.email || '').toLowerCase().includes(k) ||
+      (u.phone || '').includes(k) ||
       (u.studentNo || '').toLowerCase().includes(k)
     )
   })
@@ -295,12 +296,6 @@ onPullDownRefresh(async () => {
   padding: 16rpx 28rpx;
   gap: 16rpx;
   box-shadow: 0 2rpx 12rpx rgba(17, 24, 39, 0.04);
-}
-
-.search-icon {
-  color: $text-light;
-  font-size: 34rpx;
-  font-weight: 700;
 }
 
 .search-input {

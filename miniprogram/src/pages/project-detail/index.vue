@@ -59,7 +59,7 @@
     <!-- 已报名进度 -->
     <view v-if="enrolled && enrollment" class="card enroll-card">
       <view class="enroll-head">
-        <text class="section-title">📈 我的进度</text>
+        <text class="section-title">我的进度</text>
         <text class="badge" :class="enrollment.status === 'COMPLETED' ? 'badge-green' : 'badge-blue'">
           {{ enrollment.status === 'COMPLETED' ? '已完成' : '进行中' }}
         </text>
@@ -71,7 +71,7 @@
         <text class="muted">{{ enrollment.progress || 0 }}% · {{ enrollment.currentTask || '尚未开始任务' }}</text>
         <text v-if="enrollment.deadline" class="muted">截止 {{ formatDate(enrollment.deadline) }}</text>
       </view>
-      <button class="btn-plain submit-work-btn" @click="goSubmission">📤 提交项目成果 / 查看评分</button>
+      <button class="btn-plain submit-work-btn" @click="goSubmission">提交项目成果 / 查看评分</button>
     </view>
 
     <!-- Tab 区 -->
@@ -127,7 +127,7 @@
       <!-- 技能要求 -->
       <view v-else-if="activeTab === 'skills'" class="tab-body">
         <view v-if="skillRequirements.length === 0" class="empty-box">
-          <text class="empty-icon">🎯</text>
+          <uni-icons type="medal" size="40" color="#d1d5db" />
           <text>本项目未设置技能要求</text>
         </view>
         <view v-for="req in skillRequirements" :key="req.name" class="skill-item">
@@ -154,11 +154,11 @@
       <!-- 所需设备 -->
       <view v-else-if="activeTab === 'equipment'" class="tab-body">
         <view v-if="equipmentNames.length === 0" class="empty-box">
-          <text class="empty-icon">🧰</text>
+          <uni-icons type="gear" size="40" color="#d1d5db" />
           <text>本项目无需专用设备</text>
         </view>
         <view v-for="(name, i) in equipmentNames" :key="i" class="equip-row">
-          <text class="equip-icon">🔧</text>
+          <uni-icons type="gear" size="16" color="#6b7280" />
           <text class="equip-name">{{ name }}</text>
         </view>
         <button v-if="equipmentNames.length" class="btn-plain go-equip" @click="goEquipment">去设备图书馆借用</button>
@@ -167,7 +167,7 @@
       <!-- 教学大纲 -->
       <view v-else-if="activeTab === 'syllabus'" class="tab-body">
         <view v-if="syllabus.length === 0" class="empty-box">
-          <text class="empty-icon">📚</text>
+          <uni-icons type="list" size="40" color="#d1d5db" />
           <text>教学大纲整理中</text>
         </view>
         <view v-for="(s, i) in syllabus" :key="i" class="syllabus-item">
@@ -189,7 +189,7 @@
       <!-- BOM -->
       <view v-else-if="activeTab === 'bom'" class="tab-body">
         <view v-if="bom.length === 0" class="empty-box">
-          <text class="empty-icon">🧾</text>
+          <uni-icons type="list" size="40" color="#d1d5db" />
           <text>BOM 清单整理中</text>
         </view>
         <template v-else>
@@ -218,11 +218,11 @@
       <!-- 学习资源 -->
       <view v-else-if="activeTab === 'resources'" class="tab-body">
         <view v-if="resources.length === 0" class="empty-box">
-          <text class="empty-icon">📂</text>
+          <uni-icons type="folder-add" size="40" color="#d1d5db" />
           <text>暂无学习资源</text>
         </view>
         <view v-for="(r, i) in resources" :key="i" class="res-row" @click="openResource(r)">
-          <text class="res-icon">{{ resIcon(r.type) }}</text>
+          <uni-icons :type="resIcon(r.type)" size="20" color="#2563eb" />
           <view class="res-info">
             <text class="res-name ellipsis">{{ r.name }}</text>
             <text class="res-type">{{ r.type }}{{ r.url ? '' : ' · 资源准备中' }}</text>
@@ -234,7 +234,7 @@
       <!-- 讨论 -->
       <view v-else-if="activeTab === 'discuss'" class="tab-body">
         <view v-if="discussions.length === 0" class="empty-box">
-          <text class="empty-icon">💬</text>
+          <uni-icons type="chatboxes" size="40" color="#d1d5db" />
           <text>还没有讨论,来发第一帖</text>
         </view>
         <view v-for="d in discussions" :key="d.item.id" class="disc-item">
@@ -294,7 +294,7 @@
   </view>
 
   <view v-else class="empty-box page-loading">
-    <text class="empty-icon">⏳</text>
+    <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
     <text>加载中...</text>
   </view>
 </template>
@@ -356,8 +356,9 @@ const bomTotal = computed(() =>
 
 const diffBadge = (d) => (d === '入门' ? 'badge-green' : d === '进阶' ? 'badge-purple' : 'badge-red')
 
+// 资源类型 → uni-icons 图标名
 const resIcon = (type) =>
-  ({ 文档: '📄', 视频: '🎬', 代码: '💻', 手册: '📖', 原理图: '📐', LAYOUT: '🧩', '3D图': '🧊' }[type] || '📎')
+  ({ 文档: 'paperclip', 视频: 'videocam', 代码: 'gear', 手册: 'list', 原理图: 'map', LAYOUT: 'tune', '3D图': 'image' }[type] || 'paperclip')
 
 const mySkill = (name) => {
   const s = mySkills.value.find((x) => x.skillName === name)
@@ -864,10 +865,6 @@ const sendDiscussion = async () => {
   margin-bottom: 16rpx;
 }
 
-.equip-icon {
-  font-size: 32rpx;
-}
-
 .equip-name {
   font-size: 28rpx;
 }
@@ -1003,10 +1000,6 @@ const sendDiscussion = async () => {
   background: $gray-bg;
   border-radius: 16rpx;
   margin-bottom: 16rpx;
-}
-
-.res-icon {
-  font-size: 40rpx;
 }
 
 .res-info {

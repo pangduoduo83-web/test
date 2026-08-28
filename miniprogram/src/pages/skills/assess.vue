@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="card intro-card">
-      <text class="intro-title">📝 能力自测评</text>
+      <text class="intro-title">能力自测评</text>
       <text class="intro-desc">请根据自己的真实水平拖动滑块打分(0-100),提交后将更新技能画像与学习建议。</text>
     </view>
 

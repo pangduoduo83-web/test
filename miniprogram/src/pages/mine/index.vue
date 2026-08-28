@@ -21,7 +21,7 @@
           <text class="user-sub">{{ user?.major || '-' }} · {{ user?.grade || '-' }} · 学号 {{ user?.studentNo || '-' }}</text>
         </view>
         <view class="bell" @click="goNotifications">
-          <text class="bell-icon">🔔</text>
+          <uni-icons type="notification-filled" size="22" color="#ffffff" />
           <view v-if="unread > 0" class="bell-badge">{{ unread > 99 ? '99+' : unread }}</view>
         </view>
       </view>
@@ -33,29 +33,29 @@
         <text class="level-text">{{ dash.levelProgress || 0 }}/100</text>
       </view>
       <view class="week-row">
-        <text class="week-text">本周实践 {{ dash.weeklyHours || 0 }} 小时,继续加油 💪</text>
+        <text class="week-text">本周实践 {{ dash.weeklyHours || 0 }} 小时,继续加油</text>
       </view>
     </view>
 
     <!-- 统计四宫格 -->
     <view class="stats-grid">
       <view class="stat-card">
-        <text class="stat-icon">🎓</text>
+        <uni-icons type="flag" size="19" color="#2563eb" />
         <text class="stat-num">{{ dash.completedProjects || 0 }}</text>
         <text class="stat-label">完成项目</text>
       </view>
       <view class="stat-card">
-        <text class="stat-icon">⏱</text>
+        <uni-icons type="calendar" size="19" color="#16a34a" />
         <text class="stat-num">{{ dash.weeklyHours || 0 }}h</text>
         <text class="stat-label">本周时长</text>
       </view>
       <view class="stat-card">
-        <text class="stat-icon">🏅</text>
+        <uni-icons type="medal" size="19" color="#f59e0b" />
         <text class="stat-num">{{ dash.achievementCount || 0 }}</text>
         <text class="stat-label">成就徽章</text>
       </view>
       <view class="stat-card">
-        <text class="stat-icon">📊</text>
+        <uni-icons type="bars" size="19" color="#9333ea" />
         <text class="stat-num">{{ dash.skillAvg || 0 }}%</text>
         <text class="stat-label">技能掌握</text>
       </view>
@@ -64,7 +64,7 @@
     <!-- 学习趋势 -->
     <view class="card block">
       <view class="block-head">
-        <text class="section-title">📈 学习趋势</text>
+        <text class="section-title">学习趋势</text>
         <view class="seg-group">
           <view class="seg" :class="{ active: trendRange === 'week' }" @click="trendRange = 'week'">本周</view>
           <view class="seg" :class="{ active: trendRange === 'month' }" @click="trendRange = 'month'">本月</view>
@@ -96,11 +96,11 @@
     <!-- 进行中项目 -->
     <view class="card block">
       <view class="block-head">
-        <text class="section-title">🚀 进行中的项目</text>
+        <text class="section-title">进行中的项目</text>
         <text class="more" @click="goProjects">去项目中心 ›</text>
       </view>
       <view v-if="ongoing.length === 0" class="empty-box small-empty">
-        <text class="empty-icon">🌱</text>
+        <uni-icons type="flag" size="40" color="#d1d5db" />
         <text>还没有进行中的项目,去报名一个吧</text>
       </view>
       <view v-for="e in ongoing" :key="e.id" class="ongoing-item" @click="goProjectDetail(e.projectId)">
@@ -121,10 +121,10 @@
 
     <!-- 成就徽章 -->
     <view class="card block">
-      <text class="section-title">🏆 成就徽章</text>
+      <text class="section-title">成就徽章</text>
       <view class="ach-grid">
         <view v-for="a in achievements" :key="a.name" class="ach-item" :class="{ locked: !a.unlocked }">
-          <text class="ach-icon">{{ a.icon }}</text>
+          <uni-icons :type="achIconType(a.name)" size="26" :color="a.unlocked ? '#f59e0b' : '#9ca3af'" />
           <text class="ach-name">{{ a.name }}</text>
           <text class="ach-desc">{{ a.desc }}</text>
           <text class="badge" :class="a.unlocked ? 'badge-green' : 'badge-gray'">
@@ -136,9 +136,9 @@
 
     <!-- 教师功能 -->
     <view v-if="isTeacher || isAdmin" class="card block menu-card">
-      <view class="menu-group-title">👨‍🏫 教师功能</view>
+      <view class="menu-group-title">教师功能</view>
       <view class="menu-item" @click="goPage('/pages/teacher/workbench')">
-        <text class="menu-icon">📚</text>
+        <uni-icons type="home" size="17" color="#4b5563" />
         <text class="menu-text">教学工作台</text>
         <text class="menu-arrow">›</text>
       </view>
@@ -146,54 +146,54 @@
 
     <!-- 管理功能 -->
     <view v-if="isAdmin" class="card block menu-card">
-      <view class="menu-group-title">🛡️ 管理控制台</view>
+      <view class="menu-group-title">管理控制台</view>
       <view class="menu-item" @click="goPage('/pages/admin/dashboard')">
-        <text class="menu-icon">📊</text>
+        <uni-icons type="bars" size="17" color="#4b5563" />
         <text class="menu-text">数据看板</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/borrows')">
-        <text class="menu-icon">✅</text>
+        <uni-icons type="checkbox" size="17" color="#4b5563" />
         <text class="menu-text">借阅审批</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/submissions')">
-        <text class="menu-icon">📝</text>
+        <uni-icons type="compose" size="17" color="#4b5563" />
         <text class="menu-text">成果评分</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/enrollments')">
-        <text class="menu-icon">🎓</text>
+        <uni-icons type="personadd" size="17" color="#4b5563" />
         <text class="menu-text">报名管理</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/notifications')">
-        <text class="menu-icon">📣</text>
+        <uni-icons type="sound" size="17" color="#4b5563" />
         <text class="menu-text">通知管理</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/discussions')">
-        <text class="menu-icon">💬</text>
+        <uni-icons type="chatboxes" size="17" color="#4b5563" />
         <text class="menu-text">讨论管理</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/ai-settings')">
-        <text class="menu-icon">✨</text>
+        <uni-icons type="tune" size="17" color="#4b5563" />
         <text class="menu-text">AI 设置</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/equipment')">
-        <text class="menu-icon">🔧</text>
+        <uni-icons type="gear" size="17" color="#4b5563" />
         <text class="menu-text">设备管理</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/projects')">
-        <text class="menu-icon">🗂️</text>
+        <uni-icons type="folder-add" size="17" color="#4b5563" />
         <text class="menu-text">项目管理</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPage('/pages/admin/users')">
-        <text class="menu-icon">👥</text>
+        <uni-icons type="staff" size="17" color="#4b5563" />
         <text class="menu-text">用户管理</text>
         <text class="menu-arrow">›</text>
       </view>
@@ -202,28 +202,28 @@
     <!-- 功能菜单 -->
     <view class="card block menu-card">
       <view class="menu-item" @click="goSkills">
-        <text class="menu-icon">🎯</text>
+        <uni-icons type="medal" size="17" color="#4b5563" />
         <text class="menu-text">技能评估</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goNotifications">
-        <text class="menu-icon">🔔</text>
+        <uni-icons type="notification" size="17" color="#4b5563" />
         <text class="menu-text">站内通知</text>
         <view v-if="unread > 0" class="menu-badge">{{ unread }}</view>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goProfile">
-        <text class="menu-icon">✏️</text>
+        <uni-icons type="person" size="17" color="#4b5563" />
         <text class="menu-text">编辑资料</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="goPassword">
-        <text class="menu-icon">🔒</text>
+        <uni-icons type="locked" size="17" color="#4b5563" />
         <text class="menu-text">修改密码</text>
         <text class="menu-arrow">›</text>
       </view>
       <view class="menu-item" @click="onLogout">
-        <text class="menu-icon">🚪</text>
+        <uni-icons type="undo" size="17" color="#dc2626" />
         <text class="menu-text logout-text">退出登录</text>
         <text class="menu-arrow">›</text>
       </view>
@@ -267,6 +267,14 @@ const trendMax = computed(() => Math.max(1, ...trendData.value))
 const trendSum = computed(() => trendData.value.reduce((a, b) => a + b, 0))
 
 const barHeight = (v) => `${Math.max(6, Math.round((v / trendMax.value) * 100))}%`
+
+// 后端成就 icon 为 emoji(网页端沿用),小程序侧按成就名映射为 uni-icons 图标
+const achIconType = (name) => ({
+  初出茅庐: 'flag',
+  借阅达人: 'cart',
+  项目先锋: 'fire',
+  技术大牛: 'medal'
+}[name] || 'medal')
 
 const load = async () => {
   try {
@@ -405,10 +413,6 @@ onPullDownRefresh(async () => {
   padding: 8rpx;
 }
 
-.bell-icon {
-  font-size: 44rpx;
-}
-
 .bell-badge {
   position: absolute;
   top: -6rpx;
@@ -485,10 +489,6 @@ onPullDownRefresh(async () => {
   flex-direction: column;
   align-items: center;
   box-shadow: 0 2rpx 12rpx rgba(17, 24, 39, 0.04);
-}
-
-.stat-icon {
-  font-size: 36rpx;
 }
 
 .stat-num {
@@ -670,15 +670,7 @@ onPullDownRefresh(async () => {
 
   &.locked {
     opacity: 0.55;
-
-    .ach-icon {
-      filter: grayscale(1);
-    }
   }
-}
-
-.ach-icon {
-  font-size: 52rpx;
 }
 
 .ach-name {
@@ -716,10 +708,6 @@ onPullDownRefresh(async () => {
   &:last-child {
     border-bottom: none;
   }
-}
-
-.menu-icon {
-  font-size: 34rpx;
 }
 
 .menu-text {

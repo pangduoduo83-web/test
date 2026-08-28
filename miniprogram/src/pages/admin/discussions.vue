@@ -3,10 +3,10 @@
     <!-- 筛选 -->
     <view class="filter-row">
       <picker mode="selector" :range="projectRange" @change="changeProject($event.detail.value)">
-        <view class="pill" :class="{ active: !!projectId }">📁 {{ projectLabel }}</view>
+        <view class="pill" :class="{ active: !!projectId }">{{ projectLabel }}</view>
       </picker>
       <view class="search-box">
-        <text class="search-icon">⌕</text>
+        <uni-icons type="search" size="16" color="#9ca3af" />
         <input
           v-model="keyword"
           class="search-input"
@@ -19,11 +19,11 @@
     </view>
 
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="items.length === 0" class="empty-box">
-      <text class="empty-icon">💬</text>
+      <uni-icons type="chatboxes" size="40" color="#d1d5db" />
       <text>暂无讨论</text>
     </view>
     <view v-else class="list">
@@ -150,12 +150,6 @@ onPullDownRefresh(async () => {
   padding: 12rpx 24rpx;
   gap: 12rpx;
   box-shadow: 0 2rpx 12rpx rgba(17, 24, 39, 0.04);
-}
-
-.search-icon {
-  color: $text-light;
-  font-size: 32rpx;
-  font-weight: 700;
 }
 
 .search-input {

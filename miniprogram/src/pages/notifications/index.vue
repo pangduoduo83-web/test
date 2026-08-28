@@ -6,11 +6,11 @@
     </view>
 
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="items.length === 0" class="empty-box">
-      <text class="empty-icon">🔕</text>
+      <uni-icons type="notification" size="40" color="#d1d5db" />
       <text>暂无通知</text>
     </view>
     <view v-else class="list">
@@ -21,7 +21,9 @@
         :class="{ unread: !n.isRead }"
         @click="onRead(n)"
       >
-        <view class="n-icon" :class="`type-${n.type}`">{{ typeIcon(n.type) }}</view>
+        <view class="n-icon" :class="`type-${n.type}`">
+          <uni-icons :type="typeIcon(n.type)" size="18" :color="typeColor(n.type)" />
+        </view>
         <view class="n-body">
           <view class="n-head">
             <text class="n-title" :class="{ bold: !n.isRead }">{{ n.title }}</text>
@@ -45,7 +47,8 @@ const items = ref([])
 const unread = ref(0)
 const loading = ref(true)
 
-const typeIcon = (t) => ({ borrow: '📦', project: '🚀', system: '🔔' }[t] || '📩')
+const typeIcon = (t) => ({ borrow: 'cart', project: 'flag', system: 'notification' }[t] || 'email')
+const typeColor = (t) => ({ borrow: '#2563eb', project: '#9333ea', system: '#d97706' }[t] || '#6b7280')
 
 const load = async () => {
   try {

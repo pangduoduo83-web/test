@@ -49,7 +49,7 @@
 
     <!-- 描述 -->
     <view class="card block">
-      <text class="section-title">📋 设备描述</text>
+      <text class="section-title">设备描述</text>
       <template v-if="richDesc">
         <template v-for="(seg, i) in richDesc" :key="i">
           <rich-text v-if="seg.type === 'html'" class="rich-html" :nodes="seg.content" />
@@ -61,7 +61,7 @@
 
     <!-- 技术规格 -->
     <view v-if="asList(equip.specs).length" class="card block">
-      <text class="section-title">⚙️ 技术规格</text>
+      <text class="section-title">技术规格</text>
       <view class="spec-grid">
         <view v-for="s in asList(equip.specs)" :key="s" class="spec-item">
           <text class="spec-dot">•</text>
@@ -72,7 +72,7 @@
 
     <!-- 适用项目 -->
     <view v-if="asList(equip.suitableProjects).length" class="card block">
-      <text class="section-title">🎯 适用项目</text>
+      <text class="section-title">适用项目</text>
       <view v-for="(p, i) in asList(equip.suitableProjects)" :key="i" class="li-row">
         <text class="li-idx">{{ i + 1 }}</text>
         <text class="li-text">{{ p }}</text>
@@ -81,9 +81,9 @@
 
     <!-- 相关文档 -->
     <view v-if="asList(equip.docs).length" class="card block">
-      <text class="section-title">📚 相关文档</text>
+      <text class="section-title">相关文档</text>
       <view v-for="(d, i) in asList(equip.docs)" :key="i" class="doc-row" @click="openDoc(d)">
-        <text class="doc-icon">📄</text>
+        <uni-icons type="paperclip" size="18" color="#2563eb" />
         <text class="doc-name">{{ docName(d) }}</text>
         <text v-if="docUrl(d)" class="doc-dl">下载</text>
         <text v-else class="doc-tip muted">到馆查阅</text>
@@ -102,7 +102,7 @@
         <text class="stock-num" :class="{ 'text-red': !canBorrow }">
           {{ canBorrow ? `可借 ${equip.availableCount} 台` : statusText }}
         </text>
-        <text class="stock-loc">📍 {{ equip.location }}</text>
+        <text class="stock-loc">{{ equip.location }}</text>
       </view>
       <button class="btn-gradient apply-btn" :disabled="!canBorrow" @click="goApply">
         {{ canBorrow ? '申请借阅' : '暂不可借' }}
@@ -111,7 +111,7 @@
   </view>
 
   <view v-else class="empty-box page-loading">
-    <text class="empty-icon">⏳</text>
+    <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
     <text>加载中...</text>
   </view>
 </template>
@@ -397,10 +397,6 @@ const goApply = () => {
   background: $gray-bg;
   border-radius: 16rpx;
   margin-top: 16rpx;
-}
-
-.doc-icon {
-  font-size: 32rpx;
 }
 
 .doc-name {

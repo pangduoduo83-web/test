@@ -7,17 +7,17 @@
 
     <view class="card block">
       <view class="block-head">
-        <text class="section-title">📂 资源列表({{ list.length }})</text>
+        <text class="section-title">资源列表({{ list.length }})</text>
         <view class="add-btn" @click="openAdd">+ 添加</view>
       </view>
 
       <view v-if="list.length === 0" class="empty-box small-empty">
-        <text class="empty-icon">📭</text>
+        <uni-icons type="folder-add" size="40" color="#d1d5db" />
         <text>暂无资源,点右上角添加</text>
       </view>
 
       <view v-for="(r, i) in list" :key="i" class="res-row">
-        <text class="res-icon">{{ resIcon(r.type) }}</text>
+        <uni-icons :type="resIcon(r.type)" size="20" color="#2563eb" />
         <view class="res-info">
           <text class="res-name ellipsis">{{ r.name }}</text>
           <text class="res-type muted">{{ r.type }}{{ r.url ? ' · 已上传附件' : ' · 无附件' }}</text>
@@ -53,8 +53,8 @@
 
         <text class="field-label">附件(选其一,可留空)</text>
         <view class="upload-row">
-          <button class="btn-plain up-btn" @click="pickFile">📎 从聊天选文件</button>
-          <button class="btn-plain up-btn" @click="pickImage">🖼 上传图片</button>
+          <button class="btn-plain up-btn" @click="pickFile">从聊天选文件</button>
+          <button class="btn-plain up-btn" @click="pickImage">上传图片</button>
         </view>
         <input v-model="draft.url" class="field-input" placeholder="或直接粘贴资源链接" placeholder-class="ph" />
 
@@ -83,8 +83,9 @@ const saving = ref(false)
 const addVisible = ref(false)
 const draft = reactive({ type: '文档', name: '', url: '' })
 
+// 资源类型 → uni-icons 图标名
 const resIcon = (type) =>
-  ({ 文档: '📄', 视频: '🎬', 代码: '💻', 手册: '📖', 原理图: '📐', LAYOUT: '🧩', '3D图': '🧊' }[type] || '📎')
+  ({ 文档: 'paperclip', 视频: 'videocam', 代码: 'gear', 手册: 'list', 原理图: 'map', LAYOUT: 'tune', '3D图': 'image' }[type] || 'paperclip')
 
 onLoad(async (options) => {
   projectId.value = options.projectId
@@ -223,10 +224,6 @@ const save = async () => {
   background: $gray-bg;
   border-radius: 16rpx;
   margin-top: 16rpx;
-}
-
-.res-icon {
-  font-size: 40rpx;
 }
 
 .res-info {

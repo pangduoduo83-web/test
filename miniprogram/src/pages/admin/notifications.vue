@@ -2,7 +2,7 @@
   <view class="page">
     <!-- 发送通知 -->
     <view class="card send-card">
-      <text class="section-title">📣 发送通知</text>
+      <text class="section-title">发送通知</text>
 
       <text class="field-label">发送对象</text>
       <view class="pill-row">
@@ -36,7 +36,7 @@
           :class="{ active: form.type === t.key }"
           @click="form.type = t.key"
         >
-          {{ t.icon }} {{ t.label }}
+          {{ t.label }}
         </view>
       </view>
 
@@ -54,7 +54,7 @@
     <!-- 通知记录 -->
     <view class="card block">
       <view class="block-head">
-        <text class="section-title">🗂 通知记录</text>
+        <text class="section-title">通知记录</text>
         <view class="pill-row small">
           <view
             v-for="t in filterTypes"
@@ -69,15 +69,17 @@
       </view>
 
       <view v-if="loading" class="empty-box small-empty">
-        <text class="empty-icon">⏳</text>
+        <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
         <text>加载中...</text>
       </view>
       <view v-else-if="items.length === 0" class="empty-box small-empty">
-        <text class="empty-icon">🔕</text>
+        <uni-icons type="notification" size="40" color="#d1d5db" />
         <text>暂无通知记录</text>
       </view>
       <view v-for="n in items" :key="n.id" class="notice-row">
-        <view class="n-icon">{{ typeIcon(n.type) }}</view>
+        <view class="n-icon">
+          <uni-icons :type="typeIcon(n.type)" size="16" :color="typeColor(n.type)" />
+        </view>
         <view class="n-body">
           <view class="n-head">
             <text class="n-title ellipsis">{{ n.title }}</text>
@@ -114,9 +116,9 @@ const targets = [
 ]
 
 const types = [
-  { key: 'system', label: '系统', icon: '🔔' },
-  { key: 'project', label: '项目', icon: '🚀' },
-  { key: 'borrow', label: '借阅', icon: '📦' }
+  { key: 'system', label: '系统' },
+  { key: 'project', label: '项目' },
+  { key: 'borrow', label: '借阅' }
 ]
 
 const filterTypes = [
@@ -136,7 +138,8 @@ const filterType = ref('')
 
 const userRange = computed(() => users.value.map((u) => `${u.name}(${u.email})`))
 
-const typeIcon = (t) => ({ borrow: '📦', project: '🚀', system: '🔔' }[t] || '📩')
+const typeIcon = (t) => ({ borrow: 'cart', project: 'flag', system: 'notification' }[t] || 'email')
+const typeColor = (t) => ({ borrow: '#2563eb', project: '#9333ea', system: '#d97706' }[t] || '#6b7280')
 
 const userName = (id) => {
   const u = users.value.find((x) => x.id === id)

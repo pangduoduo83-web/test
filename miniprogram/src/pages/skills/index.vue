@@ -17,7 +17,7 @@
 
     <!-- 学习建议 -->
     <view v-if="suggestions.length" class="card block">
-      <text class="section-title">💡 个性化学习建议</text>
+      <text class="section-title">个性化学习建议</text>
       <view v-for="(s, i) in suggestions" :key="i" class="sug-row">
         <text class="sug-idx">{{ i + 1 }}</text>
         <text class="sug-text">{{ s }}</text>
@@ -27,7 +27,7 @@
     <!-- AI 学习规划师 -->
     <view class="card block ai-card">
       <view class="ai-head">
-        <text class="section-title">✨ AI 学习规划师</text>
+        <text class="section-title">AI 学习规划师</text>
         <button class="ai-gen-btn" :disabled="aiLoading" @click="genPlan">
           {{ aiLoading ? '生成中...' : plan ? '重新生成' : '生成学习路线' }}
         </button>
@@ -97,7 +97,7 @@
         </view>
 
         <text class="ai-meta muted">
-          {{ plan.source === 'AI' ? '✨ 由 AI 结合智能匹配生成' : '⚙️ AI 未启用,已使用智能匹配结果' }}
+          {{ plan.source === 'AI' ? '由 AI 结合智能匹配生成' : 'AI 未启用,已使用智能匹配结果' }}
           · {{ plan.generatedAt }}{{ plan.cached ? ' (缓存)' : '' }}
         </text>
       </template>
@@ -105,7 +105,7 @@
 
     <!-- 技能明细 -->
     <view class="card block">
-      <text class="section-title">🎯 技能维度明细</text>
+      <text class="section-title">技能维度明细</text>
       <view v-for="s in skills" :key="s.skillName" class="skill-item">
         <view class="skill-head">
           <view class="skill-name-row">
@@ -120,7 +120,7 @@
         <text class="skill-recommend muted">推荐:{{ recommend(s.skillName) }}</text>
       </view>
       <view v-if="skills.length === 0" class="empty-box">
-        <text class="empty-icon">🎯</text>
+        <uni-icons type="medal" size="40" color="#d1d5db" />
         <text>先完成一次能力测评,生成你的技能画像</text>
       </view>
     </view>

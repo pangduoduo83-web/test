@@ -13,7 +13,7 @@
     </view>
 
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else class="list">
@@ -34,17 +34,17 @@
           </view>
         </view>
         <view class="pc-actions">
-          <view class="act-btn" @click="goEdit(p.id)">✏️ 编辑</view>
-          <view class="act-btn" @click="goStudents(p)">🎓 学生</view>
-          <view class="act-btn" @click="assignMentor(p)">👨‍🏫 讲师</view>
+          <view class="act-btn" @click="goEdit(p.id)">编辑</view>
+          <view class="act-btn" @click="goStudents(p)">学生</view>
+          <view class="act-btn" @click="assignMentor(p)">讲师</view>
           <view class="act-btn" @click="toggleStatus(p)">
-            {{ p.status === 'PUBLISHED' ? '⬇ 下架' : '⬆ 发布' }}
+            {{ p.status === 'PUBLISHED' ? '下架' : '发布' }}
           </view>
-          <view class="act-btn danger" @click="onDelete(p)">🗑</view>
+          <view class="act-btn danger" @click="onDelete(p)">删除</view>
         </view>
       </view>
       <view v-if="filtered.length === 0" class="empty-box">
-        <text class="empty-icon">🗂️</text>
+        <uni-icons type="folder-add" size="40" color="#d1d5db" />
         <text>暂无项目</text>
       </view>
     </view>

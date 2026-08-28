@@ -3,7 +3,7 @@
     <!-- 搜索 + 排序 -->
     <view class="toolbar">
       <view class="search-box">
-        <text class="search-icon">⌕</text>
+        <uni-icons type="search" size="17" color="#9ca3af" />
         <input
           v-model="keyword"
           class="search-input"
@@ -53,11 +53,11 @@
 
     <!-- 项目列表 -->
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="filtered.length === 0" class="empty-box">
-      <text class="empty-icon">📭</text>
+      <uni-icons type="folder-add" size="40" color="#d1d5db" />
       <text>没有找到符合条件的项目</text>
     </view>
     <view v-else class="list">
@@ -86,10 +86,22 @@
             <text v-for="t in asList(p.tags).slice(0, 3)" :key="t" class="chip">{{ t }}</text>
           </view>
           <view class="meta-row">
-            <text class="meta">👁 {{ shortNum(p.views) }}</text>
-            <text class="meta">♥ {{ shortNum(p.favoriteCount) }}</text>
-            <text class="meta">⏱ {{ p.duration }}</text>
-            <text class="meta">👥 {{ p.enrolledCount }}人</text>
+            <view class="meta">
+              <uni-icons type="eye" size="13" color="#9ca3af" />
+              <text>{{ shortNum(p.views) }}</text>
+            </view>
+            <view class="meta">
+              <uni-icons type="heart" size="13" color="#9ca3af" />
+              <text>{{ shortNum(p.favoriteCount) }}</text>
+            </view>
+            <view class="meta">
+              <uni-icons type="calendar" size="13" color="#9ca3af" />
+              <text>{{ p.duration }}</text>
+            </view>
+            <view class="meta">
+              <uni-icons type="staff" size="13" color="#9ca3af" />
+              <text>{{ p.enrolledCount }}人</text>
+            </view>
           </view>
           <view class="footer-row">
             <text class="mentor">{{ p.mentor || p.author }}</text>
@@ -200,12 +212,6 @@ onPullDownRefresh(async () => {
   padding: 16rpx 28rpx;
   gap: 16rpx;
   box-shadow: 0 2rpx 12rpx rgba(17, 24, 39, 0.04);
-}
-
-.search-icon {
-  color: $text-light;
-  font-size: 34rpx;
-  font-weight: 700;
 }
 
 .search-input {
@@ -335,6 +341,9 @@ onPullDownRefresh(async () => {
 .meta {
   color: $text-light;
   font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
 }
 
 .footer-row {

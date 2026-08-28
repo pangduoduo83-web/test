@@ -4,7 +4,7 @@
     <view class="filter-row">
       <picker mode="selector" :range="projectRange" @change="changeProject($event.detail.value)">
         <view class="pill" :class="{ active: !!projectId }">
-          📁 {{ projectLabel }}
+          {{ projectLabel }}
         </view>
       </picker>
       <view
@@ -19,11 +19,11 @@
     </view>
 
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="items.length === 0" class="empty-box">
-      <text class="empty-icon">📋</text>
+      <uni-icons type="list" size="40" color="#d1d5db" />
       <text>暂无报名记录</text>
     </view>
     <view v-else class="list">
@@ -50,8 +50,8 @@
           </text>
         </view>
         <view class="enr-actions">
-          <view class="act-btn" @click="openEdit(e)">✏️ 调整进度</view>
-          <view class="act-btn danger" @click="onDelete(e)">🗑 删除报名</view>
+          <view class="act-btn" @click="openEdit(e)">调整进度</view>
+          <view class="act-btn danger" @click="onDelete(e)">删除报名</view>
         </view>
       </view>
       <view class="list-end muted">共 {{ items.length }} 条</view>

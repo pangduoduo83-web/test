@@ -13,11 +13,11 @@
     </view>
 
     <view v-if="loading" class="empty-box">
-      <text class="empty-icon">⏳</text>
+      <uni-icons type="spinner-cycle" size="40" color="#d1d5db" />
       <text>加载中...</text>
     </view>
     <view v-else-if="items.length === 0" class="empty-box">
-      <text class="empty-icon">📝</text>
+      <uni-icons type="compose" size="40" color="#d1d5db" />
       <text>暂无成果提交</text>
     </view>
     <view v-else class="list">
@@ -63,7 +63,7 @@
         <text class="modal-sub muted">{{ grading.userName }} · 《{{ grading.projectTitle }}》</text>
 
         <button class="ai-btn" :disabled="aiReviewing" @click="runAiReview">
-          {{ aiReviewing ? 'AI 分析中...' : '✨ AI 预评审(建议分+评语草稿)' }}
+          {{ aiReviewing ? 'AI 分析中...' : 'AI 预评审(建议分+评语草稿)' }}
         </button>
         <view v-if="aiResult" class="ai-box">
           <text class="ai-box-summary">{{ aiResult.summary }}</text>
