@@ -1,0 +1,10 @@
+# HTTPS 覆盖配置(仅服务器使用):在 8443 端口以 www.labcloud.com.cn 证书提供 HTTPS
+# 用法:docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+# 证书续期后需 docker restart ioedu-frontend(已配 certbot deploy hook 自动执行)
+services:
+  frontend:
+    ports:
+      - "8443:443"
+    volumes:
+      - ./frontend/nginx-ssl.conf:/etc/nginx/conf.d/ssl.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
