@@ -40,7 +40,9 @@
               mode="aspectFill"
               @error="failedImgs[p.id] = true"
             />
-            <view v-else class="pc-img pc-fallback">{{ p.icon || '📦' }}</view>
+            <view v-else class="pc-img pc-fallback">
+              <uni-icons type="flag" size="24" color="rgba(255,255,255,0.85)" />
+            </view>
           </view>
           <view class="pc-info">
             <view class="pc-title-row">

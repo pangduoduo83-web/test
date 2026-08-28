@@ -49,15 +49,9 @@
           <input v-model="form.license" class="field-input" placeholder="GPL-3.0" placeholder-class="ph" />
         </view>
       </view>
-      <view class="field-row">
-        <view class="field grow">
-          <text class="field-label">作者</text>
-          <input v-model="form.author" class="field-input" placeholder="如:开源电子" placeholder-class="ph" />
-        </view>
-        <view class="field grow">
-          <text class="field-label">图标 emoji</text>
-          <input v-model="form.icon" class="field-input" placeholder="🔌" placeholder-class="ph" />
-        </view>
+      <view class="field">
+        <text class="field-label">作者</text>
+        <input v-model="form.author" class="field-input" placeholder="如:开源电子" placeholder-class="ph" />
       </view>
       <view class="field">
         <text class="field-label">标签(逗号分隔)</text>
@@ -123,6 +117,7 @@ const form = reactive({
   cost: '',
   license: 'GPL-3.0',
   author: '',
+  // 图标值仅随数据保留(网页管理端可编辑),小程序端不提供输入
   icon: '🔌',
   coverUrl: '',
   status: 'PUBLISHED',

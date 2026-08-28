@@ -19,7 +19,9 @@
     <view v-else class="list">
       <view v-for="p in filtered" :key="p.id" class="card proj-card">
         <view class="pc-head" @click="goDetail(p.id)">
-          <view class="pc-icon">{{ p.icon || '📦' }}</view>
+          <view class="pc-icon">
+            <uni-icons type="flag" size="22" color="rgba(255,255,255,0.9)" />
+          </view>
           <view class="pc-info">
             <view class="pc-title-row">
               <text class="pc-title ellipsis">{{ p.title }}</text>

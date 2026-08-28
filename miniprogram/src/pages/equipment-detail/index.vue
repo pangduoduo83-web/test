@@ -10,7 +10,7 @@
         @error="imgFailed = true"
       />
       <view v-else class="hero-img hero-fallback">
-        <text class="hero-icon">{{ equip.icon || '🔧' }}</text>
+        <uni-icons type="gear" size="56" color="rgba(255,255,255,0.85)" />
       </view>
       <text class="badge status-badge" :class="statusBadge">{{ statusText }}</text>
     </view>
@@ -229,10 +229,6 @@ const goApply = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.hero-icon {
-  font-size: 130rpx;
 }
 
 .status-badge {

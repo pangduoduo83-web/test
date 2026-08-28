@@ -13,7 +13,9 @@
 
     <!-- 设备信息卡 -->
     <view v-if="equip && step < 2" class="card equip-brief">
-      <view class="eb-icon">{{ equip.icon || '🔧' }}</view>
+      <view class="eb-icon">
+        <uni-icons type="gear" size="20" color="rgba(255,255,255,0.9)" />
+      </view>
       <view class="eb-info">
         <text class="eb-name">{{ equip.name }}</text>
         <text class="eb-model">{{ equip.model }} · 可借 {{ equip.availableCount }} 台 · {{ equip.location }}</text>

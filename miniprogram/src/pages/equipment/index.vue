@@ -78,7 +78,7 @@
             @error="failedImgs[e.id] = true"
           />
           <view v-else class="thumb thumb-fallback">
-            <text class="thumb-icon">{{ e.icon || '🔧' }}</text>
+            <uni-icons type="gear" size="32" color="rgba(255,255,255,0.85)" />
           </view>
           <text class="badge status-badge" :class="statusBadge(e)">{{ statusText(e) }}</text>
           <view class="wish-btn" @click.stop="onToggleWish(e)">
@@ -379,10 +379,6 @@ onPullDownRefresh(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.thumb-icon {
-  font-size: 64rpx;
 }
 
 .status-badge {

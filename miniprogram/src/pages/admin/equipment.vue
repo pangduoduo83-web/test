@@ -12,7 +12,9 @@
     <view v-else class="list">
       <view v-for="e in filtered" :key="e.id" class="card equip-card">
         <view class="ec-head">
-          <view class="ec-icon">{{ e.icon || '🔧' }}</view>
+          <view class="ec-icon">
+            <uni-icons type="gear" size="22" color="rgba(255,255,255,0.9)" />
+          </view>
           <view class="ec-info">
             <view class="ec-name-row">
               <text class="ec-name ellipsis">{{ e.name }}</text>

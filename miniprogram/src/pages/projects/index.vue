@@ -71,7 +71,7 @@
             @error="failedCovers[p.id] = true"
           />
           <view v-else class="cover cover-fallback">
-            <text class="fallback-icon">{{ p.icon || '📦' }}</text>
+            <uni-icons type="flag" size="44" color="rgba(255,255,255,0.85)" />
           </view>
           <view class="badge cover-diff" :class="diffBadge(p.difficulty)">{{ p.difficulty }}</view>
           <view class="cover-rating">★ {{ p.rating }}</view>
@@ -273,10 +273,6 @@ onPullDownRefresh(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.fallback-icon {
-  font-size: 88rpx;
 }
 
 .cover-diff {

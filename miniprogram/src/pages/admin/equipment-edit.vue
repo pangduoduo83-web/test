@@ -52,10 +52,6 @@
         </view>
       </view>
       <view class="field">
-        <text class="field-label">图标 emoji</text>
-        <input v-model="form.icon" class="field-input" placeholder="🔧" placeholder-class="ph" />
-      </view>
-      <view class="field">
         <text class="field-label">设备图片</text>
         <view class="img-row">
           <image v-if="form.imageUrl" :src="fullUrl(form.imageUrl)" class="img-preview" mode="aspectFill" @click="chooseImg" />
@@ -118,6 +114,7 @@ const form = reactive({
   price: '',
   totalCount: '1',
   availableCount: '',
+  // 图标值仅随数据保留(网页管理端可编辑),小程序端不提供输入
   icon: '🔧',
   imageUrl: '',
   description: ''
