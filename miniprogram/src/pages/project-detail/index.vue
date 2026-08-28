@@ -313,6 +313,7 @@ import {
 import { fullUrl } from '@/config'
 import { asList, formatDate, relativeTime, shortNum } from '@/utils/format'
 import { prepareRich } from '@/utils/rich'
+import { getToken, ensureLogin } from '@/utils/auth'
 
 const tabs = [
   { key: 'overview', label: '概览' },
@@ -372,6 +373,8 @@ const load = async () => {
 }
 
 const loadSkills = () => {
+  // 我的技能是个人数据,游客浏览详情时不请求
+  if (!getToken()) return
   fetchSkills()
     .then((d) => {
       mySkills.value = d.skills || []
@@ -400,6 +403,7 @@ onShareAppMessage(() => ({
 }))
 
 const onEnroll = () => {
+  if (!ensureLogin()) return
   uni.showModal({
     title: '确认报名',
     content: `报名参与「${project.value.title}」,报名后可跟踪学习进度并获得经验值`,
@@ -420,6 +424,7 @@ const onEnroll = () => {
 }
 
 const onToggleFavorite = async () => {
+  if (!ensureLogin()) return
   try {
     const d = await toggleFavorite(projectId.value)
     favorited.value = !!d.favorited
@@ -437,6 +442,7 @@ const goEquipment = () => {
 }
 
 const goSubmission = () => {
+  if (!ensureLogin()) return
   uni.navigateTo({
     url: `/pages/submission/index?projectId=${projectId.value}&title=${encodeURIComponent(project.value.title)}`
   })
@@ -488,6 +494,7 @@ const cancelReply = () => {
 }
 
 const sendDiscussion = async () => {
+  if (!ensureLogin()) return
   const content = discussContent.value.trim()
   if (!content) {
     uni.showToast({ title: '请输入内容', icon: 'none' })

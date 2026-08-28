@@ -128,7 +128,7 @@ import { fetchEquipment, fetchLocations, fetchEquipmentFavorites, toggleEquipmen
 import { fullUrl } from '@/config'
 import { asList } from '@/utils/format'
 import { stripHtml } from '@/utils/rich'
-import { getToken } from '@/utils/auth'
+import { getToken, ensureLogin } from '@/utils/auth'
 
 const statusOptions = [
   { label: '全部', value: '' },
@@ -220,10 +220,15 @@ const goDetail = (id) => {
 }
 
 const goApply = (e) => {
+  if (!ensureLogin()) return
   uni.navigateTo({ url: `/pages/borrow-apply/index?equipmentId=${e.id}` })
 }
 
+let wishLoaded = false
 const loadWishlist = () => {
+  // 心愿单是个人数据,游客不请求;登录后再次进入时补拉
+  if (!getToken()) return
+  wishLoaded = true
   fetchEquipmentFavorites()
     .then((ids) => {
       wishIds.value = ids || []
@@ -232,6 +237,7 @@ const loadWishlist = () => {
 }
 
 const onToggleWish = async (e) => {
+  if (!ensureLogin()) return
   try {
     const d = await toggleEquipmentFavorite(e.id)
     if (d.favorited) {
@@ -244,15 +250,12 @@ const onToggleWish = async (e) => {
   }
 }
 
+// 设备列表游客可浏览(审核要求不强制登录)
 onShow(() => {
-  if (!getToken()) {
-    uni.reLaunch({ url: '/pages/auth/index' })
-    return
-  }
+  if (!wishLoaded) loadWishlist()
   if (!loadedOnce) {
     loadedOnce = true
     load()
-    loadWishlist()
     fetchLocations()
       .then((d) => {
         locations.value = d || []

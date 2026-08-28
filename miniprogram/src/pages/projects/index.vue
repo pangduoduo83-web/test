@@ -108,7 +108,6 @@ import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { fetchProjects } from '@/api'
 import { fullUrl } from '@/config'
 import { asList, shortNum } from '@/utils/format'
-import { getToken } from '@/utils/auth'
 import { stripHtml } from '@/utils/rich'
 
 const sorts = [
@@ -170,11 +169,8 @@ const goDetail = (id) => {
   uni.navigateTo({ url: `/pages/project-detail/index?id=${id}` })
 }
 
+// 项目列表游客可浏览(审核要求不强制登录),个人操作在详情页做登录守卫
 onShow(() => {
-  if (!getToken()) {
-    uni.reLaunch({ url: '/pages/auth/index' })
-    return
-  }
   if (!loadedOnce) {
     loadedOnce = true
     load()

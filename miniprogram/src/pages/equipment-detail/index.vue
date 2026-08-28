@@ -123,6 +123,7 @@ import { fetchEquipmentDetail, fetchEquipmentFavorites, toggleEquipmentFavorite 
 import { fullUrl } from '@/config'
 import { asList } from '@/utils/format'
 import { prepareRich } from '@/utils/rich'
+import { getToken, ensureLogin } from '@/utils/auth'
 
 const equip = ref(null)
 const imgFailed = ref(false)
@@ -148,11 +149,14 @@ const statusBadge = computed(() => {
 
 onLoad(async (options) => {
   equip.value = await fetchEquipmentDetail(options.id)
-  fetchEquipmentFavorites()
-    .then((ids) => {
-      wished.value = (ids || []).includes(equip.value.id)
-    })
-    .catch(() => {})
+  // 详情游客可浏览,心愿单状态仅登录后拉取
+  if (getToken()) {
+    fetchEquipmentFavorites()
+      .then((ids) => {
+        wished.value = (ids || []).includes(equip.value.id)
+      })
+      .catch(() => {})
+  }
 })
 
 // 参考文档兼容旧字符串与新 {name,url} 结构
@@ -186,6 +190,7 @@ const openDoc = (d) => {
 }
 
 const onToggleWish = async () => {
+  if (!ensureLogin()) return
   try {
     const d = await toggleEquipmentFavorite(equip.value.id)
     wished.value = !!d.favorited
@@ -196,6 +201,7 @@ const onToggleWish = async () => {
 }
 
 const goApply = () => {
+  if (!ensureLogin()) return
   uni.navigateTo({ url: `/pages/borrow-apply/index?equipmentId=${equip.value.id}` })
 }
 </script>

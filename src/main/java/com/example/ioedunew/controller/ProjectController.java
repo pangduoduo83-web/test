@@ -48,7 +48,9 @@ public class ProjectController {
 
     @GetMapping("/{id}")
     public ApiResponse<Map<String, Object>> detail(@PathVariable Long id, HttpServletRequest request) {
-        return ApiResponse.ok(projectService.detail(id, auth(request).getId()));
+        // 游客可匿名浏览详情,此时无 AuthUser,个人状态(报名/收藏)按未登录处理
+        AuthUser user = auth(request);
+        return ApiResponse.ok(projectService.detail(id, user == null ? null : user.getId()));
     }
 
     @PostMapping("/{id}/enroll")

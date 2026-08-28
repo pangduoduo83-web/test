@@ -1,17 +1,17 @@
 {
   "pages": [
     {
-      "path": "pages/auth/index",
-      "style": {
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white"
-      }
-    },
-    {
       "path": "pages/projects/index",
       "style": {
         "navigationBarTitleText": "项目中心",
         "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/auth/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTextStyle": "white"
       }
     },
     {

@@ -96,10 +96,13 @@ public class ProjectService {
 
         Map<String, Object> result = new HashMap<>();
         result.put("project", p);
-        Enrollment enrollment = enrollmentRepository.findByUserIdAndProjectId(userId, projectId).orElse(null);
+        // userId 为空表示游客浏览,个人状态一律按未报名/未收藏返回
+        Enrollment enrollment = userId == null ? null
+                : enrollmentRepository.findByUserIdAndProjectId(userId, projectId).orElse(null);
         result.put("enrolled", enrollment != null);
         result.put("enrollment", enrollment);
-        result.put("favorited", favoriteRepository.findByUserIdAndProjectId(userId, projectId).isPresent());
+        result.put("favorited", userId != null
+                && favoriteRepository.findByUserIdAndProjectId(userId, projectId).isPresent());
         return result;
     }
 

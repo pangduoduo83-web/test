@@ -1,5 +1,14 @@
 <template>
   <view class="page">
+    <!-- 游客提示:个人中心为登录后功能,不强制登录 -->
+    <view v-if="!loggedIn" class="guest-card card">
+      <view class="avatar avatar-fallback guest-avatar">?</view>
+      <text class="guest-title">未登录</text>
+      <text class="guest-sub">登录后可查看学习数据、成就徽章与个人设置</text>
+      <button class="btn-gradient guest-btn" @click="goLogin">登录 / 注册</button>
+    </view>
+
+    <template v-else>
     <!-- 用户头卡 -->
     <view class="user-card">
       <view class="user-row">
@@ -219,6 +228,7 @@
         <text class="menu-arrow">›</text>
       </view>
     </view>
+    </template>
 
     <view class="footer muted">AI未来实践中心 · 项目驱动教学实验平台</view>
   </view>
@@ -238,6 +248,7 @@ const dash = ref({})
 const unread = ref(0)
 const trendRange = ref('week')
 const trendSeries = ref('hours')
+const loggedIn = ref(true)
 
 const user = computed(() => dash.value.user || authStore.user)
 const ongoing = computed(() => dash.value.ongoingProjects || [])
@@ -297,6 +308,10 @@ const goNotifications = () => uni.navigateTo({ url: '/pages/notifications/index'
 const goProjects = () => uni.switchTab({ url: '/pages/projects/index' })
 const goProjectDetail = (id) => uni.navigateTo({ url: `/pages/project-detail/index?id=${id}` })
 
+const goLogin = () => {
+  uni.navigateTo({ url: '/pages/auth/index' })
+}
+
 const onLogout = () => {
   uni.showModal({
     title: '退出登录',
@@ -305,14 +320,17 @@ const onLogout = () => {
     success: (res) => {
       if (!res.confirm) return
       authStore.logout()
-      uni.reLaunch({ url: '/pages/auth/index' })
+      // 退出后回到可游客浏览的项目页,而非强制停留登录页
+      uni.reLaunch({ url: '/pages/projects/index' })
     }
   })
 }
 
 onShow(() => {
-  if (!getToken()) {
-    uni.reLaunch({ url: '/pages/auth/index' })
+  loggedIn.value = !!getToken()
+  if (!loggedIn.value) {
+    dash.value = {}
+    unread.value = 0
     return
   }
   load()
@@ -732,5 +750,40 @@ onPullDownRefresh(async () => {
   text-align: center;
   padding: 40rpx 0 20rpx;
   font-size: 22rpx;
+}
+
+.guest-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+  padding: 80rpx 32rpx;
+}
+
+.guest-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: $gray-bg;
+  color: $text-light;
+  font-size: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guest-title {
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.guest-sub {
+  color: $text-sub;
+  font-size: 26rpx;
+}
+
+.guest-btn {
+  margin-top: 16rpx;
+  width: 360rpx;
 }
 </style>

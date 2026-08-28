@@ -6,10 +6,15 @@ let redirectingToLogin = false
 function toLogin() {
   if (redirectingToLogin) return
   redirectingToLogin = true
+  // 游客访问需登录的功能时提示「请先登录」;有令牌说明是会话过期
+  const hadToken = !!getToken()
   clearAuth()
-  uni.showToast({ title: '登录已过期,请重新登录', icon: 'none' })
+  uni.showToast({ title: hadToken ? '登录已过期,请重新登录' : '请先登录', icon: 'none' })
   setTimeout(() => {
-    uni.reLaunch({ url: '/pages/auth/index' })
+    uni.navigateTo({
+      url: '/pages/auth/index',
+      fail: () => uni.reLaunch({ url: '/pages/auth/index' })
+    })
     redirectingToLogin = false
   }, 600)
 }

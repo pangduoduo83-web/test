@@ -150,6 +150,7 @@ import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { applyBorrow, fetchEquipmentDetail } from '@/api'
 import { today } from '@/utils/format'
+import { getToken } from '@/utils/auth'
 
 const steps = ['填写申请', '确认信息', '提交成功']
 const purposes = ['课程实验', '竞赛准备', '科研研究', '毕业设计']
@@ -178,6 +179,12 @@ const maxQty = computed(() => equip.value?.availableCount || 1)
 const durationLabel = computed(() => durationLabels[durations.indexOf(form.durationDays)] || `${form.durationDays}天`)
 
 onLoad(async (options) => {
+  // 借阅申请是登录后功能,游客引导去登录
+  if (!getToken()) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => uni.redirectTo({ url: '/pages/auth/index' }), 600)
+    return
+  }
   equip.value = await fetchEquipmentDetail(options.equipmentId)
 })
 

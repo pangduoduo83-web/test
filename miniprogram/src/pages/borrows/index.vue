@@ -1,5 +1,14 @@
 <template>
   <view class="page">
+    <!-- 游客提示:借阅记录为登录后功能,不强制登录 -->
+    <view v-if="!loggedIn" class="empty-box guest-box">
+      <text class="empty-icon">🔐</text>
+      <text>登录后可查看和管理你的借阅记录</text>
+      <button class="btn-gradient go-btn" @click="goLogin">去登录</button>
+      <button class="btn-plain go-btn" @click="goEquipment">先去设备馆逛逛</button>
+    </view>
+
+    <template v-else>
     <!-- 统计卡 -->
     <view class="stats-grid">
       <view class="stat-card">
@@ -82,6 +91,7 @@
       </view>
       <view class="list-end muted">共 {{ filtered.length }} 条记录</view>
     </view>
+    </template>
   </view>
 </template>
 
@@ -112,6 +122,7 @@ const statusMap = {
 const activeTab = ref('ALL')
 const items = ref([])
 const loading = ref(true)
+const loggedIn = ref(true)
 
 const statusMeta = (s) => statusMap[s] || { text: s, badge: 'badge-gray' }
 
@@ -215,9 +226,15 @@ const goEquipment = () => {
   uni.switchTab({ url: '/pages/equipment/index' })
 }
 
+const goLogin = () => {
+  uni.navigateTo({ url: '/pages/auth/index' })
+}
+
 onShow(() => {
-  if (!getToken()) {
-    uni.reLaunch({ url: '/pages/auth/index' })
+  loggedIn.value = !!getToken()
+  if (!loggedIn.value) {
+    loading.value = false
+    items.value = []
     return
   }
   load()
