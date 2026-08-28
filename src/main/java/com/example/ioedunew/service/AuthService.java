@@ -43,6 +43,21 @@ public class AuthService {
         this.siteConfigService = siteConfigService;
     }
 
+    /** 校验并规整手机号:空白返回 null,非法格式抛业务异常 */
+    public static String normalizePhone(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String phone = raw.trim();
+        if (phone.isEmpty()) {
+            return null;
+        }
+        if (!phone.matches("^1\\d{10}$")) {
+            throw new BusinessException("手机号格式不正确");
+        }
+        return phone;
+    }
+
     @Transactional
     public AuthDtos.AuthResponse register(AuthDtos.RegisterRequest req) {
         if (!siteConfigService.registerAllowed()) {
@@ -51,9 +66,14 @@ public class AuthService {
         if (userRepository.existsByEmail(req.getEmail())) {
             throw new BusinessException("该邮箱已注册");
         }
+        String phone = normalizePhone(req.getPhone());
+        if (phone != null && userRepository.existsByPhone(phone)) {
+            throw new BusinessException("该手机号已注册");
+        }
         User user = new User();
         user.setName(req.getName());
         user.setEmail(req.getEmail());
+        user.setPhone(phone);
         user.setPasswordHash(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()));
         user.setStudentNo(req.getStudentNo());
         user.setMajor(req.getMajor());
@@ -74,10 +94,14 @@ public class AuthService {
     }
 
     public AuthDtos.AuthResponse login(AuthDtos.LoginRequest req) {
-        User user = userRepository.findByEmail(req.getEmail())
-                .orElseThrow(() -> new BusinessException("邮箱或密码错误"));
+        // 同一输入框兼容邮箱与手机号:含 @ 视为邮箱,否则按手机号查找
+        String account = req.getEmail().trim();
+        User user = (account.contains("@")
+                ? userRepository.findByEmail(account)
+                : userRepository.findByPhone(account))
+                .orElseThrow(() -> new BusinessException("账号或密码错误"));
         if (!BCrypt.checkpw(req.getPassword(), user.getPasswordHash())) {
-            throw new BusinessException("邮箱或密码错误");
+            throw new BusinessException("账号或密码错误");
         }
         if (!Boolean.TRUE.equals(user.getEnabled())) {
             throw new BusinessException(403, "账号已被禁用,请联系管理员");
@@ -99,6 +123,16 @@ public class AuthService {
         }
         if (req.getGrade() != null) {
             user.setGrade(req.getGrade());
+        }
+        if (req.getPhone() != null) {
+            String phone = normalizePhone(req.getPhone());
+            if (phone != null) {
+                User samePhone = userRepository.findByPhone(phone).orElse(null);
+                if (samePhone != null && !samePhone.getId().equals(userId)) {
+                    throw new BusinessException("该手机号已被其他账号使用");
+                }
+            }
+            user.setPhone(phone);
         }
         user.setAvatarUrl(req.getAvatarUrl());
         return userRepository.save(user);

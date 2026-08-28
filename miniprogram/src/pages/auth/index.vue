@@ -62,9 +62,13 @@
         </view>
       </template>
 
+      <view v-if="mode === 'register'" class="field">
+        <text class="field-label">手机号(选填)</text>
+        <input v-model="form.phone" class="field-input" type="number" placeholder="填写后可用手机号登录" placeholder-class="ph" />
+      </view>
       <view class="field">
-        <text class="field-label">邮箱</text>
-        <input v-model="form.email" class="field-input" placeholder="请输入邮箱" placeholder-class="ph" />
+        <text class="field-label">{{ mode === 'login' ? '账号' : '邮箱' }}</text>
+        <input v-model="form.email" class="field-input" :placeholder="mode === 'login' ? '请输入邮箱或手机号' : '请输入邮箱'" placeholder-class="ph" />
       </view>
       <view class="field">
         <text class="field-label">密码</text>
@@ -111,6 +115,7 @@ const form = reactive({
   major: '',
   grade: '',
   email: '',
+  phone: '',
   password: ''
 })
 
@@ -161,8 +166,13 @@ const validate = () => {
     if (!form.studentNo.trim()) return '请输入学号'
     if (!form.major) return '请选择专业'
     if (!form.grade) return '请选择年级'
+    if (form.phone.trim() && !/^1\d{10}$/.test(form.phone.trim())) return '手机号格式不正确'
+    if (!form.email.trim() || !form.email.includes('@')) return '请输入正确的邮箱'
+  } else {
+    // 登录账号可为邮箱或 11 位手机号
+    const account = form.email.trim()
+    if (!account || (!account.includes('@') && !/^1\d{10}$/.test(account))) return '请输入邮箱或11位手机号'
   }
-  if (!form.email.trim() || !form.email.includes('@')) return '请输入正确的邮箱'
   if (!form.password || form.password.length < 6 || form.password.length > 32) return '密码长度需为6-32位'
   return ''
 }
@@ -184,6 +194,7 @@ const submit = async () => {
             major: form.major,
             grade: form.grade,
             email: form.email.trim(),
+            phone: form.phone.trim(),
             password: form.password
           })
     authStore.setAuth(data)

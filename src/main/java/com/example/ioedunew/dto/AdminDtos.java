@@ -28,6 +28,7 @@ public class AdminDtos {
         @Size(min = 6, max = 72, message = "密码长度须为 6-72 位")
         private String password;
 
+        private String phone;
         private String studentNo;
         private String major;
         private String grade;
@@ -43,6 +44,7 @@ public class AdminDtos {
         @Email(message = "邮箱格式不正确")
         private String email;
 
+        private String phone;
         private String studentNo;
         private String major;
         private String grade;

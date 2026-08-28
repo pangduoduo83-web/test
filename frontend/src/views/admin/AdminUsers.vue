@@ -3,7 +3,7 @@
     <div class="card">
       <div class="toolbar">
         <div class="filters">
-          <el-input v-model="filters.keyword" placeholder="姓名 / 邮箱 / 学号 / 专业" clearable
+          <el-input v-model="filters.keyword" placeholder="姓名 / 邮箱 / 手机号 / 学号 / 专业" clearable
                     style="width:260px" @keyup.enter="load" @clear="load" />
           <el-select v-model="filters.role" placeholder="全部角色" clearable style="width:120px" @change="load">
             <el-option label="学生" value="STUDENT" />
@@ -36,6 +36,9 @@
               </div>
             </div>
           </template>
+        </el-table-column>
+        <el-table-column prop="phone" label="手机号" width="130">
+          <template #default="{ row }">{{ row.phone || '-' }}</template>
         </el-table-column>
         <el-table-column prop="studentNo" label="学号" width="120">
           <template #default="{ row }">{{ row.studentNo || '-' }}</template>
@@ -86,6 +89,9 @@
           <el-form-item label="邮箱" required><el-input v-model="form.email" /></el-form-item>
           <el-form-item v-if="!form.id" label="初始密码" required>
             <el-input v-model="form.password" type="password" show-password />
+          </el-form-item>
+          <el-form-item label="手机号">
+            <el-input v-model="form.phone" placeholder="选填,可用于登录" />
           </el-form-item>
           <el-form-item label="学号"><el-input v-model="form.studentNo" /></el-form-item>
           <el-form-item label="专业"><el-input v-model="form.major" /></el-form-item>
@@ -183,7 +189,7 @@ const saving = ref(false)
 const page = ref(1)
 const pageSize = 10
 const emptyForm = {
-  id: null, name: '', email: '', password: '', studentNo: '', major: '', grade: '',
+  id: null, name: '', email: '', phone: '', password: '', studentNo: '', major: '', grade: '',
   avatarUrl: '', role: 'STUDENT', enabled: true
 }
 const form = reactive({ ...emptyForm })
@@ -207,7 +213,8 @@ const openEdit = (row = null) => {
   Object.assign(form, emptyForm)
   if (row) {
     Object.assign(form, {
-      id: row.id, name: row.name, email: row.email, studentNo: row.studentNo || '',
+      id: row.id, name: row.name, email: row.email, phone: row.phone || '',
+      studentNo: row.studentNo || '',
       major: row.major || '', grade: row.grade || '', avatarUrl: row.avatarUrl || '',
       role: row.role, enabled: !!row.enabled
     })
@@ -224,10 +231,15 @@ const save = async () => {
     ElMessage.warning('初始密码至少 6 位')
     return
   }
+  if (form.phone && !/^1\d{10}$/.test(form.phone.trim())) {
+    ElMessage.warning('手机号格式不正确')
+    return
+  }
   saving.value = true
   try {
     const payload = {
-      name: form.name, email: form.email, studentNo: form.studentNo, major: form.major,
+      name: form.name, email: form.email, phone: form.phone,
+      studentNo: form.studentNo, major: form.major,
       grade: form.grade, avatarUrl: form.avatarUrl, role: form.role, enabled: form.enabled
     }
     if (form.id) await adminUpdateUser(form.id, payload)

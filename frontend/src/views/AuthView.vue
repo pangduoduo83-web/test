@@ -73,9 +73,14 @@
             </div>
           </template>
 
-          <el-form-item label="邮箱">
-            <el-input v-model="form.email" placeholder="请输入学校邮箱">
+          <el-form-item :label="isLogin ? '账号' : '邮箱'">
+            <el-input v-model="form.email" :placeholder="isLogin ? '请输入邮箱或手机号' : '请输入学校邮箱'">
               <template #prefix><Mail :size="16" /></template>
+            </el-input>
+          </el-form-item>
+          <el-form-item v-if="!isLogin" label="手机号(选填,可用于登录)">
+            <el-input v-model="form.phone" placeholder="请输入11位手机号,可不填">
+              <template #prefix><Hash :size="16" /></template>
             </el-input>
           </el-form-item>
           <el-form-item label="密码">
@@ -142,7 +147,7 @@ const statItems = computed(() => [
   { label: '创新项目', value: stats.projectCount }
 ])
 
-const form = reactive({ name: '', studentNo: '', major: '', grade: '', email: '', password: '' })
+const form = reactive({ name: '', studentNo: '', major: '', grade: '', email: '', phone: '', password: '' })
 
 onMounted(async () => {
   if (route.query.mode === 'register') isLogin.value = false
@@ -168,7 +173,11 @@ const onForgot = () => {
 
 const submit = async () => {
   if (!form.email || !form.password) {
-    ElMessage.warning('请填写邮箱和密码')
+    ElMessage.warning(isLogin.value ? '请填写账号和密码' : '请填写邮箱和密码')
+    return
+  }
+  if (!isLogin.value && form.phone && !/^1\d{10}$/.test(form.phone.trim())) {
+    ElMessage.warning('手机号格式不正确')
     return
   }
   if (!isLogin.value && (!form.name || !form.studentNo || !form.major || !form.grade)) {

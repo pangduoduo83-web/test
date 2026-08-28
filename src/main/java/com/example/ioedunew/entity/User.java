@@ -29,6 +29,10 @@ public class User {
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
+    /** 手机号,选填,唯一,可用于登录(老库由 ddl-auto=update 自动补列) */
+    @Column(unique = true, length = 20)
+    private String phone;
+
     /** BCrypt 哈希,任何接口不得返回 */
     @JsonIgnore
     @Column(nullable = false)

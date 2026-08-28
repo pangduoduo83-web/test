@@ -81,6 +81,9 @@
             <el-form-item label="姓名">
               <el-input v-model="profileForm.name" />
             </el-form-item>
+            <el-form-item label="手机号(选填,可用于登录)">
+              <el-input v-model="profileForm.phone" placeholder="请输入11位手机号,留空则清除" />
+            </el-form-item>
             <div class="form-row">
               <el-form-item label="专业" class="grow">
                 <el-select v-model="profileForm.major">
@@ -242,7 +245,7 @@ const profileVisible = ref(false)
 const profileTab = ref('basic')
 const profileSaving = ref(false)
 const pwdSaving = ref(false)
-const profileForm = reactive({ name: '', major: '', grade: '', avatarUrl: '' })
+const profileForm = reactive({ name: '', major: '', grade: '', avatarUrl: '', phone: '' })
 const pwdForm = reactive({ oldPassword: '', newPassword: '', confirm: '' })
 
 const guideVisible = ref(false)
@@ -325,7 +328,8 @@ const onUserCommand = (cmd) => {
   } else if (cmd === 'profile') {
     const u = authStore.user || {}
     Object.assign(profileForm, {
-      name: u.name || '', major: u.major || '', grade: u.grade || '', avatarUrl: u.avatarUrl || ''
+      name: u.name || '', major: u.major || '', grade: u.grade || '',
+      avatarUrl: u.avatarUrl || '', phone: u.phone || ''
     })
     Object.assign(pwdForm, { oldPassword: '', newPassword: '', confirm: '' })
     profileTab.value = 'basic'
@@ -336,6 +340,10 @@ const onUserCommand = (cmd) => {
 const saveProfile = async () => {
   if (!profileForm.name.trim()) {
     ElMessage.warning('姓名不能为空')
+    return
+  }
+  if (profileForm.phone && !/^1\d{10}$/.test(profileForm.phone.trim())) {
+    ElMessage.warning('手机号格式不正确')
     return
   }
   profileSaving.value = true

@@ -31,6 +31,9 @@ public class AuthDtos {
         @Email(message = "邮箱格式不正确")
         private String email;
 
+        /** 选填,填写后可用手机号登录 */
+        private String phone;
+
         @NotBlank(message = "密码不能为空")
         @Size(min = 6, max = 32, message = "密码长度需在 6-32 位之间")
         private String password;
@@ -38,7 +41,8 @@ public class AuthDtos {
 
     @Data
     public static class LoginRequest {
-        @NotBlank(message = "邮箱不能为空")
+        /** 兼容历史字段名:内容可为邮箱或手机号 */
+        @NotBlank(message = "请输入邮箱或手机号")
         private String email;
 
         @NotBlank(message = "密码不能为空")
@@ -60,6 +64,9 @@ public class AuthDtos {
         private String major;
         private String grade;
         private String avatarUrl;
+
+        /** 选填,置空字符串表示清除手机号 */
+        private String phone;
     }
 
     @Data

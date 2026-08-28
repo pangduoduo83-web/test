@@ -151,6 +151,7 @@ public class AdminService {
         String kw = keyword == null ? "" : keyword.trim().toLowerCase();
         return userRepository.findAll().stream()
                 .filter(u -> kw.isEmpty() || contains(u.getName(), kw) || contains(u.getEmail(), kw)
+                        || contains(u.getPhone(), kw)
                         || contains(u.getStudentNo(), kw) || contains(u.getMajor(), kw))
                 .filter(u -> role == null || role.trim().isEmpty() || "ALL".equalsIgnoreCase(role)
                         || role.equalsIgnoreCase(u.getRole()))
@@ -170,9 +171,14 @@ public class AdminService {
         if (userRepository.existsByEmail(email)) {
             throw new BusinessException("该邮箱已被使用");
         }
+        String phone = AuthService.normalizePhone(req.getPhone());
+        if (phone != null && userRepository.existsByPhone(phone)) {
+            throw new BusinessException("该手机号已被使用");
+        }
         User user = new User();
         user.setName(requireText(req.getName(), "姓名"));
         user.setEmail(email);
+        user.setPhone(phone);
         user.setPasswordHash(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()));
         user.setStudentNo(cleanNullable(req.getStudentNo()));
         user.setMajor(cleanNullable(req.getMajor()));
@@ -205,6 +211,16 @@ public class AdminService {
                 throw new BusinessException("该邮箱已被使用");
             }
             user.setEmail(email);
+        }
+        if (req.getPhone() != null) {
+            String phone = AuthService.normalizePhone(req.getPhone());
+            if (phone != null) {
+                User samePhone = userRepository.findByPhone(phone).orElse(null);
+                if (samePhone != null && !samePhone.getId().equals(id)) {
+                    throw new BusinessException("该手机号已被使用");
+                }
+            }
+            user.setPhone(phone);
         }
         if (req.getStudentNo() != null) {
             user.setStudentNo(cleanNullable(req.getStudentNo()));

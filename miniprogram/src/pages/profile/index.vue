@@ -33,6 +33,11 @@
       </view>
 
       <view class="field">
+        <text class="field-label">手机号(选填,可用于登录)</text>
+        <input v-model="form.phone" class="field-input" type="number" placeholder="请输入11位手机号,留空则清除" placeholder-class="ph" />
+      </view>
+
+      <view class="field">
         <text class="field-label">邮箱(不可修改)</text>
         <view class="field-input readonly">{{ user?.email }}</view>
       </view>
@@ -62,7 +67,7 @@ const user = computed(() => authStore.user)
 const majors = ['电子信息工程', '通信工程', '自动化', '计算机科学', '物联网工程']
 const grades = ['大一', '大二', '大三', '大四', '研究生']
 
-const form = reactive({ name: '', major: '', grade: '' })
+const form = reactive({ name: '', major: '', grade: '', phone: '' })
 const avatarUrl = ref('')
 const saving = ref(false)
 
@@ -71,6 +76,7 @@ onLoad(() => {
   form.name = u.name || ''
   form.major = u.major || ''
   form.grade = u.grade || ''
+  form.phone = u.phone || ''
   avatarUrl.value = u.avatarUrl || ''
 })
 
@@ -98,12 +104,17 @@ const save = async () => {
     uni.showToast({ title: '请输入姓名', icon: 'none' })
     return
   }
+  if (form.phone.trim() && !/^1\d{10}$/.test(form.phone.trim())) {
+    uni.showToast({ title: '手机号格式不正确', icon: 'none' })
+    return
+  }
   saving.value = true
   try {
     const updated = await updateProfile({
       name: form.name.trim(),
       major: form.major || undefined,
       grade: form.grade || undefined,
+      phone: form.phone.trim(),
       avatarUrl: avatarUrl.value || undefined
     })
     authStore.updateUser(updated)
