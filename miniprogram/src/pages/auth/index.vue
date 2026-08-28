@@ -75,9 +75,40 @@
         <input v-model="form.password" class="field-input" password placeholder="请输入密码(6-32位)" placeholder-class="ph" />
       </view>
 
+      <view class="agree-row" @click="agreed = !agreed">
+        <view class="agree-box" :class="{ checked: agreed }">
+          <text v-if="agreed">✓</text>
+        </view>
+        <text class="agree-text">我已阅读并同意</text>
+        <text class="agree-link" @click.stop="goAgreement">《用户协议与隐私政策》</text>
+      </view>
+
       <button class="btn-gradient submit-btn" :disabled="submitting" @click="submit">
         {{ submitting ? '请稍候...' : mode === 'login' ? '登 录' : '注册并登录' }}
       </button>
+
+      <!-- #ifdef MP-WEIXIN -->
+      <view class="divider">
+        <view class="divider-line" />
+        <text class="divider-text">或</text>
+        <view class="divider-line" />
+      </view>
+      <!-- 未勾选协议时用普通按钮承接点击,避免先弹微信授权窗再提示 -->
+      <button
+        v-if="agreed"
+        class="wx-btn"
+        open-type="getPhoneNumber"
+        :disabled="wxSubmitting"
+        @getphonenumber="onWxPhone"
+      >
+        <uni-icons type="weixin" size="22" color="#fff" />
+        <text class="wx-btn-text">{{ wxSubmitting ? '登录中...' : '微信手机号一键登录' }}</text>
+      </button>
+      <button v-else class="wx-btn" @click="needAgree">
+        <uni-icons type="weixin" size="22" color="#fff" />
+        <text class="wx-btn-text">微信手机号一键登录</text>
+      </button>
+      <!-- #endif -->
 
       <view v-if="mode === 'login'" class="demo-tip" @click="fillDemo">
         <text class="demo-link">使用演示账号(学生/教师/管理员)</text>
@@ -87,14 +118,19 @@
       </view>
     </view>
 
-    <view class="footer-tip">登录即代表同意平台使用规范 · 忘记密码请联系管理员</view>
+    <view class="skip-row" @click="skipLogin">
+      <text class="skip-text">暂不登录,先去逛逛</text>
+      <uni-icons type="right" size="13" color="#6b7280" />
+    </view>
+
+    <view class="footer-tip">忘记密码请联系管理员</view>
   </view>
 </template>
 
 <script setup>
 import { reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { login, register, fetchPublicStats, fetchSiteConfig } from '@/api'
+import { login, register, wechatPhoneLogin, fetchPublicStats, fetchSiteConfig } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { getToken } from '@/utils/auth'
 import { fullUrl } from '@/config'
@@ -103,6 +139,8 @@ const authStore = useAuthStore()
 const statusBarHeight = ref(20)
 const mode = ref('login')
 const submitting = ref(false)
+const wxSubmitting = ref(false)
+const agreed = ref(false)
 const stats = reactive({ equipmentCount: 128, studentCount: 3200, projectCount: 56 })
 const site = reactive({ title: 'AI未来实践中心', logoUrl: '', allowRegister: true })
 
@@ -177,7 +215,42 @@ const validate = () => {
   return ''
 }
 
+const goAgreement = () => uni.navigateTo({ url: '/pages/agreement/index' })
+
+const needAgree = () =>
+  uni.showToast({ title: '请先阅读并勾选同意《用户协议与隐私政策》', icon: 'none' })
+
+// 游客可不登录直接浏览项目与设备(小程序审核要求)
+const skipLogin = () => uni.switchTab({ url: '/pages/projects/index' })
+
+// 微信手机号一键登录:组件回调给动态令牌 code,后端向微信换取手机号后登录/自动建号
+const onWxPhone = async (e) => {
+  const detail = e.detail || {}
+  if (!detail.code) {
+    // 用户取消授权时静默;额度用尽(errno 1400001)等异常给出说明
+    if (detail.errno === 1400001) {
+      uni.showToast({ title: '一键登录额度已用完,请用账号密码登录', icon: 'none' })
+    }
+    return
+  }
+  wxSubmitting.value = true
+  try {
+    const data = await wechatPhoneLogin(detail.code)
+    authStore.setAuth(data)
+    uni.showToast({ title: '登录成功', icon: 'success' })
+    setTimeout(() => uni.switchTab({ url: '/pages/projects/index' }), 500)
+  } catch (err) {
+    // 错误提示已由请求层统一处理
+  } finally {
+    wxSubmitting.value = false
+  }
+}
+
 const submit = async () => {
+  if (!agreed.value) {
+    needAgree()
+    return
+  }
   const err = validate()
   if (err) {
     uni.showToast({ title: err, icon: 'none' })
@@ -363,6 +436,99 @@ const submit = async () => {
   margin-top: 16rpx;
 }
 
+.agree-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin: 8rpx 0 24rpx;
+}
+
+.agree-box {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid $border-color;
+  background: #fff;
+  color: #fff;
+  font-size: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  &.checked {
+    background: $brand-blue;
+    border-color: $brand-blue;
+  }
+}
+
+.agree-text {
+  font-size: 24rpx;
+  color: $text-sub;
+}
+
+.agree-link {
+  font-size: 24rpx;
+  color: $brand-blue;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin: 30rpx 0 22rpx;
+}
+
+.divider-line {
+  flex: 1;
+  height: 2rpx;
+  background: $border-color;
+}
+
+.divider-text {
+  font-size: 22rpx;
+  color: $text-light;
+}
+
+.wx-btn {
+  background: #07c160;
+  color: #fff;
+  border-radius: 20rpx;
+  font-size: 30rpx;
+  height: 92rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+
+  &::after {
+    border: none;
+  }
+
+  &[disabled] {
+    opacity: 0.6;
+    background: #07c160;
+    color: #fff;
+  }
+}
+
+.wx-btn-text {
+  font-size: 30rpx;
+}
+
+.skip-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  margin-top: 36rpx;
+}
+
+.skip-text {
+  font-size: 26rpx;
+  color: $text-sub;
+}
+
 .demo-tip {
   margin-top: 28rpx;
   text-align: center;
@@ -378,6 +544,6 @@ const submit = async () => {
   text-align: center;
   color: $text-light;
   font-size: 22rpx;
-  padding: 48rpx 0 60rpx;
+  padding: 32rpx 0 60rpx;
 }
 </style>
