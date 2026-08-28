@@ -62,6 +62,15 @@ public class AuthController {
         return ApiResponse.ok();
     }
 
+    /** 账号注销:验证密码后删除账号与全部个人数据(不可恢复) */
+    @PostMapping("/account/delete")
+    public ApiResponse<Void> deleteAccount(@Valid @RequestBody AuthDtos.DeleteAccountRequest req,
+                                           HttpServletRequest request) {
+        AuthUser auth = requireAuth(request);
+        authService.deleteAccount(auth.getId(), req.getPassword());
+        return ApiResponse.ok();
+    }
+
     private AuthUser requireAuth(HttpServletRequest request) {
         AuthUser auth = (AuthUser) request.getAttribute(AuthUser.REQUEST_ATTR);
         if (auth == null) {

@@ -10,6 +10,7 @@ export const register = (data) => post('/auth/register', data)
 export const fetchMe = () => get('/auth/me', null, { silent: true })
 export const updateProfile = (data) => put('/auth/profile', data)
 export const changePassword = (data) => put('/auth/password', data)
+export const deleteAccount = (password) => post('/auth/account/delete', { password })
 
 // ---------- 项目中心 ----------
 export const fetchProjects = (params) => get('/projects', params)
@@ -19,6 +20,8 @@ export const toggleFavorite = (id) => post(`/projects/${id}/favorite`)
 export const updateProgress = (id, data) => put(`/projects/${id}/progress`, data)
 export const fetchDiscussions = (id) => get(`/projects/${id}/discussions`)
 export const postDiscussion = (id, data) => post(`/projects/${id}/discussions`, data)
+export const reportDiscussion = (projectId, discussionId, reason) =>
+  post(`/projects/${projectId}/discussions/${discussionId}/report`, { reason })
 export const submitWork = (id, data) => post(`/projects/${id}/submissions`, data)
 export const fetchMySubmission = (id) => get(`/projects/${id}/submissions/mine`, null, { silent: true })
 export const fetchMySubmissions = (id) => get(`/projects/${id}/submissions/mine-all`, null, { silent: true })

@@ -21,4 +21,6 @@ public interface BorrowRequestRepository extends JpaRepository<BorrowRequest, Lo
     long countByStatus(String status);
 
     boolean existsByUserId(Long userId);
+
+    void deleteByUserId(Long userId);
 }

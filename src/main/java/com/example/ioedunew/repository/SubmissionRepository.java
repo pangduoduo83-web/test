@@ -20,4 +20,6 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     boolean existsByUserId(Long userId);
 
     boolean existsByUserIdAndProjectId(Long userId, Long projectId);
+
+    void deleteByUserId(Long userId);
 }

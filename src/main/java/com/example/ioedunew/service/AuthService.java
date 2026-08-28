@@ -5,7 +5,15 @@ import com.example.ioedunew.config.JwtUtil;
 import com.example.ioedunew.dto.AuthDtos;
 import com.example.ioedunew.entity.SkillScore;
 import com.example.ioedunew.entity.User;
+import com.example.ioedunew.repository.BorrowRequestRepository;
+import com.example.ioedunew.repository.DiscussionRepository;
+import com.example.ioedunew.repository.EnrollmentRepository;
+import com.example.ioedunew.repository.EquipmentFavoriteRepository;
+import com.example.ioedunew.repository.FavoriteRepository;
+import com.example.ioedunew.repository.NotificationRepository;
+import com.example.ioedunew.repository.ProjectRepository;
 import com.example.ioedunew.repository.SkillScoreRepository;
+import com.example.ioedunew.repository.SubmissionRepository;
 import com.example.ioedunew.repository.UserRepository;
 import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.stereotype.Service;
@@ -30,17 +38,41 @@ public class AuthService {
     private final NotificationService notificationService;
     private final JwtUtil jwtUtil;
     private final SiteConfigService siteConfigService;
+    private final BorrowRequestRepository borrowRequestRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final SubmissionRepository submissionRepository;
+    private final FavoriteRepository favoriteRepository;
+    private final EquipmentFavoriteRepository equipmentFavoriteRepository;
+    private final DiscussionRepository discussionRepository;
+    private final NotificationRepository notificationRepository;
+    private final ProjectRepository projectRepository;
 
     public AuthService(UserRepository userRepository,
                        SkillScoreRepository skillScoreRepository,
                        NotificationService notificationService,
                        JwtUtil jwtUtil,
-                       SiteConfigService siteConfigService) {
+                       SiteConfigService siteConfigService,
+                       BorrowRequestRepository borrowRequestRepository,
+                       EnrollmentRepository enrollmentRepository,
+                       SubmissionRepository submissionRepository,
+                       FavoriteRepository favoriteRepository,
+                       EquipmentFavoriteRepository equipmentFavoriteRepository,
+                       DiscussionRepository discussionRepository,
+                       NotificationRepository notificationRepository,
+                       ProjectRepository projectRepository) {
         this.userRepository = userRepository;
         this.skillScoreRepository = skillScoreRepository;
         this.notificationService = notificationService;
         this.jwtUtil = jwtUtil;
         this.siteConfigService = siteConfigService;
+        this.borrowRequestRepository = borrowRequestRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.submissionRepository = submissionRepository;
+        this.favoriteRepository = favoriteRepository;
+        this.equipmentFavoriteRepository = equipmentFavoriteRepository;
+        this.discussionRepository = discussionRepository;
+        this.notificationRepository = notificationRepository;
+        this.projectRepository = projectRepository;
     }
 
     /** 校验并规整手机号:空白返回 null,非法格式抛业务异常 */
@@ -146,5 +178,38 @@ public class AuthService {
         }
         user.setPasswordHash(BCrypt.hashpw(req.getNewPassword(), BCrypt.gensalt()));
         userRepository.save(user);
+    }
+
+    /**
+     * 用户自助注销:验证密码后删除账号及全部个人数据(小程序审核要求提供注销途径)。
+     * 仅在以下情况阻止:设备未归还(需先归还)、名下有指导项目(教师需先移交)、最后一个管理员。
+     */
+    @Transactional
+    public void deleteAccount(Long userId, String password) {
+        User user = me(userId);
+        if (!BCrypt.checkpw(password, user.getPasswordHash())) {
+            throw new BusinessException("密码不正确,无法注销");
+        }
+        long holding = borrowRequestRepository.countByUserIdAndStatus(userId, "APPROVED")
+                + borrowRequestRepository.countByUserIdAndStatus(userId, "RETURN_REQUESTED");
+        if (holding > 0) {
+            throw new BusinessException(409, "你还有未归还的设备,请先归还并通过验收后再注销");
+        }
+        if (projectRepository.existsByMentorId(userId)) {
+            throw new BusinessException(409, "你名下还有指导项目,请先联系管理员移交后再注销");
+        }
+        if ("ADMIN".equals(user.getRole()) && userRepository.countByRole("ADMIN") <= 1) {
+            throw new BusinessException(409, "平台最后一个管理员不能注销");
+        }
+        // 清除全部个人数据:借阅历史、报名进度、成果、收藏、讨论、技能画像、通知
+        borrowRequestRepository.deleteByUserId(userId);
+        enrollmentRepository.deleteByUserId(userId);
+        submissionRepository.deleteByUserId(userId);
+        favoriteRepository.deleteByUserId(userId);
+        equipmentFavoriteRepository.deleteByUserId(userId);
+        discussionRepository.deleteByUserId(userId);
+        skillScoreRepository.deleteByUserId(userId);
+        notificationRepository.deleteByUserId(userId);
+        userRepository.delete(user);
     }
 }

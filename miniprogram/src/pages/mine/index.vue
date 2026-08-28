@@ -227,6 +227,11 @@
         <text class="menu-text logout-text">退出登录</text>
         <text class="menu-arrow">›</text>
       </view>
+      <view class="menu-item" @click="onDeleteAccount">
+        <uni-icons type="trash" size="17" color="#9ca3af" />
+        <text class="menu-text muted-text">注销账号</text>
+        <text class="menu-arrow">›</text>
+      </view>
     </view>
     </template>
 
@@ -237,7 +242,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
-import { fetchDashboard, fetchNotifications, updateProgress } from '@/api'
+import { fetchDashboard, fetchNotifications, updateProgress, deleteAccount } from '@/api'
 import { fullUrl } from '@/config'
 import { formatDate } from '@/utils/format'
 import { getToken } from '@/utils/auth'
@@ -330,6 +335,42 @@ const onLogout = () => {
       authStore.logout()
       // 退出后回到可游客浏览的项目页,而非强制停留登录页
       uni.reLaunch({ url: '/pages/projects/index' })
+    }
+  })
+}
+
+// 账号注销:两次确认 + 密码验证,数据不可恢复(小程序审核要求提供注销途径)
+const onDeleteAccount = () => {
+  uni.showModal({
+    title: '注销账号',
+    content: '注销后账号及全部数据(报名进度、借阅记录、成果、收藏、讨论等)将被永久删除且无法恢复。如有未归还设备需先归还。确定继续吗?',
+    confirmText: '继续注销',
+    confirmColor: '#dc2626',
+    success: (res) => {
+      if (!res.confirm) return
+      uni.showModal({
+        title: '身份验证',
+        editable: true,
+        placeholderText: '请输入当前登录密码',
+        confirmText: '确认注销',
+        confirmColor: '#dc2626',
+        success: async (r2) => {
+          if (!r2.confirm) return
+          const pwd = (r2.content || '').trim()
+          if (!pwd) {
+            uni.showToast({ title: '请输入密码', icon: 'none' })
+            return
+          }
+          try {
+            await deleteAccount(pwd)
+            authStore.logout()
+            uni.showToast({ title: '账号已注销', icon: 'none' })
+            setTimeout(() => uni.reLaunch({ url: '/pages/projects/index' }), 600)
+          } catch (e) {
+            // 请求层已提示(密码错误/有未归还设备等)
+          }
+        }
+      })
     }
   })
 }
@@ -717,6 +758,10 @@ onPullDownRefresh(async () => {
 
 .logout-text {
   color: $red;
+}
+
+.muted-text {
+  color: $text-sub;
 }
 
 .menu-badge {

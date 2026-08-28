@@ -78,4 +78,11 @@ public class AuthDtos {
         @Size(min = 6, max = 32, message = "新密码长度需在 6-32 位之间")
         private String newPassword;
     }
+
+    @Data
+    public static class DeleteAccountRequest {
+        /** 注销前需验证当前密码,防止误操作或被他人代注销 */
+        @NotBlank(message = "请输入当前密码以确认注销")
+        private String password;
+    }
 }

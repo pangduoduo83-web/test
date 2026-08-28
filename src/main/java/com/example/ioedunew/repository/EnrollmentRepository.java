@@ -20,4 +20,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     long countByUserIdAndStatus(Long userId, String status);
 
     boolean existsByUserId(Long userId);
+
+    void deleteByUserId(Long userId);
 }
