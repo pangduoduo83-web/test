@@ -153,13 +153,11 @@ public class AuthService {
     public AuthDtos.AuthResponse wechatPhoneLogin(String code) {
         String phone = weChatService.phoneNumberByCode(code);
         if (phone == null) {
-            throw new BusinessException("微信手机号获取失败,请重试或使用账号密码登录");
+            throw new BusinessException("手机号获取失败,请重试或使用账号密码登录");
         }
         User user = userRepository.findByPhone(phone).orElse(null);
         if (user == null) {
-            if (!siteConfigService.registerAllowed()) {
-                throw new BusinessException("平台已关闭自助注册,请联系管理员开通账号");
-            }
+            // 手机号已经过平台实名校验,视作可信开户,不受「关闭自助注册」开关限制(该开关仅管邮箱注册)
             user = new User();
             user.setName("用户" + phone.substring(phone.length() - 4));
             // email 列非空且唯一,一键注册先写占位邮箱,后续在编辑资料/管理端补录
@@ -176,7 +174,7 @@ public class AuthService {
                 skillScoreRepository.save(s);
             }
             notificationService.create(user.getId(), "system", "欢迎加入AI未来实践中心",
-                    "你已通过微信手机号快速注册,请到「我的-编辑资料」完善姓名与专业信息。");
+                    "你已通过手机号快捷登录完成注册,请到「我的-编辑资料」完善姓名与专业信息。");
         }
         if (!Boolean.TRUE.equals(user.getEnabled())) {
             throw new BusinessException(403, "账号已被禁用,请联系管理员");

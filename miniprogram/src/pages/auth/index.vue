@@ -93,7 +93,7 @@
         <text class="divider-text">或</text>
         <view class="divider-line" />
       </view>
-      <!-- 未勾选协议时用普通按钮承接点击,避免先弹微信授权窗再提示 -->
+      <!-- 未勾选协议时用普通按钮承接点击,避免先弹授权窗再提示 -->
       <button
         v-if="agreed"
         class="wx-btn"
@@ -101,12 +101,12 @@
         :disabled="wxSubmitting"
         @getphonenumber="onWxPhone"
       >
-        <uni-icons type="weixin" size="22" color="#fff" />
-        <text class="wx-btn-text">{{ wxSubmitting ? '登录中...' : '微信手机号一键登录' }}</text>
+        <uni-icons type="phone-filled" size="20" color="#fff" />
+        <text class="wx-btn-text">{{ wxSubmitting ? '登录中...' : '手机号快捷登录' }}</text>
       </button>
       <button v-else class="wx-btn" @click="needAgree">
-        <uni-icons type="weixin" size="22" color="#fff" />
-        <text class="wx-btn-text">微信手机号一键登录</text>
+        <uni-icons type="phone-filled" size="20" color="#fff" />
+        <text class="wx-btn-text">手机号快捷登录</text>
       </button>
       <!-- #endif -->
 
@@ -223,7 +223,7 @@ const needAgree = () =>
 // 游客可不登录直接浏览项目与设备(小程序审核要求)
 const skipLogin = () => uni.switchTab({ url: '/pages/projects/index' })
 
-// 微信手机号一键登录:组件回调给动态令牌 code,后端向微信换取手机号后登录/自动建号
+// 手机号快捷登录:getPhoneNumber 组件回调动态令牌 code,后端换取手机号后登录/自动建号
 const onWxPhone = async (e) => {
   const detail = e.detail || {}
   if (!detail.code) {
