@@ -42,6 +42,15 @@ public class MiscDtos {
 
         /** 回复的主题帖 id,发主题帖时为空 */
         private Long parentId;
+
+        /** 小程序端 wx.login 临时凭证,用于微信内容安全检测;网页端为空 */
+        private String wxCode;
+    }
+
+    @Data
+    public static class DiscussionReportRequest {
+        /** 举报理由,选填 */
+        private String reason;
     }
 
     @Data

@@ -35,19 +35,22 @@ public class ProjectService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final DiscussionRepository discussionRepository;
+    private final WeChatService weChatService;
 
     public ProjectService(ProjectRepository projectRepository,
                           EnrollmentRepository enrollmentRepository,
                           FavoriteRepository favoriteRepository,
                           UserRepository userRepository,
                           NotificationService notificationService,
-                          DiscussionRepository discussionRepository) {
+                          DiscussionRepository discussionRepository,
+                          WeChatService weChatService) {
         this.projectRepository = projectRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.favoriteRepository = favoriteRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.discussionRepository = discussionRepository;
+        this.weChatService = weChatService;
     }
 
     public List<Project> list(String keyword, String difficulty, String sort) {
@@ -199,7 +202,7 @@ public class ProjectService {
     }
 
     @Transactional
-    public Discussion postDiscussion(Long userId, Long projectId, String content, Long parentId) {
+    public Discussion postDiscussion(Long userId, Long projectId, String content, Long parentId, String wxCode) {
         if (content == null || content.trim().isEmpty()) {
             throw new BusinessException("讨论内容不能为空");
         }
@@ -210,6 +213,13 @@ public class ProjectService {
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(401, "用户不存在"));
+        // 小程序端带 wx.login code:走微信 UGC 内容安全检测(scene=2 评论)
+        if (wxCode != null && !wxCode.trim().isEmpty()) {
+            String openid = weChatService.codeToOpenid(wxCode);
+            if (!weChatService.contentSafe(openid, content.trim(), 2)) {
+                throw new BusinessException("内容含违规信息,请修改后重新发送");
+            }
+        }
         Discussion d = new Discussion();
         d.setProjectId(projectId);
         d.setUserId(userId);
@@ -217,6 +227,22 @@ public class ProjectService {
         d.setParentId(parentId);
         d.setContent(content.trim());
         return discussionRepository.save(d);
+    }
+
+    /** 举报讨论:通知全体管理员处理(小程序 UGC 审核要求提供举报途径) */
+    public void reportDiscussion(Long userId, Long projectId, Long discussionId, String reason) {
+        Discussion d = discussionRepository.findById(discussionId)
+                .filter(x -> projectId.equals(x.getProjectId()))
+                .orElseThrow(() -> new BusinessException(404, "讨论不存在"));
+        User reporter = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(401, "用户不存在"));
+        String excerpt = d.getContent().length() > 40 ? d.getContent().substring(0, 40) + "…" : d.getContent();
+        String detail = reporter.getName() + " 举报了「" + d.getUserName() + "」的讨论(#" + d.getId() + "):" + excerpt
+                + (reason == null || reason.trim().isEmpty() ? "" : ";理由:" + reason.trim())
+                + "。请前往讨论管理处理。";
+        for (User admin : userRepository.findByRole("ADMIN")) {
+            notificationService.create(admin.getId(), "system", "收到讨论内容举报", detail);
+        }
     }
 
     private void addExp(Long userId, int delta) {

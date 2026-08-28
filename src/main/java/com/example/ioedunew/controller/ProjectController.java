@@ -84,7 +84,18 @@ public class ProjectController {
                                                   @Valid @RequestBody MiscDtos.DiscussionPostRequest req,
                                                   HttpServletRequest request) {
         return ApiResponse.ok(projectService.postDiscussion(
-                auth(request).getId(), id, req.getContent(), req.getParentId()));
+                auth(request).getId(), id, req.getContent(), req.getParentId(), req.getWxCode()));
+    }
+
+    /** 举报讨论内容,通知管理员处理 */
+    @PostMapping("/{id}/discussions/{discussionId}/report")
+    public ApiResponse<Void> reportDiscussion(@PathVariable Long id,
+                                              @PathVariable Long discussionId,
+                                              @RequestBody(required = false) MiscDtos.DiscussionReportRequest req,
+                                              HttpServletRequest request) {
+        projectService.reportDiscussion(auth(request).getId(), id, discussionId,
+                req == null ? null : req.getReason());
+        return ApiResponse.ok();
     }
 
     @PostMapping("/{id}/submissions")

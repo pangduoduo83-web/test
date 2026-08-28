@@ -10,7 +10,7 @@
         @error="coverFailed = true"
       />
       <view v-else class="hero-img hero-fallback">
-        <text class="hero-icon">{{ project.icon || '📦' }}</text>
+        <uni-icons type="flag" size="56" color="rgba(255,255,255,0.85)" />
       </view>
       <view class="hero-badges">
         <text class="badge" :class="diffBadge(project.difficulty)">{{ project.difficulty }}</text>
@@ -245,7 +245,10 @@
               <text class="disc-time">{{ relativeTime(d.item.createdAt) }}</text>
             </view>
             <text class="disc-content">{{ d.item.content }}</text>
-            <text class="disc-reply-btn" @click="startReply(d.item)">回复</text>
+            <view class="disc-actions">
+              <text class="disc-reply-btn" @click="startReply(d.item)">回复</text>
+              <text class="disc-report-btn" @click="onReport(d.item)">举报</text>
+            </view>
             <view v-for="r in d.replies" :key="r.id" class="disc-sub">
               <view class="disc-head">
                 <text class="disc-user">{{ r.userName }}</text>
@@ -308,6 +311,7 @@ import {
   toggleFavorite,
   fetchDiscussions,
   postDiscussion,
+  reportDiscussion,
   fetchSkills
 } from '@/api'
 import { fullUrl } from '@/config'
@@ -494,6 +498,20 @@ const cancelReply = () => {
   replyTarget.value = null
 }
 
+// 微信端取 wx.login 临时凭证,供后端做 UGC 内容安全检测;其他端返回空
+const getWxCode = () =>
+  new Promise((resolve) => {
+    // #ifdef MP-WEIXIN
+    uni.login({
+      success: (r) => resolve(r.code || ''),
+      fail: () => resolve('')
+    })
+    // #endif
+    // #ifndef MP-WEIXIN
+    resolve('')
+    // #endif
+  })
+
 const sendDiscussion = async () => {
   if (!ensureLogin()) return
   const content = discussContent.value.trim()
@@ -503,9 +521,11 @@ const sendDiscussion = async () => {
   }
   posting.value = true
   try {
+    const wxCode = await getWxCode()
     await postDiscussion(projectId.value, {
       content,
-      parentId: replyTarget.value ? replyTarget.value.id : undefined
+      parentId: replyTarget.value ? replyTarget.value.id : undefined,
+      wxCode: wxCode || undefined
     })
     discussContent.value = ''
     replyTarget.value = null
@@ -515,6 +535,26 @@ const sendDiscussion = async () => {
   } finally {
     posting.value = false
   }
+}
+
+// 举报不当内容,通知管理员处理
+const onReport = (item) => {
+  if (!ensureLogin()) return
+  uni.showModal({
+    title: '举报该讨论',
+    editable: true,
+    placeholderText: '请简述举报理由(选填)',
+    confirmText: '提交举报',
+    success: async (res) => {
+      if (!res.confirm) return
+      try {
+        await reportDiscussion(projectId.value, item.id, (res.content || '').trim())
+        uni.showToast({ title: '已收到举报,我们会尽快处理', icon: 'none' })
+      } catch (e) {
+        // 已提示
+      }
+    }
+  })
 }
 </script>
 
@@ -541,10 +581,6 @@ const sendDiscussion = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.hero-icon {
-  font-size: 120rpx;
 }
 
 .hero-badges {
@@ -1069,11 +1105,20 @@ const sendDiscussion = async () => {
   margin-top: 8rpx;
 }
 
+.disc-actions {
+  display: flex;
+  gap: 28rpx;
+  margin-top: 12rpx;
+}
+
 .disc-reply-btn {
-  display: inline-block;
   font-size: 24rpx;
   color: $brand-blue;
-  margin-top: 12rpx;
+}
+
+.disc-report-btn {
+  font-size: 24rpx;
+  color: $text-light;
 }
 
 .disc-sub {
