@@ -38,6 +38,13 @@ public class AuthController {
         return ApiResponse.ok(authService.login(req));
     }
 
+    /** 微信手机号一键登录(小程序 getPhoneNumber 组件),未注册自动建号 */
+    @PostMapping("/wechat-phone-login")
+    public ApiResponse<AuthDtos.AuthResponse> wechatPhoneLogin(
+            @Valid @RequestBody AuthDtos.WxPhoneLoginRequest req) {
+        return ApiResponse.ok(authService.wechatPhoneLogin(req.getCode()));
+    }
+
     /**
      * 当前登录用户信息。注意:/api/auth 在拦截器白名单里,这里手动校验令牌属性。
      */

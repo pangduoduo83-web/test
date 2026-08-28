@@ -41,7 +41,8 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
         String uri = request.getRequestURI();
         if (uri.startsWith("/api/public/") || "/api/auth/login".equals(uri)
-                || "/api/auth/register".equals(uri)) {
+                || "/api/auth/register".equals(uri)
+                || "/api/auth/wechat-phone-login".equals(uri)) {
             return true;
         }
 

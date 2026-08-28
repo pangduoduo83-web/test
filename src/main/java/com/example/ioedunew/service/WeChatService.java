@@ -112,6 +112,52 @@ public class WeChatService {
         }
     }
 
+    /**
+     * 手机号快速验证组件:用 getPhoneNumber 回调的动态令牌换取用户手机号(纯号码,不含区号)。
+     * 仅企业主体小程序可用;失败返回 null,由调用方给出提示。
+     */
+    public String phoneNumberByCode(String code) {
+        if (!isConfigured() || code == null || code.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            String token = accessToken(false);
+            if (token == null) {
+                return null;
+            }
+            JsonNode resp = doGetPhoneNumber(token, code.trim());
+            int errcode = resp.path("errcode").asInt();
+            if (errcode == 40001 || errcode == 42001) {
+                token = accessToken(true);
+                if (token == null) {
+                    return null;
+                }
+                resp = doGetPhoneNumber(token, code.trim());
+                errcode = resp.path("errcode").asInt();
+            }
+            if (errcode != 0) {
+                log.warn("getuserphonenumber 失败 errcode={} errmsg={}",
+                        errcode, resp.path("errmsg").asText());
+                return null;
+            }
+            return resp.path("phone_info").path("purePhoneNumber").asText(null);
+        } catch (Exception e) {
+            log.warn("getuserphonenumber 异常: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private JsonNode doGetPhoneNumber(String token, String code) throws Exception {
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("code", code);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String resp = restTemplate.postForObject(
+                API_BASE + "/wxa/business/getuserphonenumber?access_token=" + token,
+                new HttpEntity<>(objectMapper.writeValueAsString(body), headers), String.class);
+        return objectMapper.readTree(resp);
+    }
+
     private JsonNode doSecCheck(String token, String openid, String content, int scene) throws Exception {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("version", 2);

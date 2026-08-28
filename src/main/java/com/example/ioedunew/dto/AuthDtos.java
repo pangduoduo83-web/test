@@ -85,4 +85,11 @@ public class AuthDtos {
         @NotBlank(message = "请输入当前密码以确认注销")
         private String password;
     }
+
+    @Data
+    public static class WxPhoneLoginRequest {
+        /** getPhoneNumber 组件回调的动态令牌,后端凭它向微信换取手机号 */
+        @NotBlank(message = "缺少微信手机号凭证")
+        private String code;
+    }
 }

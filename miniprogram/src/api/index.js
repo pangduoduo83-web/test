@@ -7,6 +7,7 @@ export const fetchSiteConfig = () => get('/public/site-config', null, { silent: 
 // ---------- 认证 ----------
 export const login = (data) => post('/auth/login', data)
 export const register = (data) => post('/auth/register', data)
+export const wechatPhoneLogin = (code) => post('/auth/wechat-phone-login', { code })
 export const fetchMe = () => get('/auth/me', null, { silent: true })
 export const updateProfile = (data) => put('/auth/profile', data)
 export const changePassword = (data) => put('/auth/password', data)

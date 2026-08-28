@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 认证服务:注册、登录、当前用户信息。
@@ -46,6 +47,7 @@ public class AuthService {
     private final DiscussionRepository discussionRepository;
     private final NotificationRepository notificationRepository;
     private final ProjectRepository projectRepository;
+    private final WeChatService weChatService;
 
     public AuthService(UserRepository userRepository,
                        SkillScoreRepository skillScoreRepository,
@@ -59,7 +61,8 @@ public class AuthService {
                        EquipmentFavoriteRepository equipmentFavoriteRepository,
                        DiscussionRepository discussionRepository,
                        NotificationRepository notificationRepository,
-                       ProjectRepository projectRepository) {
+                       ProjectRepository projectRepository,
+                       WeChatService weChatService) {
         this.userRepository = userRepository;
         this.skillScoreRepository = skillScoreRepository;
         this.notificationService = notificationService;
@@ -73,6 +76,7 @@ public class AuthService {
         this.discussionRepository = discussionRepository;
         this.notificationRepository = notificationRepository;
         this.projectRepository = projectRepository;
+        this.weChatService = weChatService;
     }
 
     /** 校验并规整手机号:空白返回 null,非法格式抛业务异常 */
@@ -134,6 +138,45 @@ public class AuthService {
                 .orElseThrow(() -> new BusinessException("账号或密码错误"));
         if (!BCrypt.checkpw(req.getPassword(), user.getPasswordHash())) {
             throw new BusinessException("账号或密码错误");
+        }
+        if (!Boolean.TRUE.equals(user.getEnabled())) {
+            throw new BusinessException(403, "账号已被禁用,请联系管理员");
+        }
+        return new AuthDtos.AuthResponse(jwtUtil.createToken(user.getId(), user.getRole()), user);
+    }
+
+    /**
+     * 微信手机号一键登录:凭 getPhoneNumber 组件的动态令牌向微信换取手机号,
+     * 手机号已有账号则直接登录,否则自动注册学生账号(邮箱占位,资料可后续完善)。
+     */
+    @Transactional
+    public AuthDtos.AuthResponse wechatPhoneLogin(String code) {
+        String phone = weChatService.phoneNumberByCode(code);
+        if (phone == null) {
+            throw new BusinessException("微信手机号获取失败,请重试或使用账号密码登录");
+        }
+        User user = userRepository.findByPhone(phone).orElse(null);
+        if (user == null) {
+            if (!siteConfigService.registerAllowed()) {
+                throw new BusinessException("平台已关闭自助注册,请联系管理员开通账号");
+            }
+            user = new User();
+            user.setName("用户" + phone.substring(phone.length() - 4));
+            // email 列非空且唯一,一键注册先写占位邮箱,后续在编辑资料/管理端补录
+            user.setEmail("wx" + phone + "@auto.ioedu.cn");
+            user.setPhone(phone);
+            user.setPasswordHash(BCrypt.hashpw(UUID.randomUUID().toString(), BCrypt.gensalt()));
+            user.setRole("STUDENT");
+            userRepository.save(user);
+            for (String dim : SKILL_DIMENSIONS) {
+                SkillScore s = new SkillScore();
+                s.setUserId(user.getId());
+                s.setSkillName(dim);
+                s.setScore(30);
+                skillScoreRepository.save(s);
+            }
+            notificationService.create(user.getId(), "system", "欢迎加入AI未来实践中心",
+                    "你已通过微信手机号快速注册,请到「我的-编辑资料」完善姓名与专业信息。");
         }
         if (!Boolean.TRUE.equals(user.getEnabled())) {
             throw new BusinessException(403, "账号已被禁用,请联系管理员");
