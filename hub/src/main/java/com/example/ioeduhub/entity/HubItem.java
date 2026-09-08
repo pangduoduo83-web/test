@@ -81,6 +81,12 @@ public class HubItem {
     @Column(nullable = false)
     private Integer installCount = 0;
 
+    /** 平台推荐置顶:在各客户商店里排在最前并带推荐标记 */
+    @Column(nullable = false)
+    private Boolean featured = false;
+
+    private LocalDateTime featuredAt;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

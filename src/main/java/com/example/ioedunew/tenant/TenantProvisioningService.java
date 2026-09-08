@@ -170,6 +170,55 @@ public class TenantProvisioningService {
         }
     }
 
+    /** 更新配额,body 里出现的字段才改;传 null 表示清除限制 */
+    public Map<String, Object> updateQuota(String rawCode, Map<String, Object> body) {
+        String code = normalizeCode(rawCode);
+        Tenant tenant = registry.findByCode(code)
+                .orElseThrow(() -> new BusinessException(404, "租户不存在: " + code));
+        if (body.containsKey("plan")) {
+            Object v = body.get("plan");
+            jdbc.update("UPDATE " + table + " SET plan = ? WHERE id = ?", v == null || String.valueOf(v).trim().isEmpty() ? null : String.valueOf(v).trim(), tenant.getId());
+        }
+        if (body.containsKey("maxUsers")) {
+            jdbc.update("UPDATE " + table + " SET max_users = ? WHERE id = ?", positiveOrNull(body.get("maxUsers")), tenant.getId());
+        }
+        if (body.containsKey("storageLimitMb")) {
+            jdbc.update("UPDATE " + table + " SET storage_limit_mb = ? WHERE id = ?", positiveOrNull(body.get("storageLimitMb")), tenant.getId());
+        }
+        if (body.containsKey("aiMonthlyTokens")) {
+            Integer v = positiveOrNull(body.get("aiMonthlyTokens"));
+            jdbc.update("UPDATE " + table + " SET ai_monthly_tokens = ? WHERE id = ?", v == null ? null : v.longValue(), tenant.getId());
+        }
+        if (body.containsKey("expiresAt")) {
+            Object v = body.get("expiresAt");
+            java.sql.Date d = null;
+            if (v != null && !String.valueOf(v).trim().isEmpty()) {
+                try {
+                    d = java.sql.Date.valueOf(java.time.LocalDate.parse(String.valueOf(v).trim()));
+                } catch (Exception e) {
+                    throw new BusinessException("到期日格式应为 yyyy-MM-dd");
+                }
+            }
+            jdbc.update("UPDATE " + table + " SET expires_at = ? WHERE id = ?", d, tenant.getId());
+        }
+        jdbc.update("UPDATE " + table + " SET updated_at = ? WHERE id = ?", Timestamp.valueOf(LocalDateTime.now()), tenant.getId());
+        registry.refresh();
+        return view(registry.require(code));
+    }
+
+    private static Integer positiveOrNull(Object v) {
+        if (v == null || String.valueOf(v).trim().isEmpty()) {
+            return null;
+        }
+        int n;
+        try {
+            n = (int) Double.parseDouble(String.valueOf(v));
+        } catch (NumberFormatException e) {
+            throw new BusinessException("配额必须是数字");
+        }
+        return n <= 0 ? null : n;
+    }
+
     public Map<String, Object> view(Tenant t) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", t.getId());
@@ -178,6 +227,12 @@ public class TenantProvisioningService {
         m.put("dbName", t.getDbName());
         m.put("customDomain", t.getCustomDomain());
         m.put("status", t.getStatus());
+        m.put("plan", t.getPlan());
+        m.put("maxUsers", t.getMaxUsers());
+        m.put("storageLimitMb", t.getStorageLimitMb());
+        m.put("aiMonthlyTokens", t.getAiMonthlyTokens());
+        m.put("expiresAt", t.getExpiresAt() == null ? null : t.getExpiresAt().toString());
+        m.put("expired", t.isExpired());
         m.put("createdAt", t.getCreatedAt());
         m.put("updatedAt", t.getUpdatedAt());
         return m;

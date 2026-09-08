@@ -23,7 +23,18 @@ public class Tenant {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    /** 套餐名(仅展示)与配额;为空表示不限 / 永久 */
+    private String plan;
+    private Integer maxUsers;
+    private Integer storageLimitMb;
+    private Long aiMonthlyTokens;
+    private java.time.LocalDate expiresAt;
+
     public boolean isActive() {
         return STATUS_ACTIVE.equals(status);
+    }
+
+    public boolean isExpired() {
+        return expiresAt != null && expiresAt.isBefore(java.time.LocalDate.now());
     }
 }

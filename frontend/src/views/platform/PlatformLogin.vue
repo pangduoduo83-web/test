@@ -74,7 +74,7 @@ const submit = async () => {
   try {
     const r = await hubLogin({ username: form.username.trim(), password: form.password })
     setHubAuth(r.token, r.username)
-    router.push('/platform/items')
+    router.push('/platform/home')
   } finally {
     loading.value = false
   }

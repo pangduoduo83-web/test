@@ -5,6 +5,7 @@ import com.example.ioeduhub.config.AdminJwt;
 import com.example.ioeduhub.config.HubAuthFilter;
 import com.example.ioeduhub.config.HubProperties;
 import com.example.ioeduhub.entity.HubAdmin;
+import com.example.ioeduhub.entity.HubInstall;
 import com.example.ioeduhub.entity.HubItem;
 import com.example.ioeduhub.entity.HubItemGrant;
 import com.example.ioeduhub.entity.HubItemVersion;
@@ -126,6 +127,7 @@ public class HubAdminService implements SmartInitializingSingleton {
         m.put("approved", itemRepo.countByReviewStatus(HubItem.ST_APPROVED));
         m.put("rejected", itemRepo.countByReviewStatus(HubItem.ST_REJECTED));
         m.put("offline", itemRepo.countByReviewStatus(HubItem.ST_OFFLINE));
+        m.put("featured", itemRepo.countByFeaturedTrue());
         m.put("tenants", tenantRepo.count());
         m.put("installs", installRepo.count());
         return m;
@@ -171,6 +173,49 @@ public class HubAdminService implements SmartInitializingSingleton {
         }
         m.put("grants", grants);
         m.put("reviewLogs", reviewLogRepo.findByItemIdOrderByReviewedAtDesc(id));
+        return m;
+    }
+
+    /** 按客户站点汇总的安装情况:每个站点装过几次、最近装的是哪个版本、谁装的 */
+    public Map<String, Object> installsByTenant(Long id) {
+        itemRepo.findById(id).orElseThrow(() -> new BusinessException(404, "条目不存在"));
+        Map<Long, Integer> versionNos = new LinkedHashMap<>();
+        for (HubItemVersion v : versionRepo.findByItemIdOrderByVersionNoDesc(id)) {
+            versionNos.put(v.getId(), v.getVersionNo());
+        }
+        Map<Long, Map<String, Object>> byTenant = new LinkedHashMap<>();
+        List<Map<String, Object>> recent = new ArrayList<>();
+        List<HubInstall> installs = installRepo.findByItemIdOrderByInstalledAtDesc(id);
+        for (HubInstall in : installs) {
+            Map<String, Object> row = byTenant.get(in.getTenantId());
+            if (row == null) {
+                row = new LinkedHashMap<>();
+                row.put("tenantId", in.getTenantId());
+                HubTenant t = tenantRepo.findById(in.getTenantId()).orElse(null);
+                row.put("tenantCode", t == null ? null : t.getCode());
+                row.put("tenantName", t == null ? "已注销客户 #" + in.getTenantId() : t.getName());
+                row.put("tenantStatus", t == null ? null : t.getStatus());
+                row.put("count", 0);
+                row.put("lastVersionNo", versionNos.get(in.getVersionId()));
+                row.put("lastInstalledAt", in.getInstalledAt());
+                row.put("lastInstalledBy", in.getInstalledBy());
+                byTenant.put(in.getTenantId(), row);
+            }
+            row.put("count", (Integer) row.get("count") + 1);
+            if (recent.size() < 20) {
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("tenantName", row.get("tenantName"));
+                r.put("versionNo", versionNos.get(in.getVersionId()));
+                r.put("installedBy", in.getInstalledBy());
+                r.put("installedAt", in.getInstalledAt());
+                recent.add(r);
+            }
+        }
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("total", installs.size());
+        m.put("tenantCount", byTenant.size());
+        m.put("byTenant", new ArrayList<>(byTenant.values()));
+        m.put("recent", recent);
         return m;
     }
 
@@ -228,6 +273,40 @@ public class HubAdminService implements SmartInitializingSingleton {
         logEntry.setDecision(d);
         logEntry.setComment(item.getReviewComment());
         reviewLogRepo.save(logEntry);
+        return storeService.view(item);
+    }
+
+    /** 批量审核:逐条执行,单条失败不影响其他,返回成功数与失败明细 */
+    @Transactional
+    public Map<String, Object> batchReview(List<Long> ids, String decision, String comment, String reviewer) {
+        int ok = 0;
+        List<Map<String, Object>> failed = new ArrayList<>();
+        for (Long id : new java.util.LinkedHashSet<>(ids)) {
+            try {
+                review(id, decision, comment, reviewer);
+                ok++;
+            } catch (BusinessException e) {
+                Map<String, Object> f = new LinkedHashMap<>();
+                f.put("id", id);
+                f.put("message", e.getMessage());
+                failed.add(f);
+            }
+        }
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("ok", ok);
+        m.put("failed", failed);
+        return m;
+    }
+
+    @Transactional
+    public Map<String, Object> setFeatured(Long id, boolean featured) {
+        HubItem item = itemRepo.findById(id).orElseThrow(() -> new BusinessException(404, "条目不存在"));
+        if (featured && item.getCurrentVersionId() == null) {
+            throw new BusinessException("条目还没有上架版本,先通过审核再推荐");
+        }
+        item.setFeatured(featured);
+        item.setFeaturedAt(featured ? LocalDateTime.now() : null);
+        itemRepo.save(item);
         return storeService.view(item);
     }
 

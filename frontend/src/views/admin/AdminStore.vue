@@ -18,12 +18,13 @@
         </div>
         <el-empty v-if="!loading && items.length === 0" description="商店里还没有对本站可见的项目" />
         <div class="grid">
-          <div v-for="it in items" :key="it.id" class="card item">
+          <div v-for="it in items" :key="it.id" class="card item" :class="{ featured: it.featured }">
             <div class="cover" @click="openDetail(it)">
               <img v-if="it.coverUrl" :src="storeAssetUrl(it.coverUrl)" alt="" />
               <div v-else class="cover-placeholder">📦</div>
               <el-tag v-if="it.localProjectId" size="small" type="success" class="badge">已安装 v{{ it.localVersionNo }}</el-tag>
               <el-tag v-if="it.updateAvailable" size="small" type="warning" class="badge badge-2">有新版本 v{{ it.currentVersionNo }}</el-tag>
+              <span v-if="it.featured" class="featured-badge">★ 平台推荐</span>
             </div>
             <div class="body">
               <div class="title" @click="openDetail(it)">{{ it.title }}</div>
@@ -324,6 +325,8 @@ onMounted(async () => {
 .cover-placeholder { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 42px; }
 .badge { position: absolute; top: 10px; left: 10px; }
 .badge-2 { left: auto; right: 10px; }
+.featured-badge { position: absolute; bottom: 10px; left: 10px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #f59e0b; color: #1f1300; }
+.item.featured { border-color: #fcd34d; box-shadow: 0 0 0 2px #fef3c7; }
 .body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .title { font-weight: 700; font-size: 15px; cursor: pointer; }
 .summary { font-size: 13px; color: #6b7280; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 39px; }

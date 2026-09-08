@@ -10,6 +10,10 @@
       </div>
 
       <nav class="pf-nav">
+        <div class="pf-nav-group">工作台</div>
+        <router-link to="/platform/home" class="pf-nav-item" :class="{ active: $route.path.startsWith('/platform/home') }">
+          <LayoutDashboard :size="17" />总览
+        </router-link>
         <div class="pf-nav-group">商店运营</div>
         <router-link to="/platform/items" class="pf-nav-item" :class="{ active: $route.path.startsWith('/platform/items') }">
           <PackageCheck :size="17" />条目审核与分享
@@ -58,7 +62,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Building2, KeyRound, LogOut, PackageCheck, Store } from 'lucide-vue-next'
+import { Building2, KeyRound, LayoutDashboard, LogOut, PackageCheck, Store } from 'lucide-vue-next'
 import { clearHubAuth, getHubAdminName, hubChangePassword, hubStats } from '../../api/hub'
 import '../../styles/platform.css'
 
@@ -68,6 +72,7 @@ const stats = ref({})
 const adminName = getHubAdminName()
 
 const pages = {
+  '/platform/home': { title: '总览', desc: '审核队列、客户站点与商店运转情况' },
   '/platform/items': { title: '条目审核与分享', desc: '审核客户发布的项目、控制可见范围与定向分享' },
   '/platform/sites': { title: '客户站点', desc: '开通新客户站点、启停与注销、维护商店接入密钥' }
 }

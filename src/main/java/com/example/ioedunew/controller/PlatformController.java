@@ -35,13 +35,16 @@ public class PlatformController {
 
     private final TenantRegistry registry;
     private final TenantProvisioningService provisioning;
+    private final com.example.ioedunew.tenant.TenantQuotaService quota;
 
     @Value("${ioedu.upload-dir}")
     private String uploadDir;
 
-    public PlatformController(TenantRegistry registry, TenantProvisioningService provisioning) {
+    public PlatformController(TenantRegistry registry, TenantProvisioningService provisioning,
+                              com.example.ioedunew.tenant.TenantQuotaService quota) {
         this.registry = registry;
         this.provisioning = provisioning;
+        this.quota = quota;
     }
 
     @GetMapping("/tenants")
@@ -87,6 +90,28 @@ public class PlatformController {
     @PutMapping("/tenants/{code}/status")
     public ApiResponse<Map<String, Object>> updateStatus(@PathVariable String code, @RequestBody Map<String, Object> body) {
         return ApiResponse.ok(provisioning.updateStatus(code, str(body.get("status"))));
+    }
+
+    /** 配额,body 里出现的字段才改:{ plan?, maxUsers?, storageLimitMb?, aiMonthlyTokens?, expiresAt?(yyyy-MM-dd) },传 null 清除 */
+    @PutMapping("/tenants/{code}/quota")
+    public ApiResponse<Map<String, Object>> updateQuota(@PathVariable String code, @RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(provisioning.updateQuota(code, body));
+    }
+
+    /** 全部站点的用量快照(用户数、7 天活跃、上传占用、本月 AI Token) */
+    @GetMapping("/usage")
+    public ApiResponse<List<Map<String, Object>>> usage() {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (Tenant t : registry.all()) {
+            list.add(quota.usage(t));
+        }
+        return ApiResponse.ok(list);
+    }
+
+    @GetMapping("/tenants/{code}/usage")
+    public ApiResponse<Map<String, Object>> tenantUsage(@PathVariable String code) {
+        Tenant t = registry.findByCode(code).orElseThrow(() -> new BusinessException(404, "租户不存在: " + code));
+        return ApiResponse.ok(quota.usage(t));
     }
 
     /**

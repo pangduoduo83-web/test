@@ -69,6 +69,10 @@ public class TenantFilter extends OncePerRequestFilter {
             reject(response, 403, "该站点已停用,请联系平台管理员");
             return;
         }
+        if (tenant.isExpired()) {
+            reject(response, 403, "该站点服务已于 " + tenant.getExpiresAt() + " 到期,请联系平台续期");
+            return;
+        }
         TenantContext.set(tenant.getCode());
         try {
             chain.doFilter(request, response);

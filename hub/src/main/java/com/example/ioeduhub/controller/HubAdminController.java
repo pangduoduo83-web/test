@@ -66,11 +66,33 @@ public class HubAdminController {
         return ApiResponse.ok(adminService.latestPayload(id));
     }
 
+    @GetMapping("/items/{id}/installs")
+    public ApiResponse<Map<String, Object>> installs(@PathVariable Long id) {
+        return ApiResponse.ok(adminService.installsByTenant(id));
+    }
+
     /** body: { decision: APPROVED|REJECTED|OFFLINE, comment } */
     @PostMapping("/items/{id}/review")
     public ApiResponse<Map<String, Object>> review(@RequestAttribute(HubAuthFilter.ATTR_ADMIN) String admin,
                                                    @PathVariable Long id, @RequestBody Map<String, String> body) {
         return ApiResponse.ok(adminService.review(id, body.get("decision"), body.get("comment"), admin));
+    }
+
+    /** body: { ids: [1,2], decision: APPROVED|REJECTED|OFFLINE, comment } → { ok, failed:[{id,message}] } */
+    @PostMapping("/items/batch-review")
+    public ApiResponse<Map<String, Object>> batchReview(@RequestAttribute(HubAuthFilter.ATTR_ADMIN) String admin,
+                                                        @RequestBody Map<String, Object> body) {
+        List<Long> ids = longList(body.get("ids"));
+        if (ids.isEmpty()) {
+            throw new BusinessException("请先勾选要处理的条目");
+        }
+        return ApiResponse.ok(adminService.batchReview(ids, str(body.get("decision")), str(body.get("comment")), admin));
+    }
+
+    /** body: { featured: true|false } */
+    @PutMapping("/items/{id}/featured")
+    public ApiResponse<Map<String, Object>> featured(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(adminService.setFeatured(id, Boolean.TRUE.equals(body.get("featured"))));
     }
 
     /** body: { visibility: PUBLIC|RESTRICTED } */
@@ -83,14 +105,21 @@ public class HubAdminController {
     @PutMapping("/items/{id}/grants")
     public ApiResponse<Map<String, Object>> grants(@RequestAttribute(HubAuthFilter.ATTR_ADMIN) String admin,
                                                    @PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(adminService.replaceGrants(id, longList(body.get("tenantIds")), admin));
+    }
+
+    private static List<Long> longList(Object raw) {
         List<Long> ids = new ArrayList<>();
-        Object raw = body.get("tenantIds");
         if (raw instanceof List) {
             for (Object o : (List<?>) raw) {
                 ids.add(Long.valueOf(String.valueOf(o)));
             }
         }
-        return ApiResponse.ok(adminService.replaceGrants(id, ids, admin));
+        return ids;
+    }
+
+    private static String str(Object o) {
+        return o == null ? null : String.valueOf(o);
     }
 
     // ---------- 客户站点(联动多租户主系统) ----------
@@ -114,6 +143,17 @@ public class HubAdminController {
     @PutMapping("/sites/{code}/status")
     public ApiResponse<Map<String, Object>> siteStatus(@PathVariable String code, @RequestBody Map<String, String> body) {
         return ApiResponse.ok(siteService.updateStatus(code, body.get("status")));
+    }
+
+    @GetMapping("/sites/usage")
+    public ApiResponse<JsonNode> sitesUsage() {
+        return ApiResponse.ok(siteService.usage());
+    }
+
+    /** body: { plan?, maxUsers?, storageLimitMb?, aiMonthlyTokens?, expiresAt? },传 null 表示清除该限制 */
+    @PutMapping("/sites/{code}/quota")
+    public ApiResponse<JsonNode> siteQuota(@PathVariable String code, @RequestBody JsonNode body) {
+        return ApiResponse.ok(siteService.updateQuota(code, body));
     }
 
     @PostMapping("/sites/{code}/rotate-key")

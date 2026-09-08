@@ -8,5 +8,7 @@ import java.util.List;
 public interface InstallRepo extends JpaRepository<HubInstall, Long> {
     List<HubInstall> findByTenantIdOrderByInstalledAtDesc(Long tenantId);
 
+    List<HubInstall> findByItemIdOrderByInstalledAtDesc(Long itemId);
+
     long count();
 }

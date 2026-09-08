@@ -188,6 +188,7 @@ public class StoreService {
         m.put("currentVersionNo", currentVersionNo(item));
         m.put("latestVersionNo", item.getLatestVersionNo());
         m.put("installCount", item.getInstallCount());
+        m.put("featured", Boolean.TRUE.equals(item.getFeatured()));
         m.put("createdAt", item.getCreatedAt());
         m.put("updatedAt", item.getUpdatedAt());
         return m;

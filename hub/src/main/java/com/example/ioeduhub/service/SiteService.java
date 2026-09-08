@@ -81,6 +81,12 @@ public class SiteService {
             m.put("status", t.path("status").asText());
             m.put("createdAt", t.path("createdAt").asText(null));
             m.put("siteUrl", siteUrl(code, t.path("customDomain").asText(null)));
+            m.put("plan", t.path("plan").asText(null));
+            m.put("maxUsers", t.hasNonNull("maxUsers") ? t.get("maxUsers").asInt() : null);
+            m.put("storageLimitMb", t.hasNonNull("storageLimitMb") ? t.get("storageLimitMb").asInt() : null);
+            m.put("aiMonthlyTokens", t.hasNonNull("aiMonthlyTokens") ? t.get("aiMonthlyTokens").asLong() : null);
+            m.put("expiresAt", t.path("expiresAt").asText(null));
+            m.put("expired", t.path("expired").asBoolean(false));
             HubTenant h = hubByCode.get(code);
             m.put("storeRegistered", h != null);
             m.put("storeTenantId", h == null ? null : h.getId());
@@ -137,6 +143,18 @@ public class SiteService {
         m.put("storeApiKey", site.path("storeKeyConfigured").asBoolean(false) ? null : apiKey);
         log.info("已开通客户站点 {}(商店 Key 自动写入: {})", code, m.get("storeKeyConfigured"));
         return m;
+    }
+
+    /** 全部站点的用量快照(用户、活跃、存储、AI Token),直接转发主系统 */
+    public JsonNode usage() {
+        requireConfigured();
+        return call(HttpMethod.GET, "/api/platform/usage", null);
+    }
+
+    /** 配额:{ plan?, maxUsers?, storageLimitMb?, aiMonthlyTokens?, expiresAt? } */
+    public JsonNode updateQuota(String code, JsonNode body) {
+        requireConfigured();
+        return call(HttpMethod.PUT, "/api/platform/tenants/" + code + "/quota", body);
     }
 
     public Map<String, Object> updateStatus(String code, String status) {

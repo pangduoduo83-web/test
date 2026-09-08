@@ -43,9 +43,11 @@ public class FileController {
             "zip", "rar", "7z", "mp4", "mp3");
 
     private final UploadStorage storage;
+    private final com.example.ioedunew.tenant.TenantQuotaService quotaService;
 
-    public FileController(UploadStorage storage) {
+    public FileController(UploadStorage storage, com.example.ioedunew.tenant.TenantQuotaService quotaService) {
         this.storage = storage;
+        this.quotaService = quotaService;
     }
 
     @PostMapping
@@ -71,6 +73,7 @@ public class FileController {
         if (file == null || file.isEmpty()) {
             throw new BusinessException("请选择要上传的文件");
         }
+        quotaService.checkStorageQuota(file.getSize());
         String original = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
         int dot = original.lastIndexOf('.');
         String ext = dot < 0 ? "" : original.substring(dot + 1).toLowerCase(Locale.ROOT);

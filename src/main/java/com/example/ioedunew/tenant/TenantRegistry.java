@@ -46,6 +46,12 @@ public class TenantRegistry {
         t.setStatus(rs.getString("status"));
         t.setCreatedAt(toLocal(rs.getTimestamp("created_at")));
         t.setUpdatedAt(toLocal(rs.getTimestamp("updated_at")));
+        t.setPlan(rs.getString("plan"));
+        t.setMaxUsers(rs.getObject("max_users") == null ? null : rs.getInt("max_users"));
+        t.setStorageLimitMb(rs.getObject("storage_limit_mb") == null ? null : rs.getInt("storage_limit_mb"));
+        t.setAiMonthlyTokens(rs.getObject("ai_monthly_tokens") == null ? null : rs.getLong("ai_monthly_tokens"));
+        java.sql.Date exp = rs.getDate("expires_at");
+        t.setExpiresAt(exp == null ? null : exp.toLocalDate());
         return t;
     };
 
@@ -57,8 +63,8 @@ public class TenantRegistry {
 
     /** 从平台库重新加载全部租户(启动、开通、状态变更后调用) */
     public synchronized void refresh() {
-        List<Tenant> list = jdbc.query("SELECT id, code, name, db_name, custom_domain, status, created_at, updated_at FROM "
-                + table + " ORDER BY id", ROW_MAPPER);
+        List<Tenant> list = jdbc.query("SELECT id, code, name, db_name, custom_domain, status, created_at, updated_at, "
+                + "plan, max_users, storage_limit_mb, ai_monthly_tokens, expires_at FROM " + table + " ORDER BY id", ROW_MAPPER);
         Map<String, Tenant> codes = new HashMap<>();
         Map<String, Tenant> domains = new HashMap<>();
         for (Tenant t : list) {
