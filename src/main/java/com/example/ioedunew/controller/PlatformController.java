@@ -53,7 +53,7 @@ public class PlatformController {
         return ApiResponse.ok(list);
     }
 
-    /** body: { code, name, customDomain?, adminEmail?, adminPassword?, seedDemo? } */
+    /** body: { code, name, customDomain?, adminEmail?, adminPassword?, seedDemo?, hubApiKey? } */
     @PostMapping("/tenants")
     public ApiResponse<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
         String code = str(body.get("code"));
@@ -62,7 +62,25 @@ public class PlatformController {
         String adminEmail = str(body.get("adminEmail"));
         String adminPassword = str(body.get("adminPassword"));
         boolean seedDemo = Boolean.TRUE.equals(body.get("seedDemo"));
-        return ApiResponse.ok(provisioning.provision(code, name, customDomain, adminEmail, adminPassword, seedDemo));
+        String hubApiKey = str(body.get("hubApiKey"));
+        return ApiResponse.ok(provisioning.provision(code, name, customDomain, adminEmail, adminPassword, seedDemo, hubApiKey));
+    }
+
+    /** 为已有租户写入/更换项目商店 API Key,body: { apiKey } */
+    @PutMapping("/tenants/{code}/store-key")
+    public ApiResponse<Map<String, Object>> storeKey(@PathVariable String code, @RequestBody Map<String, Object> body) {
+        String apiKey = str(body.get("apiKey"));
+        if (apiKey == null || apiKey.trim().isEmpty()) {
+            throw new BusinessException("apiKey 不能为空");
+        }
+        boolean ok = provisioning.setStoreApiKey(code, apiKey.trim());
+        if (!ok) {
+            throw new BusinessException(500, "写入商店 API Key 失败(请检查主密钥 IOEDU_MASTER_KEY 是否配置)");
+        }
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("code", code);
+        m.put("storeKeyConfigured", true);
+        return ApiResponse.ok(m);
     }
 
     /** body: { status: ACTIVE | SUSPENDED } */

@@ -49,34 +49,58 @@
         </div>
       </el-tab-pane>
 
-      <!-- 我的发布 -->
+      <!-- 本站发布:本地项目 → 商店 -->
       <el-tab-pane label="本站发布" name="mine">
+        <p class="hint">在下表中选择本地项目点「发布到商店」,项目的封面、富文本图片与教学资料会一并上传;提交后由平台管理员审核,通过即上架供其他客户安装。修改过的项目再点「更新版本」会追加新版本并重新审核,期间旧版本继续上架。</p>
         <div class="toolbar">
-          <el-select v-model="publishProjectId" filterable placeholder="选择要发布到商店的本地项目" style="width:360px">
-            <el-option v-for="p in localProjects" :key="p.id" :value="p.id"
-                       :label="p.title + (p.hubItemId ? `(已发布,条目 #${p.hubItemId})` : '')" />
-          </el-select>
-          <el-input v-model="changelog" placeholder="版本说明(可选)" style="width:260px" />
-          <el-button type="primary" :disabled="!publishProjectId" :loading="publishing" @click="publish">发布 / 更新到商店</el-button>
+          <el-input v-model="localFilter" placeholder="搜索本地项目" clearable style="width:260px" />
+          <el-radio-group v-model="localScope" size="small">
+            <el-radio-button value="ALL">全部</el-radio-button>
+            <el-radio-button value="PUBLISHED">已发布</el-radio-button>
+            <el-radio-button value="NONE">未发布</el-radio-button>
+          </el-radio-group>
         </div>
-        <p class="hint">发布后需平台管理员审核通过才会在商店上架;再次发布同一项目会追加新版本并重新审核。项目里的封面、富文本图片与教学资料会一并上传到商店。</p>
-        <el-table :data="mine" stripe>
-          <el-table-column prop="id" label="条目" width="70" />
-          <el-table-column prop="title" label="标题" min-width="200" />
-          <el-table-column label="审核状态" width="130">
+        <el-table :data="filteredLocal" stripe>
+          <el-table-column label="本地项目" min-width="260">
             <template #default="{ row }">
-              <el-tag :type="statusType(row.reviewStatus)" size="small">{{ statusText(row.reviewStatus) }}</el-tag>
+              <div class="local-cell">
+                <img v-if="row.coverUrl" :src="row.coverUrl" class="local-thumb" alt="" />
+                <span v-else class="local-thumb">📦</span>
+                <div>
+                  <div class="local-title">{{ row.title }}</div>
+                  <div class="local-sub">{{ row.category || '未分类' }} · {{ row.difficulty }} · {{ row.mentor || '未指派讲师' }}
+                    <el-tag v-if="row.status !== 'PUBLISHED'" size="small" type="info" effect="plain">草稿</el-tag></div>
+                </div>
+              </div>
             </template>
           </el-table-column>
-          <el-table-column label="版本" width="140">
-            <template #default="{ row }">上架 v{{ row.currentVersionNo ?? '-' }} / 最新 v{{ row.latestVersionNo }}</template>
+          <el-table-column label="商店状态" width="150">
+            <template #default="{ row }">
+              <el-tag v-if="row.publishedByUs" :type="statusType(row.hubReviewStatus)" size="small">{{ statusText(row.hubReviewStatus) }}</el-tag>
+              <el-tag v-else-if="row.hubItemId" type="info" size="small" effect="plain">来自商店 #{{ row.hubItemId }}</el-tag>
+              <span v-else class="muted">未发布</span>
+            </template>
           </el-table-column>
-          <el-table-column prop="visibility" label="可见范围" width="110">
-            <template #default="{ row }">{{ row.visibility === 'PUBLIC' ? '公开' : '定向分享' }}</template>
+          <el-table-column label="版本" width="150">
+            <template #default="{ row }">
+              <span v-if="row.publishedByUs">上架 {{ row.hubCurrentVersionNo ? 'v' + row.hubCurrentVersionNo : '-' }} / 最新 v{{ row.hubLatestVersionNo }}</span>
+              <span v-else-if="row.hubItemId">本地 v{{ row.hubVersionNo }}</span>
+              <span v-else class="muted">—</span>
+            </template>
           </el-table-column>
-          <el-table-column prop="installCount" label="安装次数" width="100" />
-          <el-table-column prop="reviewComment" label="审核意见" min-width="180" show-overflow-tooltip />
-          <el-table-column prop="updatedAt" label="更新时间" width="170" />
+          <el-table-column label="安装次数" width="90">
+            <template #default="{ row }">{{ row.publishedByUs ? row.hubInstallCount : '—' }}</template>
+          </el-table-column>
+          <el-table-column label="审核意见" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.hubReviewComment || '' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" :type="row.publishedByUs ? 'default' : 'primary'" :loading="publishing === row.id" @click="publish(row)">
+                {{ row.publishedByUs ? '更新版本' : (row.hubItemId ? '作为新条目发布' : '发布到商店') }}
+              </el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </el-tab-pane>
 
@@ -131,11 +155,11 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  adminGetStoreSettings, adminListProjects, adminTestStoreSettings, adminUpdateStoreSettings,
-  storeAssetUrl, storeInstall, storeItem, storeItems, storeMine, storePublish, storeStatus
+  adminGetStoreSettings, adminTestStoreSettings, adminUpdateStoreSettings,
+  storeAssetUrl, storeInstall, storeItem, storeItems, storeLocalProjects, storePublish, storeStatus
 } from '../../api'
 
 const tab = ref('browse')
@@ -148,11 +172,19 @@ const installing = ref(null)
 const detailVisible = ref(false)
 const detail = ref(null)
 
-const mine = ref([])
 const localProjects = ref([])
-const publishProjectId = ref(null)
-const changelog = ref('')
-const publishing = ref(false)
+const localFilter = ref('')
+const localScope = ref('ALL')
+const publishing = ref(null)
+const filteredLocal = computed(() => {
+  const k = localFilter.value.trim().toLowerCase()
+  return localProjects.value.filter((p) => {
+    if (k && !(p.title + (p.category || '') + (p.mentor || '')).toLowerCase().includes(k)) return false
+    if (localScope.value === 'PUBLISHED') return p.publishedByUs
+    if (localScope.value === 'NONE') return !p.publishedByUs
+    return true
+  })
+})
 
 const settings = ref(null)
 const settingsForm = reactive({ baseUrl: '', apiKey: '' })
@@ -172,12 +204,7 @@ const loadItems = async () => {
 }
 
 const loadMine = async () => {
-  if (!status.value?.connected) return
-  try {
-    const [m, p] = await Promise.all([storeMine(), adminListProjects()])
-    mine.value = m
-    localProjects.value = p
-  } catch (e) { /* 已提示 */ }
+  try { localProjects.value = await storeLocalProjects() } catch (e) { /* 已提示 */ }
 }
 
 const loadSettings = async () => {
@@ -222,15 +249,24 @@ const openDetail = async (it) => {
   detailVisible.value = true
 }
 
-const publish = async () => {
-  publishing.value = true
+const publish = async (row) => {
+  if (!status.value?.connected) { ElMessage.warning('尚未接入项目商店,请先在「接入设置」完成配置'); return }
+  let changelog = ''
   try {
-    const item = await storePublish(publishProjectId.value, { changelog: changelog.value })
+    const r = await ElMessageBox.prompt(
+      row.publishedByUs ? `将「${row.title}」的当前内容作为新版本提交审核,请填写版本说明:` : `将「${row.title}」发布到项目商店,提交后由平台管理员审核。可填写版本说明:`,
+      row.publishedByUs ? '更新版本' : '发布到商店',
+      { confirmButtonText: '提交', cancelButtonText: '取消', inputPlaceholder: '例如:首次发布 / 更新了第 3 章实验步骤', inputValidator: () => true }
+    )
+    changelog = r.value || ''
+  } catch (e) { return }
+  publishing.value = row.id
+  try {
+    const item = await storePublish(row.id, { changelog })
     ElMessage.success(item.newItem ? `已提交到商店(条目 #${item.id}),等待平台审核` : `已追加新版本 v${item.latestVersionNo},等待平台审核`)
-    changelog.value = ''
     await loadMine()
   } finally {
-    publishing.value = false
+    publishing.value = null
   }
 }
 
@@ -261,7 +297,7 @@ const testSettings = async () => {
   }
 }
 
-const statusText = (s) => ({ PENDING: '待审核', APPROVED: '已上架', REJECTED: '已驳回', OFFLINE: '已下架' }[s] || s)
+const statusText = (s) => ({ PENDING: '待审核', APPROVED: '已上架', REJECTED: '已驳回', OFFLINE: '已下架' }[s] || s || '未发布')
 const statusType = (s) => ({ PENDING: 'warning', APPROVED: 'success', REJECTED: 'danger', OFFLINE: 'info' }[s] || '')
 const sourceText = (s) => ({ DB: '本站设置', ENV: '平台默认', NONE: '未配置' }[s] || '-')
 
@@ -295,6 +331,11 @@ onMounted(async () => {
 .tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .actions { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; }
 .settings { max-width: 760px; }
+.local-cell { display: flex; align-items: center; gap: 12px; }
+.local-thumb { width: 56px; height: 40px; object-fit: cover; border-radius: 8px; background: #f3f4f6; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.local-title { font-weight: 600; }
+.local-sub { font-size: 12px; color: #9ca3af; display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.muted { color: #9ca3af; font-size: 12px; }
 .detail-cover { width: 100%; border-radius: 10px; margin-bottom: 12px; }
 .detail h4 { margin: 18px 0 10px; }
 </style>

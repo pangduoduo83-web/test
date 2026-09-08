@@ -55,7 +55,7 @@ IOEDU_AI_MODEL=deepseek-chat                   # 选填,默认 deepseek-chat
 
 ## 项目商店(跨客户共享项目)
 
-`hub/` 是独立的商店服务(Spring Boot 2.6 / Java 8,库 `ioedu_hub`,端口 8081)。客户站点管理员在「管理后台 → 项目商店」把本地项目发布到商店或安装商店里的项目(附件随之搬运、本地记住上游版本以便更新);平台管理员在 `/platform/login` 登录商店后台审核上架、设置可见范围与定向分享、为客户签发 API Key。本地开发:`cd hub && mvn spring-boot:run -Dspring-boot.run.profiles=dev`(平台管理员 `platform / platform123`),主后端 dev profile 已默认指向 `http://localhost:8081`。详见《部署指南.md》5.3 节。
+`hub/` 是独立的商店服务(Spring Boot 2.6 / Java 8,库 `ioedu_hub`,端口 8081)。客户站点管理员在「管理后台 → 项目商店」、教师在「教师工作台」把本地项目发布到商店,或在商店里安装项目(附件随之搬运、本地记住上游版本以便更新);平台管理员在 `/platform/login` 登录平台控制台:审核上架、设置可见范围与定向分享,以及在「客户站点」页一键开通新客户(建库 + 初始化管理员 + 商店登记 + 写入接入密钥)。本地开发:`cd hub && mvn spring-boot:run -Dspring-boot.run.profiles=dev`(平台管理员 `platform / platform123`),主后端 dev profile 已默认指向 `http://localhost:8081`。详见《部署指南.md》5.3 节。
 
 ## 快速启动
 

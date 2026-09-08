@@ -1,117 +1,165 @@
 <template>
   <div>
-    <div class="toolbar">
-      <el-radio-group v-model="status" @change="load">
-        <el-radio-button value="PENDING">待审核</el-radio-button>
-        <el-radio-button value="APPROVED">已上架</el-radio-button>
-        <el-radio-button value="REJECTED">已驳回</el-radio-button>
-        <el-radio-button value="OFFLINE">已下架</el-radio-button>
-        <el-radio-button value="ALL">全部</el-radio-button>
-      </el-radio-group>
-      <el-button @click="load">刷新</el-button>
+    <div class="pf-stats">
+      <div class="pf-card pf-stat">
+        <span class="pf-stat-icon" style="background:#fffbeb;color:#d97706"><Clock3 :size="20" /></span>
+        <div><div class="pf-stat-value">{{ stats.pending ?? '–' }}</div><div class="pf-stat-label">待审核</div></div>
+      </div>
+      <div class="pf-card pf-stat">
+        <span class="pf-stat-icon" style="background:#ecfdf5;color:#059669"><CircleCheckBig :size="20" /></span>
+        <div><div class="pf-stat-value">{{ stats.approved ?? '–' }}</div><div class="pf-stat-label">已上架</div></div>
+      </div>
+      <div class="pf-card pf-stat">
+        <span class="pf-stat-icon" style="background:#eef2ff;color:#4f46e5"><Building2 :size="20" /></span>
+        <div><div class="pf-stat-value">{{ stats.tenants ?? '–' }}</div><div class="pf-stat-label">接入客户</div></div>
+      </div>
+      <div class="pf-card pf-stat">
+        <span class="pf-stat-icon" style="background:#f0f9ff;color:#0284c7"><Download :size="20" /></span>
+        <div><div class="pf-stat-value">{{ stats.installs ?? '–' }}</div><div class="pf-stat-label">累计安装</div></div>
+      </div>
     </div>
 
-    <el-table :data="items" stripe>
-      <el-table-column prop="id" label="条目" width="70" />
-      <el-table-column label="封面" width="90">
-        <template #default="{ row }">
-          <img v-if="row.coverUrl" :src="row.coverUrl" class="thumb" alt="" />
-          <span v-else class="thumb placeholder">📦</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="publisherTenantName" label="发布方" width="140" show-overflow-tooltip />
-      <el-table-column prop="category" label="分类" width="110" />
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="statusType(row.reviewStatus)" size="small">{{ statusText(row.reviewStatus) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="版本" width="130">
-        <template #default="{ row }">上架 v{{ row.currentVersionNo ?? '-' }} / 最新 v{{ row.latestVersionNo }}</template>
-      </el-table-column>
-      <el-table-column label="可见" width="100">
-        <template #default="{ row }">{{ row.visibility === 'PUBLIC' ? '公开' : '定向' }}</template>
-      </el-table-column>
-      <el-table-column prop="installCount" label="安装" width="70" />
-      <el-table-column prop="updatedAt" label="更新时间" width="165" />
-      <el-table-column label="操作" width="120" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" type="primary" @click="open(row)">审核 / 分享</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="pf-card">
+      <div class="pf-card-head">
+        <div class="pf-seg">
+          <button v-for="s in segments" :key="s.value" :class="{ active: status === s.value }" @click="status = s.value; load()">
+            {{ s.label }}<span v-if="s.count !== undefined" class="count">{{ s.count }}</span>
+          </button>
+        </div>
+        <div class="pf-toolbar">
+          <el-input v-model="keyword" placeholder="搜索标题 / 发布方" clearable style="width:240px">
+            <template #prefix><Search :size="14" /></template>
+          </el-input>
+          <el-button @click="load"><RefreshCw :size="14" style="margin-right:6px" />刷新</el-button>
+        </div>
+      </div>
 
-    <el-drawer v-model="visible" :title="detail ? `#${detail.id} ${detail.title}` : ''" size="640px">
+      <el-table :data="filtered" @row-click="open" row-class-name="clickable">
+        <el-table-column label="项目" min-width="300">
+          <template #default="{ row }">
+            <div class="pf-title-cell">
+              <img v-if="row.coverUrl" :src="row.coverUrl" class="pf-thumb" alt="" />
+              <span v-else class="pf-thumb">📦</span>
+              <div>
+                <div class="t">{{ row.title }}</div>
+                <div class="s">#{{ row.id }} · {{ row.category || '未分类' }} · {{ (row.tags || []).slice(0, 3).join(' / ') }}</div>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="发布方" width="180">
+          <template #default="{ row }">
+            <div>{{ row.publisherTenantName }}</div>
+            <div class="s2">{{ row.publisherUserName || '–' }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="120">
+          <template #default="{ row }"><span class="pf-pill" :class="statusType(row.reviewStatus)">{{ statusText(row.reviewStatus) }}</span></template>
+        </el-table-column>
+        <el-table-column label="版本" width="130">
+          <template #default="{ row }">
+            <div>上架 <b>{{ row.currentVersionNo ? 'v' + row.currentVersionNo : '–' }}</b></div>
+            <div class="s2">最新 v{{ row.latestVersionNo }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="可见范围" width="130">
+          <template #default="{ row }"><span class="pf-pill" :class="row.visibility === 'PUBLIC' ? 'primary' : 'info'">{{ row.visibility === 'PUBLIC' ? '所有客户' : '指定客户' }}</span></template>
+        </el-table-column>
+        <el-table-column prop="installCount" label="安装" width="80" />
+        <el-table-column label="更新时间" width="150">
+          <template #default="{ row }"><span class="s2">{{ fmt(row.updatedAt) }}</span></template>
+        </el-table-column>
+        <el-table-column width="110" align="right">
+          <template #default="{ row }"><el-button size="small" type="primary" plain @click.stop="open(row)">处理</el-button></template>
+        </el-table-column>
+        <template #empty>
+          <div class="pf-empty">
+            <div class="pf-empty-icon">🗂️</div>
+            <div class="pf-empty-title">{{ status === 'PENDING' ? '没有待审核的条目' : '这里还没有条目' }}</div>
+            <div>客户站点在「管理后台 → 项目商店 → 本站发布」提交的项目会出现在这里</div>
+          </div>
+        </template>
+      </el-table>
+    </div>
+
+    <!-- 处理抽屉 -->
+    <el-drawer v-model="visible" :title="detail ? detail.title : ''" size="680px" class="pf-root">
       <div v-if="detail" class="detail">
-        <el-descriptions :column="2" size="small" border>
-          <el-descriptions-item label="发布方">{{ detail.publisherTenantName }} / {{ detail.publisherUserName || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="分类">{{ detail.category || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="状态"><el-tag :type="statusType(detail.reviewStatus)" size="small">{{ statusText(detail.reviewStatus) }}</el-tag></el-descriptions-item>
-          <el-descriptions-item label="版本">上架 v{{ detail.currentVersionNo ?? '-' }} / 最新 v{{ detail.latestVersionNo }}</el-descriptions-item>
-          <el-descriptions-item label="简介" :span="2">{{ detail.summary || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="标签" :span="2">
-            <el-tag v-for="t in detail.tags" :key="t" size="small" effect="plain" class="tag">{{ t }}</el-tag>
-          </el-descriptions-item>
-        </el-descriptions>
-
-        <h4>审核</h4>
-        <div class="row">
-          <el-input v-model="comment" placeholder="审核意见(驳回时必填)" style="flex:1" />
-          <el-button type="success" :loading="acting" @click="review('APPROVED')">通过并上架 v{{ detail.latestVersionNo }}</el-button>
-          <el-button type="danger" :loading="acting" @click="review('REJECTED')">驳回</el-button>
-          <el-button :loading="acting" @click="review('OFFLINE')">下架</el-button>
+        <div class="detail-top">
+          <img v-if="detail.coverUrl" :src="detail.coverUrl" class="detail-cover" alt="" />
+          <div class="detail-meta">
+            <div class="row"><span class="pf-pill" :class="statusType(detail.reviewStatus)">{{ statusText(detail.reviewStatus) }}</span>
+              <span class="pf-pill" :class="detail.visibility === 'PUBLIC' ? 'primary' : 'info'">{{ detail.visibility === 'PUBLIC' ? '所有客户可见' : '仅指定客户可见' }}</span></div>
+            <dl class="pf-kv">
+              <dt>发布方</dt><dd>{{ detail.publisherTenantName }} · {{ detail.publisherUserName || '–' }}</dd>
+              <dt>分类</dt><dd>{{ detail.category || '–' }}</dd>
+              <dt>版本</dt><dd>上架 {{ detail.currentVersionNo ? 'v' + detail.currentVersionNo : '–' }} / 最新 v{{ detail.latestVersionNo }}</dd>
+              <dt>简介</dt><dd>{{ detail.summary || '–' }}</dd>
+            </dl>
+          </div>
         </div>
-        <el-button text size="small" @click="preview">预览最新版本内容(JSON)</el-button>
+        <div v-if="detail.reviewComment" class="pf-note warning" style="margin-top:14px"><MessageSquareText :size="15" />上次审核意见:{{ detail.reviewComment }}</div>
 
-        <h4>可见范围与定向分享</h4>
-        <div class="row">
-          <el-radio-group v-model="visibility" @change="saveVisibility">
-            <el-radio-button value="PUBLIC">所有客户可见</el-radio-button>
-            <el-radio-button value="RESTRICTED">仅指定客户可见</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div class="row">
-          <el-select v-model="grantIds" multiple filterable placeholder="选择可见的客户(任何可见范围下都可以额外指定)" style="flex:1">
-            <el-option v-for="t in tenants" :key="t.id" :value="t.id" :label="`${t.name}(${t.code})`" />
-          </el-select>
-          <el-button type="primary" :loading="acting" @click="saveGrants">保存分享名单</el-button>
+        <div class="pf-section-title">审核最新版本 v{{ detail.latestVersionNo }}</div>
+        <div class="pf-card review-box">
+          <el-input v-model="comment" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" placeholder="审核意见(驳回时必填,会展示给发布方)" />
+          <div class="review-actions">
+            <el-button text @click="preview"><Eye :size="14" style="margin-right:6px" />预览内容</el-button>
+            <span class="spacer"></span>
+            <el-button :loading="acting" @click="review('OFFLINE')" :disabled="detail.reviewStatus === 'OFFLINE'">下架</el-button>
+            <el-button type="danger" plain :loading="acting" @click="review('REJECTED')">驳回</el-button>
+            <el-button type="primary" :loading="acting" @click="review('APPROVED')">通过并上架</el-button>
+          </div>
         </div>
 
-        <h4>版本记录</h4>
+        <div class="pf-section-title">可见范围</div>
+        <div class="pf-card pf-card-body vis-box">
+          <div class="pf-seg">
+            <button :class="{ active: visibility === 'PUBLIC' }" @click="saveVisibility('PUBLIC')">所有客户可见</button>
+            <button :class="{ active: visibility === 'RESTRICTED' }" @click="saveVisibility('RESTRICTED')">仅指定客户可见</button>
+          </div>
+          <div class="grant-row">
+            <el-select v-model="grantIds" multiple filterable collapse-tags collapse-tags-tooltip placeholder="选择可见的客户(任何可见范围下都可额外指定)" style="flex:1">
+              <el-option v-for="t in tenants" :key="t.id" :value="t.id" :label="`${t.name}(${t.code})`" />
+            </el-select>
+            <el-button type="primary" plain :loading="acting" @click="saveGrants">保存名单</el-button>
+          </div>
+          <div class="hint">{{ visibility === 'PUBLIC' ? '当前所有已接入客户都能浏览并安装;名单用于额外记录重点分享对象。' : '当前只有名单中的客户能在商店里看到此项目。' }}</div>
+        </div>
+
+        <div class="pf-section-title">版本与审核记录</div>
         <el-table :data="detail.versions" size="small">
-          <el-table-column prop="versionNo" label="版本" width="70" />
+          <el-table-column prop="versionNo" label="版本" width="70"><template #default="{ row }">v{{ row.versionNo }}</template></el-table-column>
           <el-table-column prop="changelog" label="说明" show-overflow-tooltip />
-          <el-table-column prop="createdBy" label="提交人" width="140" />
-          <el-table-column prop="createdAt" label="时间" width="165" />
-          <el-table-column label="上架中" width="80">
-            <template #default="{ row }"><el-tag v-if="row.current" size="small" type="success">是</el-tag></template>
-          </el-table-column>
+          <el-table-column prop="createdBy" label="提交人" width="130" show-overflow-tooltip />
+          <el-table-column label="时间" width="140"><template #default="{ row }"><span class="s2">{{ fmt(row.createdAt) }}</span></template></el-table-column>
+          <el-table-column width="80"><template #default="{ row }"><span v-if="row.current" class="pf-pill success">上架中</span></template></el-table-column>
         </el-table>
-
-        <h4>审核记录</h4>
-        <el-timeline>
-          <el-timeline-item v-for="l in detail.reviewLogs" :key="l.id" :timestamp="l.reviewedAt">
-            {{ l.reviewer }} · {{ statusText(l.decision) }} {{ l.comment ? '· ' + l.comment : '' }}
+        <el-timeline class="logs">
+          <el-timeline-item v-for="l in detail.reviewLogs" :key="l.id" :timestamp="fmt(l.reviewedAt)" placement="top">
+            <b>{{ l.reviewer }}</b> {{ statusText(l.decision) }}<span v-if="l.comment"> · {{ l.comment }}</span>
           </el-timeline-item>
         </el-timeline>
       </div>
     </el-drawer>
 
-    <el-dialog v-model="previewVisible" title="最新版本内容" width="720px">
+    <el-dialog v-model="previewVisible" title="最新版本内容(JSON)" width="760px" class="pf-root">
       <pre class="json">{{ previewJson }}</pre>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { hubGrants, hubItem, hubItemPayload, hubItems, hubReview, hubTenants, hubVisibility } from '../../api/hub'
+import { Building2, CircleCheckBig, Clock3, Download, Eye, MessageSquareText, RefreshCw, Search } from 'lucide-vue-next'
+import { hubGrants, hubItem, hubItemPayload, hubItems, hubReview, hubStats, hubTenants, hubVisibility } from '../../api/hub'
 
 const emit = defineEmits(['refresh-stats'])
 const status = ref('PENDING')
+const keyword = ref('')
 const items = ref([])
+const stats = ref({})
 const tenants = ref([])
 const visible = ref(false)
 const detail = ref(null)
@@ -122,8 +170,22 @@ const acting = ref(false)
 const previewVisible = ref(false)
 const previewJson = ref('')
 
+const segments = computed(() => [
+  { value: 'PENDING', label: '待审核', count: stats.value.pending },
+  { value: 'APPROVED', label: '已上架', count: stats.value.approved },
+  { value: 'REJECTED', label: '已驳回', count: stats.value.rejected },
+  { value: 'OFFLINE', label: '已下架', count: stats.value.offline },
+  { value: 'ALL', label: '全部' }
+])
+const filtered = computed(() => {
+  const k = keyword.value.trim().toLowerCase()
+  return items.value.filter((i) => !k || (i.title + (i.publisherTenantName || '')).toLowerCase().includes(k))
+})
+
 const load = async () => {
-  items.value = await hubItems(status.value)
+  const [list, s] = await Promise.all([hubItems(status.value), hubStats()])
+  items.value = list
+  stats.value = s
   emit('refresh-stats')
 }
 
@@ -137,11 +199,13 @@ const open = async (row) => {
 }
 
 const review = async (decision) => {
+  if (decision === 'REJECTED' && !comment.value.trim()) { ElMessage.warning('驳回请填写审核意见'); return }
   acting.value = true
   try {
     await hubReview(detail.value.id, { decision, comment: comment.value })
     ElMessage.success({ APPROVED: '已上架', REJECTED: '已驳回', OFFLINE: '已下架' }[decision])
     detail.value = await hubItem(detail.value.id)
+    comment.value = ''
     await load()
   } finally {
     acting.value = false
@@ -149,7 +213,9 @@ const review = async (decision) => {
 }
 
 const saveVisibility = async (v) => {
+  if (v === visibility.value) return
   await hubVisibility(detail.value.id, v)
+  visibility.value = v
   ElMessage.success(v === 'PUBLIC' ? '已设为所有客户可见' : '已设为仅指定客户可见')
   await load()
 }
@@ -170,17 +236,25 @@ const preview = async () => {
 }
 
 const statusText = (s) => ({ PENDING: '待审核', APPROVED: '已上架', REJECTED: '已驳回', OFFLINE: '已下架' }[s] || s)
-const statusType = (s) => ({ PENDING: 'warning', APPROVED: 'success', REJECTED: 'danger', OFFLINE: 'info' }[s] || '')
+const statusType = (s) => ({ PENDING: 'warning', APPROVED: 'success', REJECTED: 'danger', OFFLINE: 'info' }[s] || 'info')
+const fmt = (t) => (t ? String(t).replace('T', ' ').slice(0, 16) : '–')
 
 onMounted(load)
 </script>
 
 <style scoped>
-.toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
-.thumb { width: 56px; height: 40px; object-fit: cover; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: #f3f4f6; }
-.placeholder { font-size: 20px; }
-.detail h4 { margin: 18px 0 10px; }
-.row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.tag { margin-right: 6px; }
-.json { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 10px; max-height: 60vh; overflow: auto; font-size: 12px; }
+.s2 { font-size: 12px; color: var(--pf-text-3); }
+:deep(.clickable) { cursor: pointer; }
+.detail-top { display: flex; gap: 18px; }
+.detail-cover { width: 200px; height: 130px; object-fit: cover; border-radius: 12px; flex-shrink: 0; background: #eef0f6; }
+.detail-meta { flex: 1; min-width: 0; }
+.detail-meta .row { display: flex; gap: 8px; margin-bottom: 12px; }
+.review-box { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.review-actions { display: flex; align-items: center; gap: 8px; }
+.review-actions .spacer { flex: 1; }
+.vis-box { display: flex; flex-direction: column; gap: 12px; }
+.grant-row { display: flex; gap: 10px; align-items: center; }
+.hint { font-size: 12px; color: var(--pf-text-3); }
+.logs { margin-top: 16px; padding-left: 4px; }
+.json { background: #0f172a; color: #e2e8f0; padding: 16px; border-radius: 12px; max-height: 60vh; overflow: auto; font-size: 12px; margin: 0; }
 </style>

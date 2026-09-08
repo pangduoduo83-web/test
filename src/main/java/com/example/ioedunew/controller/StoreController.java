@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URLConnection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -73,7 +74,7 @@ public class StoreController {
         String status = body == null || body.get("status") == null ? "PUBLISHED" : String.valueOf(body.get("status"));
         Long overwrite = body == null || body.get("overwriteProjectId") == null
                 ? null : Long.valueOf(String.valueOf(body.get("overwriteProjectId")));
-        return ApiResponse.ok(storeService.install(id, status, overwrite, actingUser(user)));
+        return ApiResponse.ok(storeService.install(id, status, overwrite, user, userName(user)));
     }
 
     /** body: { changelog? } */
@@ -83,7 +84,14 @@ public class StoreController {
                                          @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
         requireStaff(user);
         String changelog = body == null || body.get("changelog") == null ? "" : String.valueOf(body.get("changelog"));
-        return ApiResponse.ok(storeService.publish(projectId, changelog, actingUser(user)));
+        return ApiResponse.ok(storeService.publish(projectId, changelog, user, userName(user)));
+    }
+
+    /** 当前用户可发布的本地项目及其在商店中的状态(管理员全部,教师仅自己指导的) */
+    @GetMapping("/api/store/local-projects")
+    public ApiResponse<List<Map<String, Object>>> localProjects(@RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        requireStaff(user);
+        return ApiResponse.ok(storeService.localProjects(user));
     }
 
     @GetMapping("/api/store/mine")
@@ -130,8 +138,8 @@ public class StoreController {
         }
     }
 
-    private String actingUser(AuthUser user) {
+    private String userName(AuthUser user) {
         User u = userRepository.findById(user.getId()).orElse(null);
-        return u == null ? String.valueOf(user.getId()) : u.getName() + "(" + user.getRole() + ")";
+        return u == null ? "用户" + user.getId() : u.getName();
     }
 }

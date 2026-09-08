@@ -2,6 +2,7 @@ package com.example.ioedunew.tenant;
 
 import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.init.DataSeeder;
+import com.example.ioedunew.store.StoreSettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,23 +32,27 @@ public class TenantProvisioningService {
     private final TenantRegistry registry;
     private final TenantSchemaMigrator migrator;
     private final DataSeeder dataSeeder;
+    private final StoreSettingsService storeSettings;
     private final String table;
 
     public TenantProvisioningService(JdbcTemplate jdbc, TenantProperties props, TenantRegistry registry,
-                                     TenantSchemaMigrator migrator, DataSeeder dataSeeder) {
+                                     TenantSchemaMigrator migrator, DataSeeder dataSeeder,
+                                     StoreSettingsService storeSettings) {
         this.jdbc = jdbc;
         this.props = props;
         this.registry = registry;
         this.migrator = migrator;
         this.dataSeeder = dataSeeder;
+        this.storeSettings = storeSettings;
         this.table = "`" + props.getPlatformDb() + "`.`tenants`";
     }
 
     /**
      * 开通新租户。返回租户信息;若管理员密码由系统随机生成,结果里附带 initialAdminPassword(只返回这一次)。
+     * hubApiKey 非空时顺带写入该租户的项目商店接入 Key(由商店平台管理端一键开通时传入)。
      */
     public Map<String, Object> provision(String rawCode, String name, String customDomain,
-                                         String adminEmail, String adminPassword, boolean seedDemo) {
+                                         String adminEmail, String adminPassword, boolean seedDemo, String hubApiKey) {
         String code = normalizeCode(rawCode);
         if (registry.findByCode(code).isPresent()) {
             throw new BusinessException(409, "租户编码已存在: " + code);
@@ -90,7 +95,23 @@ public class TenantProvisioningService {
         if (!props.getBaseDomain().isEmpty()) {
             result.put("siteHost", code + "." + props.getBaseDomain());
         }
+        result.put("storeKeyConfigured", hubApiKey != null && !hubApiKey.trim().isEmpty() && setStoreApiKey(code, hubApiKey));
         return result;
+    }
+
+    /** 把商店 API Key 写入某租户的接入设置(加密存库);失败只记日志不影响开通 */
+    public boolean setStoreApiKey(String rawCode, String apiKey) {
+        String code = normalizeCode(rawCode);
+        registry.findByCode(code).orElseThrow(() -> new BusinessException(404, "租户不存在: " + code));
+        try {
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("apiKey", apiKey);
+            TenantContext.runAs(code, () -> storeSettings.update(body));
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("租户 {} 写入商店 API Key 失败: {}", code, e.getMessage());
+            return false;
+        }
     }
 
     /** 默认租户登记(库名指向老部署的 ioedu 库,数据零迁移);仅在注册表里没有默认租户时调用 */

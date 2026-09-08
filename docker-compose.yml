@@ -85,6 +85,11 @@ services:
       HUB_JWT_SECRET: ${HUB_JWT_SECRET:?请在 .env 中设置 HUB_JWT_SECRET(不少于 32 个字符)}
       HUB_ADMIN_USERNAME: ${HUB_ADMIN_USERNAME:-platform}
       HUB_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:-}
+      # 商店后台「客户站点」页一键开通站点:调用后端平台接口,令牌与 PLATFORM_TOKEN 相同
+      HUB_PLATFORM_API_URL: http://backend:8080
+      HUB_PLATFORM_TOKEN: ${PLATFORM_TOKEN:-}
+      # 站点访问地址模板,{code} 替换为站点编码,仅用于后台展示
+      HUB_SITE_URL_TEMPLATE: ${SITE_URL_TEMPLATE:-}
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom -Duser.timezone=Asia/Shanghai}
     volumes:
       - ioedu-hub-assets:/app/hub-assets

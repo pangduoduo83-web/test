@@ -63,7 +63,8 @@ const router = createRouter({
       children: [
         { path: '', redirect: '/platform/items' },
         { path: 'items', name: 'platform-items', component: () => import('../views/platform/PlatformItems.vue') },
-        { path: 'tenants', name: 'platform-tenants', component: () => import('../views/platform/PlatformTenants.vue') }
+        { path: 'sites', name: 'platform-sites', component: () => import('../views/platform/PlatformSites.vue') },
+        { path: 'tenants', redirect: '/platform/sites' }
       ]
     }
   ]

@@ -69,11 +69,14 @@
         <el-table-column label="更新时间" width="110">
           <template #default="{ row }">{{ (row.updatedAt || '').slice(0, 10) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="380" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" @click="openResources(row)">管理资源</el-button>
             <el-button size="small" @click="openCover(row)">更换封面</el-button>
             <el-button size="small" @click="openStudents(row)">学生进度</el-button>
+            <el-button size="small" plain :loading="publishing === row.id" @click="publishToStore(row)">
+              {{ row.hubItemId ? '更新到商店' : '发布到商店' }}
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -141,10 +144,10 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { BookOpen, Check, FileText, Star, Upload, Users } from 'lucide-vue-next'
 import {
-  teacherProjectStudents, teacherProjects, teacherStats,
+  storePublish, teacherProjectStudents, teacherProjects, teacherStats,
   teacherUpdateCover, teacherUpdateResources, uploadDocFile
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
@@ -153,6 +156,28 @@ const stats = reactive({ projectCount: 0, studentTotal: 0, resourceCount: 0, avg
 const projects = ref([])
 const current = ref(null)
 const saving = ref(false)
+const publishing = ref(null)
+
+/** 把自己指导的项目发布到跨校项目商店(提交后由平台管理员审核上架) */
+const publishToStore = async (row) => {
+  let changelog = ''
+  try {
+    const r = await ElMessageBox.prompt(
+      row.hubItemId ? `将「${row.title}」的当前内容作为新版本提交商店审核,请填写版本说明:` : `将「${row.title}」发布到项目商店,审核通过后其他院校可以安装使用。可填写版本说明:`,
+      row.hubItemId ? '更新到商店' : '发布到商店',
+      { confirmButtonText: '提交审核', cancelButtonText: '取消', inputPlaceholder: '例如:首次发布', inputValidator: () => true }
+    )
+    changelog = r.value || ''
+  } catch (e) { return }
+  publishing.value = row.id
+  try {
+    const item = await storePublish(row.id, { changelog })
+    ElMessage.success(item.newItem ? `已提交到项目商店(条目 #${item.id}),等待平台审核` : `已追加新版本 v${item.latestVersionNo},等待平台审核`)
+    await load()
+  } finally {
+    publishing.value = null
+  }
+}
 
 const resVisible = ref(false)
 const resRows = ref([])

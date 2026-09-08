@@ -1,12 +1,15 @@
 package com.example.ioedunew.store;
 
 import com.example.ioedunew.common.BusinessException;
+import com.example.ioedunew.config.AuthUser;
 import com.example.ioedunew.entity.Project;
 import com.example.ioedunew.repository.ProjectRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +25,8 @@ import java.util.Map;
  */
 @Service
 public class StoreService {
+
+    private static final Logger log = LoggerFactory.getLogger(StoreService.class);
 
     private final HubClient hubClient;
     private final ProjectPackager packager;
@@ -79,9 +84,11 @@ public class StoreService {
 
     /**
      * 安装:拉取当前版本 → 下载附件 → 建本地项目(或按 overwriteProjectId 覆盖已安装项目的教学内容)。
+     * 教师安装的项目自动指派给自己做讲师,进入其教学工作台。
      */
     @Transactional
-    public Project install(long itemId, String status, Long overwriteProjectId, String actingUser) {
+    public Project install(long itemId, String status, Long overwriteProjectId, AuthUser user, String userName) {
+        String actingUser = userName + "(" + user.getRole() + ")";
         JsonNode result = hubClient.install(itemId, actingUser);
         JsonNode payload = packager.downloadAssets(result.path("payload"));
         int versionNo = result.path("versionNo").asInt();
@@ -93,10 +100,15 @@ public class StoreService {
             if (project.getHubItemId() == null || project.getHubItemId() != itemId) {
                 throw new BusinessException("该本地项目不是从此商店条目安装的,不能覆盖更新");
             }
+            requireOwnership(project, user);
             packager.apply(payload, project);
         } else {
             project = packager.toProject(payload);
             project.setStatus("DRAFT".equalsIgnoreCase(status) ? "DRAFT" : "PUBLISHED");
+            if (user.isTeacher()) {
+                project.setMentorId(user.getId());
+                project.setMentor(userName);
+            }
         }
         project.setHubItemId(itemId);
         project.setHubVersionNo(versionNo);
@@ -104,11 +116,54 @@ public class StoreService {
         return projectRepository.save(project);
     }
 
+    /** 当前用户可发布的本地项目(管理员全部,教师仅自己指导的),附带商店状态 */
+    public List<Map<String, Object>> localProjects(AuthUser user) {
+        Map<Long, JsonNode> mine = new HashMap<>();
+        if (settings.isConfigured()) {
+            try {
+                for (JsonNode item : hubClient.mine()) {
+                    mine.put(item.path("id").asLong(), item);
+                }
+            } catch (BusinessException e) {
+                log.warn("读取本站已发布条目失败: {}", e.getMessage());
+            }
+        }
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (Project p : projectRepository.findAll()) {
+            if (!user.isAdmin() && !user.getId().equals(p.getMentorId())) {
+                continue;
+            }
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", p.getId());
+            m.put("title", p.getTitle());
+            m.put("category", p.getCategory());
+            m.put("difficulty", p.getDifficulty());
+            m.put("status", p.getStatus());
+            m.put("coverUrl", p.getCoverUrl());
+            m.put("mentor", p.getMentor());
+            m.put("updatedAt", p.getUpdatedAt());
+            m.put("hubItemId", p.getHubItemId());
+            m.put("hubVersionNo", p.getHubVersionNo());
+            JsonNode item = p.getHubItemId() == null ? null : mine.get(p.getHubItemId());
+            m.put("publishedByUs", item != null);
+            m.put("hubReviewStatus", item == null ? null : item.path("reviewStatus").asText(null));
+            m.put("hubCurrentVersionNo", item == null || !item.hasNonNull("currentVersionNo") ? null : item.get("currentVersionNo").asInt());
+            m.put("hubLatestVersionNo", item == null ? null : item.path("latestVersionNo").asInt());
+            m.put("hubReviewComment", item == null ? null : item.path("reviewComment").asText(null));
+            m.put("hubInstallCount", item == null ? null : item.path("installCount").asInt());
+            out.add(m);
+        }
+        out.sort((a, b) -> String.valueOf(b.get("updatedAt")).compareTo(String.valueOf(a.get("updatedAt"))));
+        return out;
+    }
+
     /** 发布本地项目:导出 → 上传附件 → 提交商店(已来自商店且由本租户发布的条目会追加为新版本) */
     @Transactional
-    public JsonNode publish(long projectId, String changelog, String actingUser) {
+    public JsonNode publish(long projectId, String changelog, AuthUser user, String userName) {
+        String actingUser = userName + "(" + user.getRole() + ")";
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new BusinessException(404, "项目不存在"));
+        requireOwnership(project, user);
         ObjectNode payload = packager.uploadAssets(packager.export(project));
 
         ObjectNode body = objectMapper.createObjectNode();
@@ -140,6 +195,16 @@ public class StoreService {
             out.add(n);
         }
         return out;
+    }
+
+    /** 管理员可操作全部项目;教师只能发布/更新自己指导的项目 */
+    private void requireOwnership(Project project, AuthUser user) {
+        if (user.isAdmin()) {
+            return;
+        }
+        if (project.getMentorId() == null || !project.getMentorId().equals(user.getId())) {
+            throw new BusinessException(403, "只能发布或更新自己指导的项目");
+        }
     }
 
     private void decorate(ObjectNode n, Project local) {

@@ -1,8 +1,12 @@
 package com.example.ioeduhub.controller;
 
 import com.example.ioeduhub.common.ApiResponse;
+import com.example.ioeduhub.common.BusinessException;
 import com.example.ioeduhub.config.HubAuthFilter;
 import com.example.ioeduhub.service.HubAdminService;
+import com.example.ioeduhub.service.SiteService;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,9 +27,11 @@ import java.util.Map;
 public class HubAdminController {
 
     private final HubAdminService adminService;
+    private final SiteService siteService;
 
-    public HubAdminController(HubAdminService adminService) {
+    public HubAdminController(HubAdminService adminService, SiteService siteService) {
         this.adminService = adminService;
+        this.siteService = siteService;
     }
 
     @PostMapping("/login")
@@ -86,6 +92,46 @@ public class HubAdminController {
         }
         return ApiResponse.ok(adminService.replaceGrants(id, ids, admin));
     }
+
+    // ---------- 客户站点(联动多租户主系统) ----------
+
+    @GetMapping("/sites/config")
+    public ApiResponse<Map<String, Object>> sitesConfig() {
+        return ApiResponse.ok(siteService.config());
+    }
+
+    @GetMapping("/sites")
+    public ApiResponse<List<Map<String, Object>>> sites() {
+        return ApiResponse.ok(siteService.list());
+    }
+
+    /** body: { code, name, customDomain?, adminEmail?, adminPassword?, seedDemo? } */
+    @PostMapping("/sites")
+    public ApiResponse<Map<String, Object>> provisionSite(@RequestBody JsonNode body) {
+        return ApiResponse.ok(siteService.provision(body));
+    }
+
+    @PutMapping("/sites/{code}/status")
+    public ApiResponse<Map<String, Object>> siteStatus(@PathVariable String code, @RequestBody Map<String, String> body) {
+        return ApiResponse.ok(siteService.updateStatus(code, body.get("status")));
+    }
+
+    @PostMapping("/sites/{code}/rotate-key")
+    public ApiResponse<Map<String, Object>> siteRotateKey(@PathVariable String code) {
+        return ApiResponse.ok(siteService.rotateKey(code));
+    }
+
+    @DeleteMapping("/sites/{code}")
+    public ApiResponse<Void> deleteSite(@PathVariable String code, @RequestParam String confirm,
+                                        @RequestParam(defaultValue = "false") boolean dropData) {
+        if (!code.equalsIgnoreCase(confirm)) {
+            throw new BusinessException("请输入站点编码确认注销");
+        }
+        siteService.delete(code, dropData);
+        return ApiResponse.ok();
+    }
+
+    // ---------- 商店客户(底层) ----------
 
     @GetMapping("/tenants")
     public ApiResponse<List<Map<String, Object>>> tenants() {
