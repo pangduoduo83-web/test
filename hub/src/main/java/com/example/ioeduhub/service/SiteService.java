@@ -189,7 +189,11 @@ public class SiteService {
             return "https://" + customDomain;
         }
         String tpl = props.getSiteUrlTemplate();
-        return tpl.isEmpty() ? null : tpl.replace("{code}", code);
+        if (tpl.isEmpty()) {
+            return null;
+        }
+        // 默认站点走根域 www,而不是 default.根域
+        return tpl.replace("{code}", "default".equals(code) ? "www" : code);
     }
 
     private void requireConfigured() {
