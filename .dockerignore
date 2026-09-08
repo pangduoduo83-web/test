@@ -1,5 +1,7 @@
 target/
 frontend/
+hub/
+miniprogram/
 IoeduFront/
 .idea/
 *.bat

@@ -11,6 +11,7 @@ import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.Equipment;
 import com.example.ioedunew.entity.Notification;
 import com.example.ioedunew.entity.Project;
+import com.example.ioedunew.entity.SkillDimension;
 import com.example.ioedunew.entity.Submission;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.ProjectRepository;
@@ -22,6 +23,7 @@ import com.example.ioedunew.service.AuthService;
 import com.example.ioedunew.service.BorrowService;
 import com.example.ioedunew.service.NotificationService;
 import com.example.ioedunew.service.SiteConfigService;
+import com.example.ioedunew.service.SkillDimensionService;
 import com.example.ioedunew.service.SubmissionService;
 import com.example.ioedunew.service.TeacherService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -60,6 +62,7 @@ public class AdminController {
     private final AiConfigService aiConfigService;
     private final AiClient aiClient;
     private final SiteConfigService siteConfigService;
+    private final SkillDimensionService skillDimensionService;
 
     public AdminController(AdminService adminService,
                            BorrowService borrowService,
@@ -71,7 +74,8 @@ public class AdminController {
                            AiReviewService aiReviewService,
                            AiConfigService aiConfigService,
                            AiClient aiClient,
-                           SiteConfigService siteConfigService) {
+                           SiteConfigService siteConfigService,
+                           SkillDimensionService skillDimensionService) {
         this.adminService = adminService;
         this.borrowService = borrowService;
         this.authService = authService;
@@ -83,6 +87,7 @@ public class AdminController {
         this.aiConfigService = aiConfigService;
         this.aiClient = aiClient;
         this.siteConfigService = siteConfigService;
+        this.skillDimensionService = skillDimensionService;
     }
 
     // ---------- 数据看板 ----------
@@ -267,6 +272,32 @@ public class AdminController {
     @PutMapping("/site-settings")
     public ApiResponse<Map<String, Object>> updateSiteSettings(@RequestBody Map<String, Object> body) {
         return ApiResponse.ok(siteConfigService.update(body));
+    }
+
+    // ---------- 技能维度 ----------
+
+    @GetMapping("/skill-dimensions")
+    public ApiResponse<List<Map<String, Object>>> skillDimensions() {
+        return ApiResponse.ok(skillDimensionService.listForAdmin());
+    }
+
+    @PostMapping("/skill-dimensions")
+    public ApiResponse<SkillDimension> createSkillDimension(
+            @Valid @RequestBody MiscDtos.SkillDimensionRequest req) {
+        return ApiResponse.ok(skillDimensionService.create(req));
+    }
+
+    @PutMapping("/skill-dimensions/{id}")
+    public ApiResponse<SkillDimension> updateSkillDimension(
+            @PathVariable Long id,
+            @Valid @RequestBody MiscDtos.SkillDimensionRequest req) {
+        return ApiResponse.ok(skillDimensionService.update(id, req));
+    }
+
+    @DeleteMapping("/skill-dimensions/{id}")
+    public ApiResponse<Void> deleteSkillDimension(@PathVariable Long id) {
+        skillDimensionService.delete(id);
+        return ApiResponse.ok();
     }
 
     // ---------- AI 设置 ----------

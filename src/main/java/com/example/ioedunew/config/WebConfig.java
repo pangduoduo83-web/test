@@ -1,39 +1,32 @@
 package com.example.ioedunew.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.example.ioedunew.tenant.PlatformTokenInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.io.File;
-
 /**
- * Web 配置:注册认证拦截器、跨域规则与上传图片的静态资源映射。
+ * Web 配置:注册认证拦截器、平台令牌拦截器与跨域规则。
+ * 上传文件不再用静态资源映射,而由 UploadController 按租户目录提供(见 /uploads/**)。
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
+    private final PlatformTokenInterceptor platformTokenInterceptor;
 
-    @Value("${ioedu.upload-dir}")
-    private String uploadDir;
-
-    public WebConfig(AuthInterceptor authInterceptor) {
+    public WebConfig(AuthInterceptor authInterceptor, PlatformTokenInterceptor platformTokenInterceptor) {
         this.authInterceptor = authInterceptor;
-    }
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String absolute = new File(uploadDir).getAbsolutePath();
-        registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + absolute + File.separator);
+        this.platformTokenInterceptor = platformTokenInterceptor;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(authInterceptor).addPathPatterns("/api/**");
+        registry.addInterceptor(platformTokenInterceptor).addPathPatterns("/api/platform/**");
+        registry.addInterceptor(authInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns("/api/platform/**");
     }
 
     @Override

@@ -1,50 +1,47 @@
 package com.example.ioedunew.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.example.ioedunew.ai.llm.ChatMessage;
+import com.example.ioedunew.ai.llm.ChatRequest;
+import com.example.ioedunew.ai.llm.ChatResult;
+import com.example.ioedunew.ai.llm.LlmGateway;
+import com.example.ioedunew.ai.llm.StreamListener;
+import com.example.ioedunew.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 /**
- * OpenAI 兼容协议的大模型客户端(DeepSeek / 通义千问等)。
- * 配置来自 AiConfigService(管理后台可改,即时生效,无需重启)。
- * 稳定性策略:全局并发上限、连接/读取超时、连续失败短路熔断;
- * 未配置或已停用时由调用方走规则降级。
+ * 大模型调用的稳定性外壳:配置来自 AiConfigService(每个租户的 system_settings,管理后台可改,即时生效),
+ * 实际协议由 LlmGateway 实现。策略:全局 + 每租户并发上限、每租户连续失败短路熔断
+ * (一个客户填错 Key 不会熔断其他客户);未配置或已停用时由调用方走规则降级。
  */
 @Component
 public class AiClient {
 
     private static final Logger log = LoggerFactory.getLogger(AiClient.class);
 
-    /** 全局最多同时 4 个模型请求,避免拖垮后端线程池 */
-    private final Semaphore concurrency = new Semaphore(4);
+    /** 整个进程最多同时 16 个模型请求,避免拖垮后端线程池;每个租户最多 4 个 */
+    private final Semaphore globalConcurrency = new Semaphore(16);
+    private static final int PER_TENANT_CONCURRENCY = 4;
 
     /** 连续失败 3 次后熔断 60 秒,期间直接走降级 */
     private static final int CIRCUIT_THRESHOLD = 3;
     private static final long CIRCUIT_COOLDOWN_MS = 60_000L;
-    private volatile int consecutiveFailures = 0;
-    private volatile long circuitOpenUntil = 0L;
+
+    private final ConcurrentHashMap<String, TenantState> states = new ConcurrentHashMap<>();
 
     private final AiConfigService configService;
-    private final ObjectMapper objectMapper;
+    private final LlmGateway gateway;
 
-    public AiClient(AiConfigService configService, ObjectMapper objectMapper) {
+    public AiClient(AiConfigService configService, LlmGateway gateway) {
         this.configService = configService;
-        this.objectMapper = objectMapper;
+        this.gateway = gateway;
     }
 
     /** 是否已配置且启用(未就绪时调用方应直接走规则降级) */
@@ -57,36 +54,72 @@ public class AiClient {
      * 任何失败(未配置/熔断/超时/响应异常)都抛 AiUnavailableException。
      */
     public String chatJson(String systemPrompt, String userPrompt, int maxTokens) {
+        ChatRequest req = new ChatRequest();
+        req.getMessages().add(ChatMessage.system(systemPrompt));
+        req.getMessages().add(ChatMessage.user(userPrompt));
+        req.setMaxTokens(maxTokens);
+        req.setJsonMode(true);
+        String content = chat(req).getContent();
+        if (content == null || content.trim().isEmpty()) {
+            throw new AiUnavailableException("模型响应为空");
+        }
+        return content.trim();
+    }
+
+    /** 通用非流式补全(支持工具调用),受并发闸与熔断保护 */
+    public ChatResult chat(ChatRequest request) {
+        return guarded(cfg -> gateway.chat(cfg, request));
+    }
+
+    /** 流式补全,受并发闸与熔断保护;监听器在调用线程上回调 */
+    public void stream(ChatRequest request, StreamListener listener) {
+        guarded(cfg -> {
+            gateway.stream(cfg, request, listener);
+            return null;
+        });
+    }
+
+    private <T> T guarded(Call<T> call) {
         AiConfigService.AiConfig cfg = configService.effective();
         if (!cfg.isReady()) {
             throw new AiUnavailableException("AI 服务未配置或已停用");
         }
-        if (System.currentTimeMillis() < circuitOpenUntil) {
+        TenantState state = state();
+        if (System.currentTimeMillis() < state.circuitOpenUntil) {
             throw new AiUnavailableException("AI 服务熔断中");
         }
-        boolean acquired = false;
+        boolean tenantAcquired = false;
+        boolean globalAcquired = false;
         try {
-            acquired = concurrency.tryAcquire(2, TimeUnit.SECONDS);
-            if (!acquired) {
+            tenantAcquired = state.concurrency.tryAcquire(2, TimeUnit.SECONDS);
+            if (!tenantAcquired) {
+                throw new AiUnavailableException("AI 服务繁忙");
+            }
+            globalAcquired = globalConcurrency.tryAcquire(2, TimeUnit.SECONDS);
+            if (!globalAcquired) {
                 throw new AiUnavailableException("AI 服务繁忙");
             }
             long start = System.currentTimeMillis();
-            String content = doCall(cfg, systemPrompt, userPrompt, Math.min(maxTokens, cfg.maxTokens));
-            consecutiveFailures = 0;
-            log.info("AI 调用成功 model={} 耗时={}ms 输出={}字", cfg.model, System.currentTimeMillis() - start, content.length());
-            return content;
+            T result = call.run(cfg);
+            state.consecutiveFailures = 0;
+            log.info("AI 调用成功 tenant={} model={} 耗时={}ms", TenantContext.get(), cfg.model,
+                    System.currentTimeMillis() - start);
+            return result;
         } catch (AiUnavailableException e) {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AiUnavailableException("AI 调用被中断");
         } catch (Exception e) {
-            recordFailure();
-            log.warn("AI 调用失败: {}", e.getMessage());
+            recordFailure(state);
+            log.warn("AI 调用失败 tenant={}: {}", TenantContext.get(), e.getMessage());
             throw new AiUnavailableException("AI 调用失败:" + e.getMessage());
         } finally {
-            if (acquired) {
-                concurrency.release();
+            if (globalAcquired) {
+                globalConcurrency.release();
+            }
+            if (tenantAcquired) {
+                state.concurrency.release();
             }
         }
     }
@@ -104,11 +137,15 @@ public class AiClient {
         }
         long start = System.currentTimeMillis();
         try {
-            String content = doCall(cfg,
-                    "你是连接测试助手,只输出 JSON:{\"pong\":true}",
-                    "{\"ping\":true}", 30);
-            consecutiveFailures = 0;
-            circuitOpenUntil = 0L;
+            ChatRequest req = new ChatRequest();
+            req.getMessages().add(ChatMessage.system("你是连接测试助手,只输出 JSON:{\"pong\":true}"));
+            req.getMessages().add(ChatMessage.user("{\"ping\":true}"));
+            req.setMaxTokens(30);
+            req.setJsonMode(true);
+            String content = gateway.chat(cfg, req).getContent();
+            TenantState state = state();
+            state.consecutiveFailures = 0;
+            state.circuitOpenUntil = 0L;
             result.put("ok", true);
             result.put("latencyMs", System.currentTimeMillis() - start);
             result.put("reply", content.length() > 60 ? content.substring(0, 60) : content);
@@ -120,46 +157,28 @@ public class AiClient {
         return result;
     }
 
-    private String doCall(AiConfigService.AiConfig cfg, String systemPrompt, String userPrompt,
-                          int maxTokens) throws Exception {
-        ObjectNode body = objectMapper.createObjectNode();
-        body.put("model", cfg.model);
-        body.put("temperature", cfg.temperature);
-        body.put("max_tokens", maxTokens);
-        body.put("stream", false);
-        body.putObject("response_format").put("type", "json_object");
-        ArrayNode messages = body.putArray("messages");
-        messages.addObject().put("role", "system").put("content", systemPrompt);
-        messages.addObject().put("role", "user").put("content", userPrompt);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
-        headers.set("Authorization", "Bearer " + cfg.apiKey.trim());
-
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(cfg.connectTimeoutMs);
-        factory.setReadTimeout(cfg.readTimeoutMs);
-        RestTemplate restTemplate = new RestTemplate(factory);
-
-        String url = cfg.baseUrl.replaceAll("/+$", "") + "/chat/completions";
-        String response = restTemplate.postForObject(url,
-                new HttpEntity<>(objectMapper.writeValueAsString(body), headers), String.class);
-
-        JsonNode root = objectMapper.readTree(response);
-        JsonNode content = root.path("choices").path(0).path("message").path("content");
-        if (content.isMissingNode() || content.asText().trim().isEmpty()) {
-            throw new IllegalStateException("模型响应为空");
-        }
-        return content.asText().trim();
+    private TenantState state() {
+        return states.computeIfAbsent(TenantContext.require(), k -> new TenantState());
     }
 
-    private void recordFailure() {
-        consecutiveFailures++;
-        if (consecutiveFailures >= CIRCUIT_THRESHOLD) {
-            circuitOpenUntil = System.currentTimeMillis() + CIRCUIT_COOLDOWN_MS;
-            consecutiveFailures = 0;
-            log.warn("AI 连续失败,熔断 {} 秒", CIRCUIT_COOLDOWN_MS / 1000);
+    private void recordFailure(TenantState state) {
+        state.consecutiveFailures++;
+        if (state.consecutiveFailures >= CIRCUIT_THRESHOLD) {
+            state.circuitOpenUntil = System.currentTimeMillis() + CIRCUIT_COOLDOWN_MS;
+            state.consecutiveFailures = 0;
+            log.warn("AI 连续失败,租户 {} 熔断 {} 秒", TenantContext.get(), CIRCUIT_COOLDOWN_MS / 1000);
         }
+    }
+
+    private interface Call<T> {
+        T run(AiConfigService.AiConfig cfg) throws Exception;
+    }
+
+    /** 每个租户独立的并发闸与熔断状态 */
+    private static class TenantState {
+        final Semaphore concurrency = new Semaphore(PER_TENANT_CONCURRENCY);
+        volatile int consecutiveFailures = 0;
+        volatile long circuitOpenUntil = 0L;
     }
 
     /** AI 暂不可用(未配置/熔断/超时等),调用方据此降级 */

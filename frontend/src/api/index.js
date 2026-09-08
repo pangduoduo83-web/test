@@ -103,9 +103,37 @@ export const adminListDiscussions = (params) => http.get('/admin/discussions', {
 export const adminDeleteDiscussion = (id) => http.delete(`/admin/discussions/${id}`)
 export const adminAiReview = (id) => http.post(`/admin/submissions/${id}/ai-review`)
 
+// ---------- 技能维度(管理端) ----------
+export const adminListSkillDimensions = () => http.get('/admin/skill-dimensions')
+export const adminCreateSkillDimension = (data) => http.post('/admin/skill-dimensions', data)
+export const adminUpdateSkillDimension = (id, data) => http.put(`/admin/skill-dimensions/${id}`, data)
+export const adminDeleteSkillDimension = (id) => http.delete(`/admin/skill-dimensions/${id}`)
+
 // ---------- AI 学习规划师 ----------
 export const fetchAiPlan = () => http.get('/ai/learning-plan')
 export const generateAiPlan = (data) => http.post('/ai/learning-plan/generate', data)
+
+// ---------- AI 助手 / SKILL ----------
+export const aiSkills = () => http.get('/ai/skills')
+export const aiSkillDetail = (key) => http.get(`/ai/skills/${key}`)
+export const aiCreateSkill = (data) => http.post('/ai/skills', data)
+export const aiUpdateSkill = (id, data) => http.put(`/ai/skills/${id}`, data)
+export const aiDeleteSkill = (id) => http.delete(`/ai/skills/${id}`)
+export const aiDuplicateSkill = (key, data) => http.post(`/ai/skills/${key}/duplicate`, data)
+export const aiTools = () => http.get('/ai/tools')
+export const aiChat = (data) => http.post('/ai/chat', data, { timeout: 180000 })
+export const aiConversations = () => http.get('/ai/conversations')
+export const aiConversationMessages = (id) => http.get(`/ai/conversations/${id}/messages`)
+export const aiDeleteConversation = (id) => http.delete(`/ai/conversations/${id}`)
+
+// ---------- AI 中心(管理端) ----------
+export const adminAiSkills = () => http.get('/admin/ai/skills')
+export const adminAiPromoteSkill = (id) => http.post(`/admin/ai/skills/${id}/promote`)
+export const adminAiTools = () => http.get('/admin/ai/tools')
+export const adminAiUpdateTool = (name, data) => http.put(`/admin/ai/tools/${name}`, data)
+export const adminAiRuns = (params) => http.get('/admin/ai/runs', { params })
+export const adminAiRunTools = (id) => http.get(`/admin/ai/runs/${id}/tools`)
+export const adminAiUsage = (days) => http.get('/admin/ai/usage', { params: { days } })
 
 // ---------- AI 设置(管理端) ----------
 export const adminGetAiSettings = () => http.get('/admin/ai-settings')
@@ -115,3 +143,17 @@ export const adminTestAiSettings = () => http.post('/admin/ai-settings/test')
 // ---------- 站点设置(管理端) ----------
 export const adminGetSiteSettings = () => http.get('/admin/site-settings')
 export const adminUpdateSiteSettings = (data) => http.put('/admin/site-settings', data)
+
+// ---------- 项目商店(教师/管理员) ----------
+export const storeStatus = () => http.get('/store/status')
+export const storeItems = (params) => http.get('/store/items', { params })
+export const storeItem = (id) => http.get(`/store/items/${id}`)
+export const storeInstall = (id, data) => http.post(`/store/items/${id}/install`, data, { timeout: 180000 })
+export const storePublish = (projectId, data) => http.post(`/store/publish/${projectId}`, data, { timeout: 180000 })
+export const storeMine = () => http.get('/store/mine')
+export const adminGetStoreSettings = () => http.get('/admin/store-settings')
+export const adminUpdateStoreSettings = (data) => http.put('/admin/store-settings', data)
+export const adminTestStoreSettings = () => http.post('/admin/store-settings/test')
+/** 商店返回的封面 /hub-assets/xxx 经本站后端代理展示 */
+export const storeAssetUrl = (url) =>
+  url && url.startsWith('/hub-assets/') ? url.replace('/hub-assets/', '/api/public/store-assets/') : url

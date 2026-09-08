@@ -1,6 +1,5 @@
 # 一键部署:MySQL + Spring Boot 后端 + Nginx 前端
-# 用法:docker compose up -d --build
-# 数据库密码可通过 .env 文件里的 DB_PASSWORD 覆盖,默认 123456789
+# 用法:复制 .env.example 为 .env 并填好密钥,然后 docker compose up -d --build
 services:
   mysql:
     image: mysql:8.0
@@ -9,7 +8,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-123456789}
       MYSQL_DATABASE: ioedu
       TZ: Asia/Shanghai
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --max-connections=500
     volumes:
       - ioedu-mysql-data:/var/lib/mysql
     healthcheck:
@@ -21,23 +20,87 @@ services:
     restart: unless-stopped
 
   backend:
+    image: ${IOEDU_IMAGE:-ioedu-backend:latest}
     build: .
     container_name: ioedu-backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/ioedu?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-123456789}
       TZ: Asia/Shanghai
-      # AI 大模型配置(.env 里配 AI_API_KEY 即启用,不配则自动降级)
+      IOEDU_DB_URL: jdbc:mysql://mysql:3306/ioedu?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      IOEDU_DB_USERNAME: root
+      IOEDU_DB_PASSWORD: ${DB_PASSWORD:-123456789}
+      IOEDU_DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      # 必填:>=32 字符随机串,不同环境必须不同
+      IOEDU_JWT_SECRET: ${JWT_SECRET:?请在 .env 中设置 JWT_SECRET(不少于 32 个字符)}
+      # 首次启动创建的管理员;密码留空则随机生成并打印到 docker compose logs backend
+      IOEDU_ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ioedu.cn}
+      IOEDU_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      IOEDU_SEED_DEMO: ${SEED_DEMO:-false}
+      # 多租户:子域名根域(c001.根域 → 租户 c001;留空则所有 Host 都是默认租户)与平台管理接口令牌
+      IOEDU_TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-}
+      IOEDU_TENANT_STRICT_HOST: ${TENANT_STRICT_HOST:-false}
+      IOEDU_PLATFORM_TOKEN: ${PLATFORM_TOKEN:-}
+      IOEDU_PLATFORM_DB: ${PLATFORM_DB:-ioedu_platform}
+      # 项目商店:后端调用 hub 的内网地址;库内密钥加密主密钥(保存商店 API Key / 大模型 Key 时必需)
+      IOEDU_HUB_BASE_URL: ${HUB_BASE_URL:-http://hub:8081}
+      IOEDU_MASTER_KEY: ${MASTER_KEY:-}
+      # 微信小程序(不用小程序可留空)
+      IOEDU_WECHAT_APPID: ${WECHAT_APPID:-}
+      IOEDU_WECHAT_SECRET: ${WECHAT_SECRET:-}
+      # AI 大模型配置(.env 里配 AI_API_KEY 即启用,不配则自动降级;也可在管理后台在线配置)
       IOEDU_AI_BASE_URL: ${AI_BASE_URL:-https://api.deepseek.com}
       IOEDU_AI_API_KEY: ${AI_API_KEY:-}
       IOEDU_AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      # AI 助手每人每日运行次数上限(0 不限)
+      IOEDU_AI_DAILY_RUNS: ${AI_DAILY_RUNS:-50}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom -Duser.timezone=Asia/Shanghai}
     volumes:
-      # 上传图片持久化,容器重建不丢失
+      # 上传文件持久化,容器重建不丢失
       - ioedu-uploads:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health || wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    # JVM 堆按容器内存上限的 75% 计算,不设上限会按整机内存算
+    deploy:
+      resources:
+        limits:
+          memory: ${BACKEND_MEMORY:-2048M}
+    restart: unless-stopped
+
+  # 项目商店(hub):所有客户共用的公共中心服务,独立库 ioedu_hub,仅内网访问
+  hub:
+    image: ${IOEDU_HUB_IMAGE:-ioedu-hub:latest}
+    build: ./hub
+    container_name: ioedu-hub
+    environment:
+      TZ: Asia/Shanghai
+      HUB_DB_URL: jdbc:mysql://mysql:3306/ioedu_hub?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      HUB_DB_USERNAME: root
+      HUB_DB_PASSWORD: ${DB_PASSWORD:-123456789}
+      HUB_JWT_SECRET: ${HUB_JWT_SECRET:?请在 .env 中设置 HUB_JWT_SECRET(不少于 32 个字符)}
+      HUB_ADMIN_USERNAME: ${HUB_ADMIN_USERNAME:-platform}
+      HUB_ADMIN_PASSWORD: ${HUB_ADMIN_PASSWORD:-}
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom -Duser.timezone=Asia/Shanghai}
+    volumes:
+      - ioedu-hub-assets:/app/hub-assets
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8081/actuator/health || wget -qO- http://localhost:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: ${HUB_MEMORY:-1024M}
     restart: unless-stopped
 
   frontend:
@@ -46,9 +109,13 @@ services:
     ports:
       - "8093:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+      hub:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   ioedu-mysql-data:
   ioedu-uploads:
+  ioedu-hub-assets:

@@ -23,6 +23,14 @@
 - **AI 成果预评审**(管理端评分弹窗):AI 阅读学生成果说明,给出建议分、亮点/不足与评语草稿,自动填入评分表单,最终由教师确认修改
 - **稳定性**:服务端代理调用(密钥不出后端)、结果结构校验与项目 ID 白名单、每用户限流(3次/小时)、10 分钟缓存、超时+熔断+规则降级
 
+### AI 助手与 SKILL(`/app/ai`)
+
+- **SKILL**:一段可复用的 AI 能力 = 系统提示词 + 输入结构(JSON Schema,可选表单)+ 工具白名单 + 模型参数,定义为一份 spec JSON。内置 SKILL 在 `src/main/resources/skills/*.json`(学习助手、设备借用顾问、项目推荐官、BOM 审查员),用户可「另存为」后自定义;教师/管理员可创建本站共享 SKILL,管理员可把个人 SKILL 提升为本站共享。
+- **工具(Tool)**:模型可调用的平台能力,定义形状 `{name, description, inputSchema}` 与 MCP Tool / OpenAI function 一致(`ai/tool/AiTool.java`,实现类注册为 bean 即自动进入 `ToolRegistry`)。内置只读工具:`equipment.search/get`、`project.search/get`、`borrow.my_list`、`skill.my_scores`;写操作 `borrow.apply` 执行前必须经用户确认。管理员在「AI 中心 → 工具策略」可关闭工具、限制角色、强制确认、设每日次数。
+- **对话**:`POST /api/ai/chat/stream` 为 SSE 流式(事件 delta / tool_call / tool_result / confirm_required / done / error),`POST /api/ai/chat` 为非流式;会话历史、运行审计(`ai_runs` / `ai_tool_invocations`)与每日用量(`IOEDU_AI_DAILY_RUNS`,默认 50 次/人/天)均入库。
+- **为 Agent 预留**:`LlmGateway` 抽象了 OpenAI 兼容协议(含 tools 与 stream),日后升级 Boot 3 可换 Spring AI 实现;SKILL 的 inputSchema 即工具参数定义,可直接被 Agent 当工具编排;工具定义按 MCP 形状设计,加一个 MCP Server 端点即可对外暴露。
+- 本地联调:`node scripts/mock-ai-server.mjs` 已支持流式与工具调用,后端设 `IOEDU_AI_BASE_URL=http://localhost:9281 IOEDU_AI_API_KEY=mock-key`。
+
 ### 配置(不配则 AI 自动降级,平台其余功能不受影响)
 
 **推荐方式:管理后台在线配置(免重启)** —— 管理员登录 → 「AI 设置」页,填接口地址/模型/API Key,可调输出 Token 上限、温度、超时,支持 DeepSeek/通义千问一键预设与**连接测试**,保存后立即生效。配置存数据库,优先级高于环境变量。
@@ -41,23 +49,33 @@ IOEDU_AI_MODEL=deepseek-chat                   # 选填,默认 deepseek-chat
 通义千问填法:`https://dashscope.aliyuncs.com/compatible-mode` + `qwen-plus`。
 本地联调可不买 Key:先 `node scripts/mock-ai-server.mjs` 起模拟模型,再在 AI 设置页填 `http://localhost:9281` + 任意 Key。
 
+## 多租户(一套后端服务多个客户)
+
+后端为单进程多租户:每个客户一个独立 MySQL 库 `ioedu_<编码>`,按请求 Host 的子域名(`c001.根域`)切库,数据、登录令牌、上传文件三层隔离;老部署的 `ioedu` 库自动成为默认租户。开通客户通过平台接口 `POST /api/platform/tenants`(静态令牌 `IOEDU_PLATFORM_TOKEN` 鉴权),本地联调可用 `X-Tenant-Id` 请求头切换租户,`smoke-test-tenant.ps1` 覆盖开通、隔离、停用、注销全流程。详见《部署指南.md》5.2 节。
+
+## 项目商店(跨客户共享项目)
+
+`hub/` 是独立的商店服务(Spring Boot 2.6 / Java 8,库 `ioedu_hub`,端口 8081)。客户站点管理员在「管理后台 → 项目商店」把本地项目发布到商店或安装商店里的项目(附件随之搬运、本地记住上游版本以便更新);平台管理员在 `/platform/login` 登录商店后台审核上架、设置可见范围与定向分享、为客户签发 API Key。本地开发:`cd hub && mvn spring-boot:run -Dspring-boot.run.profiles=dev`(平台管理员 `platform / platform123`),主后端 dev profile 已默认指向 `http://localhost:8081`。详见《部署指南.md》5.3 节。
+
 ## 快速启动
 
 ### 1. 数据库
 
-本地安装 MySQL 8,确认 root 密码。默认配置连接 `localhost:3306`,首次启动自动建库 `ioedu` 并写入种子数据(10 个项目 + 12 台设备 + 演示账号)。已初始化过的老库再次启动时会自动回填新增字段(封面图、Fork 数、PCB 尺寸、分类对齐参考站),并补插种子中新增的设备。
+本地安装 MySQL 8,确认 root 密码。默认配置连接 `localhost:3306`,首次启动自动建库 `ioedu`,由 Flyway 执行 `src/main/resources/db/migration/` 下的脚本建表(Hibernate 只做校验,不再自动改表;以后改表结构请新增 `V{n}__xxx.sql`)。
 
-密码配置二选一:
-
-- 修改 `src/main/resources/application.properties` 中 `spring.datasource.password`
-- 或设置环境变量 `IOEDU_DB_PASSWORD`
+数据库密码默认 `123456789`,可用环境变量 `IOEDU_DB_PASSWORD` 覆盖(也可覆盖 `IOEDU_DB_URL` / `IOEDU_DB_USERNAME`)。
 
 ### 2. 后端(端口 8080)
 
+本地开发请激活 **dev profile**:它提供内置开发 JWT 密钥、写入演示数据(10 个项目 + 12 台设备 + 演示账号)并把管理员设为 `admin@ioedu.cn / admin123`,`smoke-test.ps1` 依赖这些数据。
+
 ```bash
-mvn spring-boot:run
-# 或在 IDEA 中直接运行 IoeduNewApplication
+start-backend.bat
+# 等价于 mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# IDEA 里运行 IoeduNewApplication 时在 Run Configuration 加 --spring.profiles.active=dev
 ```
+
+不带 profile 启动就是生产模式:必须设置 `IOEDU_JWT_SECRET`(≥32 字符),不写演示数据,首个管理员密码来自 `IOEDU_ADMIN_PASSWORD`(留空则随机生成并打印到日志)。
 
 ### 3. 前端(端口 5173)
 
@@ -89,16 +107,16 @@ docker compose up -d --build
 
 将启动 3 个容器:`ioedu-mysql`(数据卷持久化)、`ioedu-backend`(8080,仅内网)、`ioedu-frontend`(Nginx,对外 8093 端口,反代 /api)。浏览器访问 http://服务器IP:8093 即可。
 
-- 修改数据库密码:项目根目录建 `.env` 文件写 `DB_PASSWORD=你的密码`(默认 123456789)
+- 首次部署先 `cp .env.example .env` 并填写:`JWT_SECRET`(必填,≥32 随机字符)、`DB_PASSWORD`、`ADMIN_PASSWORD`(可留空随机生成并打印到日志)等,详见《部署指南.md》
 - 更新发版:`git pull && docker compose up -d --build`
 - 查看日志:`docker compose logs -f backend`
 - 国内服务器 npm 下载慢:取消 `frontend/Dockerfile` 中 npmmirror 注释
 
-## 演示账号
+## 演示账号(仅 dev profile / `IOEDU_SEED_DEMO=true` 时存在)
 
 | 角色 | 邮箱 | 密码 |
 |---|---|---|
-| 管理员 | admin@ioedu.cn | admin123 |
+| 管理员 | admin@ioedu.cn | admin123(dev profile 默认;生产由 `IOEDU_ADMIN_PASSWORD` 指定或随机生成) |
 | 学生 | zhang@stu.ioedu.cn | 123456 |
 | 教师(陈老师) | chen@ioedu.cn | 123456 |
 | 教师(李老师/王老师/赵老师) | li@ioedu.cn / wang@ioedu.cn / zhao@ioedu.cn | 123456 |

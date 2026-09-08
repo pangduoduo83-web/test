@@ -3,7 +3,7 @@ package com.example.ioedunew.controller;
 import com.example.ioedunew.common.ApiResponse;
 import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.config.AuthUser;
-import org.springframework.beans.factory.annotation.Value;
+import com.example.ioedunew.service.UploadStorage;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,8 +23,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 文件上传接口:保存到本地磁盘 {upload-dir}/yyyyMM/uuid.ext,
- * 由 WebConfig 将 /uploads/** 映射为静态资源对外访问。
+ * 文件上传接口:保存到当前租户目录 {upload-dir}/{租户}/yyyyMM/uuid.ext,
+ * 由 UploadController 按 /uploads/** 对外提供。
  * 安全边界:
  * - /api/upload 仅允许常见图片扩展名,登录用户可用(头像/封面);
  * - /api/upload/file 允许教学资料类扩展名,仅教师/管理员可用;
@@ -42,8 +42,11 @@ public class FileController {
             "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt", "csv", "md",
             "zip", "rar", "7z", "mp4", "mp3");
 
-    @Value("${ioedu.upload-dir}")
-    private String uploadDir;
+    private final UploadStorage storage;
+
+    public FileController(UploadStorage storage) {
+        this.storage = storage;
+    }
 
     @PostMapping
     public ApiResponse<Map<String, String>> upload(@RequestParam("file") MultipartFile file) throws IOException {
@@ -76,7 +79,7 @@ public class FileController {
         }
 
         String month = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        File dir = new File(uploadDir, month);
+        File dir = storage.tenantRoot().resolve(month).toFile();
         if (!dir.exists() && !dir.mkdirs()) {
             throw new BusinessException(500, "上传目录创建失败");
         }

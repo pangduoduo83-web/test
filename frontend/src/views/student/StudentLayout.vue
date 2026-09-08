@@ -217,7 +217,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  BarChart3, Bell, BookOpen, Bookmark, ClipboardList, GraduationCap,
+  BarChart3, Bell, BookOpen, Bookmark, Bot, ClipboardList, GraduationCap,
   HelpCircle, LogOut, Megaphone, Package, Rocket, Search, Settings, User, Wrench
 } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
@@ -272,6 +272,7 @@ const menus = [
   { path: '/app/equipment', icon: Wrench, title: '设备图书馆', desc: '借用开发工具仪表' },
   { path: '/app/borrowing', icon: ClipboardList, title: '借阅管理', desc: '申请审批追踪' },
   { path: '/app/skills', icon: BarChart3, title: '技能评估', desc: '能力测评与提升' },
+  { path: '/app/ai', icon: Bot, title: 'AI 助手', desc: '智能问答与技能' },
   { path: '/app/dashboard', icon: User, title: '个人中心', desc: '我的项目进度' }
 ]
 

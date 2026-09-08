@@ -3,10 +3,10 @@
     <div class="head-row">
       <div>
         <h2 class="page-title">技能评估与提升</h2>
-        <p class="page-subtitle">全面评估你的专业技能，获取个性化学习建议</p>
+        <p class="page-subtitle">画像由项目评审实证自动校准,自评只作为起点与对照</p>
       </div>
       <button class="btn-gradient assess-btn" @click="openAssess">
-        <Zap :size="15" /> 开始能力测评
+        <Zap :size="15" /> {{ data.selfComplete ? '更新自评' : '开始能力自评' }}
       </button>
     </div>
 
@@ -15,50 +15,68 @@
       <div class="card">
         <div class="card-head">
           <h3>综合能力雷达</h3>
-          <div class="overall">综合评分 <b class="gradient-text">{{ data.overall }}</b></div>
+          <div class="overall">
+            综合评分 <b class="gradient-text">{{ data.overall }}</b>
+            <span v-if="data.selfOverall !== null" class="overall-self">自评 {{ data.selfOverall }}</span>
+          </div>
         </div>
-        <div ref="radarRef" class="chart"></div>
+        <div v-if="data.skills.length" ref="radarRef" class="chart"></div>
+        <div v-else class="chart-empty">管理员尚未配置技能维度</div>
+        <div class="chart-foot">
+          <span class="legend-dot solid"></span>综合分(实证校准)
+          <template v-if="data.selfComplete"><span class="legend-dot dashed"></span>自评</template>
+          <span class="chart-foot-right">
+            {{ data.evidenceTotal > 0 ? `已计入 ${data.evidenceTotal} 次项目实证` : '尚无项目实证,完成项目评审后自动校准' }}
+          </span>
+        </div>
       </div>
 
       <!-- 成长曲线 -->
       <div class="card">
         <div class="card-head"><h3>学习成长曲线</h3></div>
-        <div ref="lineRef" class="chart"></div>
+        <div v-if="data.history.length >= 2" ref="lineRef" class="chart"></div>
+        <div v-else class="chart-empty">
+          暂无成长记录<br />
+          <small>完成自评或项目评审后,综合评分的每次变化都会记录在这里</small>
+        </div>
       </div>
     </div>
 
     <!-- 技能详情 -->
     <div class="card">
       <div class="card-head"><h3>技能详情分析</h3></div>
-      <div v-for="s in data.skills" :key="s.id" class="skill-block">
+      <div v-for="(s, i) in data.skills" :key="s.skillName" class="skill-block">
         <div class="skill-head">
-          <span class="skill-icon" :style="{ background: meta(s.skillName).bg }">
-            <component :is="meta(s.skillName).icon" :size="20" color="#fff" />
+          <span class="skill-icon" :style="{ background: meta(s.skillName, i).bg }">
+            <component :is="meta(s.skillName, i).icon" :size="20" color="#fff" />
           </span>
           <div class="skill-title-box">
             <div class="skill-title-row">
               <span class="skill-name">{{ s.skillName }}</span>
               <span class="skill-level badge" :class="levelBadge(s.score)">{{ levelText(s.score) }}</span>
+              <span v-if="s.evidenceCount > 0" class="badge badge-green">实证 {{ s.evidenceCount }} 次</span>
+              <span v-else class="badge badge-gray">{{ s.selfScore !== null ? '仅自评' : '未自评' }}</span>
             </div>
-            <div class="skill-desc">{{ meta(s.skillName).desc }}</div>
+            <div class="skill-desc">{{ s.description || '专业技能维度' }}</div>
           </div>
           <div class="skill-score-box">
             <b>{{ s.score }}%</b>
-            <span>掌握度</span>
+            <span>综合掌握度</span>
           </div>
         </div>
         <div class="skill-bar">
           <div class="skill-bar-inner" :style="{ width: s.score + '%' }"></div>
+          <span v-if="s.selfScore !== null" class="skill-bar-self" :style="{ left: s.selfScore + '%' }"
+                :title="`自评 ${s.selfScore}`"></span>
         </div>
-        <div class="sub-grid">
-          <div v-for="sub in subSkills(s)" :key="sub.name" class="sub-box">
-            <b>{{ sub.score }}%</b>
-            <span>{{ sub.name }}</span>
-          </div>
-        </div>
-        <div class="skill-suggest">
-          <BookOpen :size="14" /> 推荐项目:
-          <span class="suggest-links">{{ recommend(s.skillName) }}</span>
+        <div class="skill-facts">
+          <span>自评 <b>{{ s.selfScore !== null ? s.selfScore : '—' }}</b></span>
+          <span v-if="s.selfScore !== null && s.evidenceCount > 0" :class="gapClass(s)">
+            {{ gapText(s) }}
+          </span>
+          <span v-if="lastEvent(s.skillName)" class="skill-last">
+            最近:{{ lastEvent(s.skillName).note }}
+          </span>
         </div>
       </div>
     </div>
@@ -66,9 +84,27 @@
     <!-- 学习建议 -->
     <div class="card suggest-card">
       <h3 class="suggest-head"><Target :size="17" color="#2563eb" /> 个性化学习建议</h3>
-      <p class="suggest-sub">根据你的技能评估，我们为你制定了专属的学习计划</p>
+      <p class="suggest-sub">根据你的技能画像与实证情况,我们为你制定了专属的学习计划</p>
       <div class="suggest-list">
         <div v-for="(s, i) in data.suggestions" :key="i" class="suggest-item">{{ s }}</div>
+      </div>
+    </div>
+
+    <!-- 变动记录 -->
+    <div v-if="data.events.length" class="card events-card">
+      <h3 class="suggest-head"><History :size="17" color="#0891b2" /> 画像变动记录</h3>
+      <div class="event-list">
+        <div v-for="(e, i) in data.events" :key="i" class="event-item">
+          <span class="badge" :class="e.source === 'PROJECT' ? 'badge-green' : 'badge-blue'">
+            {{ sourceText(e.source) }}
+          </span>
+          <span class="event-skill">{{ e.skillName }}</span>
+          <span class="event-delta" :class="deltaClass(e)">
+            {{ e.beforeScore }} → {{ e.afterScore }}
+          </span>
+          <span class="event-note">{{ e.note }}</span>
+          <span class="event-time">{{ formatTime(e.createdAt) }}</span>
+        </div>
       </div>
     </div>
 
@@ -94,7 +130,7 @@
       </div>
 
       <div v-if="!plan && !aiLoading" class="ai-empty">
-        基于你的六维技能画像与全部实战项目,AI 将为你规划「基础补强 → 综合实践 → 挑战提升」三阶段学习路线。
+        基于你的技能画像与全部实战项目,AI 将为你规划「基础补强 → 综合实践 → 挑战提升」三阶段学习路线。
         推荐依据:技能短板覆盖、能力匹配度、难度递进、报名状态与你的学习目标。
       </div>
       <div v-else-if="aiLoading" class="ai-empty">正在分析技能画像与项目库,大约需要 10~20 秒...</div>
@@ -144,16 +180,19 @@
       </template>
     </div>
 
-    <!-- 测评弹窗 -->
-    <el-dialog v-model="assessVisible" title="能力测评" width="520px">
-      <p class="assess-tip">请根据你的实际情况,拖动滑块自评各项技能掌握程度(0-100)。</p>
+    <!-- 自评弹窗 -->
+    <el-dialog v-model="assessVisible" title="能力自评" width="520px">
+      <p class="assess-tip">
+        请按实际情况拖动滑块自评各项掌握程度(0-100)。自评只是起点:已有项目实证的维度,综合分不会被自评改写,
+        但自评与实证的差距会显示在画像中,帮助你校准自我认知。
+      </p>
       <div v-for="(v, name) in assessForm" :key="name" class="assess-row">
         <span class="assess-name">{{ name }}</span>
         <el-slider v-model="assessForm[name]" :max="100" show-input :show-input-controls="false" size="small" />
       </div>
       <template #footer>
         <el-button @click="assessVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitAssess">提交测评</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitAssess">提交自评</el-button>
       </template>
     </el-dialog>
   </div>
@@ -165,12 +204,15 @@ import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import {
-  Activity, BookOpen, CircuitBoard, Code, Cpu, Radio, Sparkles, Target, Wrench, Zap
+  Activity, BookOpen, Braces, CircuitBoard, Code, Cpu, History, Layers, Radio, Sparkles, Target, Wrench, Zap
 } from 'lucide-vue-next'
 import { fetchAiPlan, fetchSkills, generateAiPlan, submitAssessment } from '../../api'
 
 const router = useRouter()
-const data = reactive({ skills: [], overall: 0, suggestions: [] })
+const data = reactive({
+  skills: [], overall: 0, selfOverall: null, selfComplete: false, evidenceTotal: 0,
+  suggestions: [], history: [], events: []
+})
 const radarRef = ref(null)
 const lineRef = ref(null)
 const assessVisible = ref(false)
@@ -218,99 +260,90 @@ const genPlan = async () => {
   }
 }
 
-// 技能维度静态元数据:图标 / 说明 / 子技能拆解
-const skillMeta = {
-  '嵌入式开发': {
-    icon: Cpu, bg: 'linear-gradient(135deg,#60a5fa,#2563eb)',
-    desc: '掌握微控制器编程、外设驱动开发，实时操作系统等核心技能',
-    subs: ['MCU编程', 'RTOS应用', '驱动开发', '调试技巧']
-  },
-  'PCB设计': {
-    icon: CircuitBoard, bg: 'linear-gradient(135deg,#a78bfa,#7c3aed)',
-    desc: '电路原理图设计、PCB布局布线、信号完整性分析',
-    subs: ['原理图设计', 'PCB布局', '高速设计', '仿真分析']
-  },
-  '编程能力': {
-    icon: Code, bg: 'linear-gradient(135deg,#4ade80,#16a34a)',
-    desc: 'C/C++、Python等编程语言，数据结构与算法基础',
-    subs: ['C/C++', 'Python', '数据结构', '算法设计']
-  },
-  '通信技术': {
-    icon: Radio, bg: 'linear-gradient(135deg,#22d3ee,#0891b2)',
-    desc: '有线/无线通信协议栈、组网与协议分析能力',
-    subs: ['串口协议', 'SPI/I2C', '无线通信', '网络协议']
-  },
-  '信号处理': {
-    icon: Activity, bg: 'linear-gradient(135deg,#facc15,#f59e0b)',
-    desc: '信号采集、数字滤波、频谱分析与算法实现',
-    subs: ['采样理论', '滤波器设计', 'FFT分析', 'MATLAB']
-  },
-  '硬件调试': {
-    icon: Wrench, bg: 'linear-gradient(135deg,#fb923c,#ea580c)',
-    desc: '仪器仪表使用、电路故障定位与焊接工艺',
-    subs: ['仪器使用', '故障定位', '焊接工艺', '测试方案']
-  }
+// 维度是后台可配置的:已知名称用专属图标,其余按顺序轮换配色
+const knownMeta = {
+  '嵌入式开发': { icon: Cpu, bg: 'linear-gradient(135deg,#60a5fa,#2563eb)' },
+  'PCB设计': { icon: CircuitBoard, bg: 'linear-gradient(135deg,#a78bfa,#7c3aed)' },
+  '编程能力': { icon: Code, bg: 'linear-gradient(135deg,#4ade80,#16a34a)' },
+  '通信技术': { icon: Radio, bg: 'linear-gradient(135deg,#22d3ee,#0891b2)' },
+  '信号处理': { icon: Activity, bg: 'linear-gradient(135deg,#facc15,#f59e0b)' },
+  '硬件调试': { icon: Wrench, bg: 'linear-gradient(135deg,#fb923c,#ea580c)' }
 }
-const defaultMeta = {
-  icon: BookOpen, bg: 'linear-gradient(135deg,#94a3b8,#64748b)',
-  desc: '专业技能维度', subs: ['基础理论', '工程实践', '工具使用', '综合应用']
-}
-const meta = (name) => skillMeta[name] || defaultMeta
-
-// 子技能分数:以总分为基线做固定偏移,仅用于展示拆解结构
-const subOffsets = [8, -5, -10, 3]
-const subSkills = (s) => meta(s.skillName).subs.map((name, i) => ({
-  name,
-  score: Math.max(5, Math.min(100, s.score + subOffsets[i % subOffsets.length]))
-}))
-
-const recommendMap = {
-  '嵌入式开发': '智能温湿度监测系统、无人机飞控系统、智能家居中控',
-  '编程能力': 'C语言进阶、Python数据分析、算法竞赛入门',
-  '通信技术': '无线通信原理、物联网通信技术、LoRa组网实战',
-  'PCB设计': '两层板设计入门、开关电源layout、高速PCB设计',
-  '信号处理': '数字信号处理、MATLAB信号分析、简易示波器DIY',
-  '硬件调试': '模拟电路调试、通信协议分析、示波器使用进阶'
-}
-const recommend = (name) => recommendMap[name] || '项目中心相关实战项目'
+const palette = [
+  { icon: Layers, bg: 'linear-gradient(135deg,#f472b6,#db2777)' },
+  { icon: Braces, bg: 'linear-gradient(135deg,#34d399,#059669)' },
+  { icon: BookOpen, bg: 'linear-gradient(135deg,#94a3b8,#64748b)' },
+  { icon: Target, bg: 'linear-gradient(135deg,#818cf8,#4f46e5)' }
+]
+const meta = (name, i) => knownMeta[name] || palette[i % palette.length]
 
 const levelText = (v) => v >= 80 ? '精通' : v >= 60 ? '熟练' : v >= 40 ? '进阶' : '入门'
 const levelBadge = (v) => v >= 80 ? 'badge-purple' : v >= 60 ? 'badge-green' : v >= 40 ? 'badge-blue' : 'badge-gray'
 
+const gapText = (s) => {
+  const gap = s.selfScore - s.score
+  if (Math.abs(gap) < 8) return '自评与实证基本一致'
+  return gap > 0 ? `自评高出实证 ${gap} 分` : `实证高于自评 ${-gap} 分`
+}
+const gapClass = (s) => {
+  const gap = s.selfScore - s.score
+  return Math.abs(gap) < 8 ? 'gap-ok' : gap > 0 ? 'gap-over' : 'gap-under'
+}
+const lastEvent = (name) => data.events.find((e) => e.skillName === name)
+const sourceText = (src) => (src === 'PROJECT' ? '项目实证' : src === 'SELF' ? '自评' : '初始')
+const deltaClass = (e) => (e.afterScore > e.beforeScore ? 'up' : e.afterScore < e.beforeScore ? 'down' : '')
+const formatTime = (v) => (v || '').replace('T', ' ').slice(0, 16)
+
 const renderCharts = () => {
-  if (radarRef.value) {
+  if (radarRef.value && data.skills.length) {
     if (!radarChart) radarChart = echarts.init(radarRef.value)
+    const series = [{
+      value: data.skills.map((s) => s.score),
+      name: '综合分',
+      areaStyle: { color: 'rgba(59,130,246,.3)' },
+      lineStyle: { color: '#3b82f6', width: 2 },
+      itemStyle: { color: '#3b82f6' }
+    }]
+    if (data.selfComplete) {
+      series.push({
+        value: data.skills.map((s) => s.selfScore),
+        name: '自评',
+        lineStyle: { color: '#9333ea', width: 1.5, type: 'dashed' },
+        itemStyle: { color: '#9333ea' },
+        areaStyle: { color: 'rgba(147,51,234,.06)' }
+      })
+    }
     radarChart.setOption({
+      tooltip: { trigger: 'item' },
       radar: {
         indicator: data.skills.map((s) => ({ name: s.skillName, max: 100 })),
         radius: '65%',
         axisName: { color: '#6b7280', fontSize: 12 },
         splitArea: { areaStyle: { color: ['#fafafa', '#f3f4f6'] } }
       },
-      series: [{
-        type: 'radar',
-        data: [{
-          value: data.skills.map((s) => s.score),
-          name: '当前水平',
-          areaStyle: { color: 'rgba(59,130,246,.3)' },
-          lineStyle: { color: '#3b82f6', width: 2 },
-          itemStyle: { color: '#3b82f6' }
-        }]
-      }]
-    })
+      series: [{ type: 'radar', data: series }]
+    }, true)
   }
-  if (lineRef.value) {
+  if (lineRef.value && data.history.length >= 2) {
     if (!lineChart) lineChart = echarts.init(lineRef.value)
-    const base = Math.max(10, data.overall - 25)
-    const growth = Array.from({ length: 6 }, (_, i) =>
-      Math.min(100, Math.round(base + (data.overall - base) * (i / 5))))
     lineChart.setOption({
       grid: { left: 36, right: 16, top: 20, bottom: 28 },
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: ['第1月', '第2月', '第3月', '第4月', '第5月', '第6月'], axisLabel: { color: '#6b7280' } },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params) => {
+          const p = params[0]
+          const h = data.history[p.dataIndex]
+          return `${formatTime(h.time)}<br/>综合评分 <b>${h.overall}</b> · ${sourceText(h.source)}`
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: data.history.map((h) => formatTime(h.time).slice(5, 10)),
+        axisLabel: { color: '#6b7280' }
+      },
       yAxis: { type: 'value', max: 100, splitLine: { lineStyle: { color: '#f3f4f6' } } },
       series: [{
-        type: 'line', data: growth, smooth: true,
+        type: 'line', data: data.history.map((h) => h.overall), smooth: true,
         lineStyle: { width: 3, color: '#10b981' }, itemStyle: { color: '#10b981' },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -319,32 +352,35 @@ const renderCharts = () => {
           ])
         }
       }]
-    })
+    }, true)
   }
 }
 
-const load = async () => {
-  const res = await fetchSkills()
+const apply = async (res) => {
   Object.assign(data, res)
   await nextTick()
   renderCharts()
 }
 
+const load = async () => {
+  await apply(await fetchSkills())
+}
+
 const openAssess = () => {
   Object.keys(assessForm).forEach((k) => delete assessForm[k])
-  data.skills.forEach((s) => { assessForm[s.skillName] = s.score })
+  data.skills.forEach((s) => { assessForm[s.skillName] = s.selfScore !== null ? s.selfScore : s.score })
   assessVisible.value = true
 }
 
 const submitAssess = async () => {
   submitting.value = true
   try {
-    const res = await submitAssessment({ ...assessForm })
-    Object.assign(data, res)
-    renderCharts()
+    await apply(await submitAssessment({ ...assessForm }))
     assessVisible.value = false
     plan.value = null
-    ElMessage.success('测评完成,技能画像已更新!可重新生成 AI 学习路线')
+    ElMessage.success(data.evidenceTotal > 0
+      ? '自评已更新,可对照实证分校准自我认知'
+      : '自评完成,技能画像已建立!完成项目评审后会自动校准')
   } catch (e) { /* 已提示 */ } finally {
     submitting.value = false
   }
@@ -365,14 +401,26 @@ window.addEventListener('resize', () => { radarChart?.resize(); lineChart?.resiz
 
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .card-head h3 { margin: 0; font-size: 16px; }
-.overall { font-size: 13px; color: var(--text-secondary); }
-.overall b { font-size: 22px; margin-left: 4px; }
+.overall { font-size: 13px; color: var(--text-secondary); display: flex; align-items: baseline; gap: 4px; }
+.overall b { font-size: 22px; }
+.overall-self { margin-left: 10px; font-size: 12px; color: #9333ea; }
 
 .chart { height: 280px; }
-
-.skill-block {
-  padding: 18px 0; border-bottom: 1px solid var(--border);
+.chart-empty {
+  height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #9ca3af; font-size: 14px; text-align: center; line-height: 1.8;
 }
+.chart-empty small { font-size: 12px; }
+.chart-foot {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text-secondary); margin-top: 4px;
+}
+.chart-foot-right { margin-left: auto; color: #9ca3af; }
+.legend-dot { display: inline-block; width: 18px; height: 0; margin-left: 8px; }
+.legend-dot.solid { border-top: 2px solid #3b82f6; }
+.legend-dot.dashed { border-top: 2px dashed #9333ea; }
+
+.skill-block { padding: 18px 0; border-bottom: 1px solid var(--border); }
 .skill-block:last-child { border-bottom: none; padding-bottom: 4px; }
 .skill-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
 .skill-icon {
@@ -381,40 +429,39 @@ window.addEventListener('resize', () => { radarChart?.resize(); lineChart?.resiz
   box-shadow: 0 8px 12px -3px rgba(0,0,0,.15);
 }
 .skill-title-box { flex: 1; min-width: 0; }
-.skill-title-row { display: flex; align-items: center; gap: 10px; }
+.skill-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .skill-name { font-weight: 700; font-size: 15px; color: #111827; }
 .skill-desc { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
 .skill-score-box { text-align: right; flex-shrink: 0; }
 .skill-score-box b { display: block; font-size: 20px; color: #111827; line-height: 1.1; }
 .skill-score-box span { font-size: 11px; color: #9ca3af; }
 
-.skill-bar { height: 8px; border-radius: 999px; background: #f3f4f6; overflow: hidden; margin-bottom: 12px; }
+.skill-bar {
+  position: relative; height: 8px; border-radius: 999px; background: #f3f4f6; margin-bottom: 10px;
+}
 .skill-bar-inner {
   height: 100%; border-radius: 999px;
   background: linear-gradient(to right, #3b82f6, #6366f1);
   transition: width .3s;
 }
-
-.sub-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }
-@media (max-width: 900px) { .sub-grid { grid-template-columns: repeat(2, 1fr); } }
-.sub-box {
-  background: #f9fafb; border-radius: 10px;
-  padding: 12px 8px; text-align: center;
-  display: flex; flex-direction: column; gap: 2px;
+.skill-bar-self {
+  position: absolute; top: -4px; width: 2px; height: 16px; margin-left: -1px;
+  background: #9333ea; border-radius: 1px;
 }
-.sub-box b { font-size: 16px; color: #111827; }
-.sub-box span { font-size: 12px; color: var(--text-secondary); }
-
-.skill-suggest {
-  font-size: 13px; color: var(--text-secondary);
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+.skill-facts {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text-secondary);
 }
-.suggest-links { color: var(--brand-blue); }
+.skill-facts b { color: #111827; }
+.gap-ok { color: #16a34a; }
+.gap-over { color: #ca8a04; }
+.gap-under { color: #2563eb; }
+.skill-last { color: #9ca3af; }
 
 .assess-btn { display: inline-flex; align-items: center; gap: 6px; }
 
-.suggest-card { margin-top: 16px; }
-.suggest-card h3 { margin: 0 0 4px; }
+.suggest-card, .events-card { margin-top: 16px; }
+.suggest-card h3, .events-card h3 { margin: 0 0 4px; }
 .suggest-head { display: flex; align-items: center; gap: 8px; }
 .suggest-sub { color: var(--text-secondary); font-size: 13px; margin: 0 0 14px; }
 .suggest-list { display: grid; gap: 10px; }
@@ -423,6 +470,19 @@ window.addEventListener('resize', () => { radarChart?.resize(); lineChart?.resiz
   border: 1px solid #dbeafe;
   border-radius: 12px; padding: 14px 16px; font-size: 14px; color: #1e40af;
 }
+
+.event-list { display: flex; flex-direction: column; margin-top: 10px; }
+.event-item {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.event-item:last-child { border-bottom: none; }
+.event-skill { font-weight: 600; color: #111827; min-width: 72px; }
+.event-delta { font-variant-numeric: tabular-nums; color: var(--text-secondary); min-width: 64px; }
+.event-delta.up { color: #16a34a; }
+.event-delta.down { color: #dc2626; }
+.event-note { flex: 1; min-width: 200px; color: #4b5563; }
+.event-time { font-size: 12px; color: #9ca3af; }
 
 .ai-card { margin-top: 16px; }
 .ai-card h3 { margin: 0; }
@@ -478,7 +538,7 @@ window.addEventListener('resize', () => { radarChart?.resize(); lineChart?.resiz
 .ai-next-text { font-size: 13px; color: var(--text-secondary); flex: 1; }
 .ai-meta { margin-top: 8px; font-size: 12px; color: #9ca3af; text-align: right; }
 
-.assess-tip { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+.assess-tip { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; line-height: 1.7; }
 .assess-row { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
 .assess-name { width: 80px; flex-shrink: 0; font-size: 13px; }
 .assess-row :deep(.el-slider) { flex: 1; }

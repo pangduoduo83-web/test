@@ -5,6 +5,8 @@ import lombok.Data;
 import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -72,5 +74,28 @@ public class MiscDtos {
         private int score;
 
         private String feedback;
+
+        /** 教师确认的技能证据(通常由 AI 预评审预填、教师可改),为空则只按项目技能要求计入 */
+        private List<SkillEvidenceItem> skillEvidence;
+    }
+
+    @Data
+    public static class SkillEvidenceItem {
+        private String name;
+
+        /** 该维度在本次成果中体现出的水平 0-100 */
+        private Integer level;
+    }
+
+    @Data
+    public static class SkillDimensionRequest {
+        @Size(max = 30, message = "技能维度名称不能超过 30 字")
+        private String name;
+
+        @Size(max = 200, message = "维度说明不能超过 200 字")
+        private String description;
+
+        private Integer sortOrder;
+        private Boolean enabled;
     }
 }

@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { getToken, getUser } from '../utils/authStorage'
+import { getHubToken } from '../api/hub'
 
 // 路由:/ 即登录页(与参考站一致),/app 学生端,/admin 管理端
 const router = createRouter({
@@ -18,7 +19,8 @@ const router = createRouter({
         { path: 'projects/:id', name: 'project-detail', component: () => import('../views/student/ProjectDetailView.vue') },
         { path: 'equipment', name: 'equipment', component: () => import('../views/student/EquipmentView.vue') },
         { path: 'borrowing', name: 'borrowing', component: () => import('../views/student/BorrowingView.vue') },
-        { path: 'skills', name: 'skills', component: () => import('../views/student/SkillsView.vue') }
+        { path: 'skills', name: 'skills', component: () => import('../views/student/SkillsView.vue') },
+        { path: 'ai', name: 'ai-assistant', component: () => import('../views/student/AiAssistantView.vue') }
       ]
     },
     {
@@ -44,15 +46,31 @@ const router = createRouter({
         { path: 'submissions', name: 'admin-submissions', component: () => import('../views/admin/AdminSubmissions.vue') },
         { path: 'notifications', name: 'admin-notifications', component: () => import('../views/admin/AdminNotifications.vue') },
         { path: 'discussions', name: 'admin-discussions', component: () => import('../views/admin/AdminDiscussions.vue') },
+        { path: 'skill-dimensions', name: 'admin-skill-dimensions', component: () => import('../views/admin/AdminSkillDimensions.vue') },
         { path: 'ai-settings', name: 'admin-ai-settings', component: () => import('../views/admin/AdminAiSettings.vue') },
         { path: 'site-settings', name: 'admin-site-settings', component: () => import('../views/admin/AdminSiteSettings.vue') },
+        { path: 'store', name: 'admin-store', component: () => import('../views/admin/AdminStore.vue') },
+        { path: 'ai-center', name: 'admin-ai-center', component: () => import('../views/admin/AdminAiCenter.vue') },
         { path: 'users', name: 'admin-users', component: () => import('../views/admin/AdminUsers.vue') }
+      ]
+    },
+    // 项目商店平台管理端:独立登录(商店服务的平台管理员),与客户站点账号无关
+    { path: '/platform/login', name: 'platform-login', component: () => import('../views/platform/PlatformLogin.vue') },
+    {
+      path: '/platform',
+      component: () => import('../views/platform/PlatformLayout.vue'),
+      meta: { requiresHubAdmin: true },
+      children: [
+        { path: '', redirect: '/platform/items' },
+        { path: 'items', name: 'platform-items', component: () => import('../views/platform/PlatformItems.vue') },
+        { path: 'tenants', name: 'platform-tenants', component: () => import('../views/platform/PlatformTenants.vue') }
       ]
     }
   ]
 })
 
 router.beforeEach((to) => {
+  if (to.meta.requiresHubAdmin && !getHubToken()) return '/platform/login'
   const token = getToken()
   const user = getUser()
   if (to.meta.requiresAuth && !token) return '/auth'

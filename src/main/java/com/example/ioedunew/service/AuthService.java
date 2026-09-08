@@ -3,7 +3,6 @@ package com.example.ioedunew.service;
 import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.config.JwtUtil;
 import com.example.ioedunew.dto.AuthDtos;
-import com.example.ioedunew.entity.SkillScore;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.BorrowRequestRepository;
 import com.example.ioedunew.repository.DiscussionRepository;
@@ -12,6 +11,7 @@ import com.example.ioedunew.repository.EquipmentFavoriteRepository;
 import com.example.ioedunew.repository.FavoriteRepository;
 import com.example.ioedunew.repository.NotificationRepository;
 import com.example.ioedunew.repository.ProjectRepository;
+import com.example.ioedunew.repository.SkillScoreEventRepository;
 import com.example.ioedunew.repository.SkillScoreRepository;
 import com.example.ioedunew.repository.SubmissionRepository;
 import com.example.ioedunew.repository.UserRepository;
@@ -25,17 +25,19 @@ import java.util.UUID;
 
 /**
  * 认证服务:注册、登录、当前用户信息。
- * 注册副作用:初始化 6 个技能维度基线分并发送欢迎通知。
+ * 注册副作用:按当前启用的技能维度初始化基线分并发送欢迎通知。
  */
 @Service
 public class AuthService {
 
-    /** 技能评估的固定维度 */
+    /** 默认技能维度:仅用于首次初始化 skill_dimensions 表与演示数据,实际维度以后台配置为准 */
     public static final List<String> SKILL_DIMENSIONS = Arrays.asList(
             "嵌入式开发", "编程能力", "通信技术", "PCB设计", "信号处理", "硬件调试");
 
     private final UserRepository userRepository;
     private final SkillScoreRepository skillScoreRepository;
+    private final SkillScoreEventRepository skillScoreEventRepository;
+    private final SkillService skillService;
     private final NotificationService notificationService;
     private final JwtUtil jwtUtil;
     private final SiteConfigService siteConfigService;
@@ -51,6 +53,8 @@ public class AuthService {
 
     public AuthService(UserRepository userRepository,
                        SkillScoreRepository skillScoreRepository,
+                       SkillScoreEventRepository skillScoreEventRepository,
+                       SkillService skillService,
                        NotificationService notificationService,
                        JwtUtil jwtUtil,
                        SiteConfigService siteConfigService,
@@ -65,6 +69,8 @@ public class AuthService {
                        WeChatService weChatService) {
         this.userRepository = userRepository;
         this.skillScoreRepository = skillScoreRepository;
+        this.skillScoreEventRepository = skillScoreEventRepository;
+        this.skillService = skillService;
         this.notificationService = notificationService;
         this.jwtUtil = jwtUtil;
         this.siteConfigService = siteConfigService;
@@ -117,13 +123,7 @@ public class AuthService {
         user.setRole("STUDENT");
         userRepository.save(user);
 
-        for (String dim : SKILL_DIMENSIONS) {
-            SkillScore s = new SkillScore();
-            s.setUserId(user.getId());
-            s.setSkillName(dim);
-            s.setScore(30);
-            skillScoreRepository.save(s);
-        }
+        skillService.initUser(user.getId());
         notificationService.create(user.getId(), "system", "欢迎加入AI未来实践中心",
                 "完成一次能力测评,开启你的项目驱动学习之旅吧!");
         return new AuthDtos.AuthResponse(jwtUtil.createToken(user.getId(), user.getRole()), user);
@@ -166,13 +166,7 @@ public class AuthService {
             user.setPasswordHash(BCrypt.hashpw(UUID.randomUUID().toString(), BCrypt.gensalt()));
             user.setRole("STUDENT");
             userRepository.save(user);
-            for (String dim : SKILL_DIMENSIONS) {
-                SkillScore s = new SkillScore();
-                s.setUserId(user.getId());
-                s.setSkillName(dim);
-                s.setScore(30);
-                skillScoreRepository.save(s);
-            }
+            skillService.initUser(user.getId());
             notificationService.create(user.getId(), "system", "欢迎加入AI未来实践中心",
                     "你已通过手机号快捷登录完成注册,请到「我的-编辑资料」完善姓名与专业信息。");
         }
@@ -250,6 +244,7 @@ public class AuthService {
         equipmentFavoriteRepository.deleteByUserId(userId);
         discussionRepository.deleteByUserId(userId);
         skillScoreRepository.deleteByUserId(userId);
+        skillScoreEventRepository.deleteByUserId(userId);
         notificationRepository.deleteByUserId(userId);
         userRepository.delete(user);
     }

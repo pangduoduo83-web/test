@@ -19,8 +19,8 @@ import java.util.stream.Collectors;
 
 /**
  * 项目成果提交与评分服务。
- * 评分副作用:>=60 分自动把对应报名进度置为 100(完成),经验值按 score/10 发放,并通知学生;
- * 这些副作用只允许经由 grade() 发生。
+ * 评分副作用:>=60 分自动把对应报名进度置为 100(完成),经验值按 score/10 发放,通知学生,
+ * 并按项目技能要求(及教师确认的 AI 证据)更新学生技能画像;这些副作用只允许经由 grade() 发生。
  */
 @Service
 public class SubmissionService {
@@ -30,17 +30,20 @@ public class SubmissionService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final SkillService skillService;
 
     public SubmissionService(SubmissionRepository submissionRepository,
                              EnrollmentRepository enrollmentRepository,
                              ProjectRepository projectRepository,
                              UserRepository userRepository,
-                             NotificationService notificationService) {
+                             NotificationService notificationService,
+                             SkillService skillService) {
         this.submissionRepository = submissionRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.skillService = skillService;
     }
 
     @Transactional
@@ -127,11 +130,14 @@ public class SubmissionService {
         s.setGradedAt(LocalDateTime.now());
         submissionRepository.save(s);
 
+        Project project = projectRepository.findById(s.getProjectId()).orElse(null);
+        double evidenceWeight = 1.0;
         if (s.getAssessmentName() == null || s.getAssessmentName().isEmpty()) {
             gradeWhole(s, req);
         } else {
-            gradeAssessment(s, req);
+            evidenceWeight = gradeAssessment(s, req, project) / 100.0;
         }
+        skillService.applyProjectEvidence(s, project, req.getSkillEvidence(), evidenceWeight);
         return s;
     }
 
@@ -153,9 +159,10 @@ public class SubmissionService {
     /**
      * 分阶段考核项评分:经验按权重折算;
      * 全部考核项均已评分时计算加权综合分,综合 >=60 判定项目完成。
+     *
+     * @return 该考核项在项目中的权重(0-100),供技能实证按比例折算
      */
-    private void gradeAssessment(Submission s, MiscDtos.GradeRequest req) {
-        Project project = projectRepository.findById(s.getProjectId()).orElse(null);
+    private int gradeAssessment(Submission s, MiscDtos.GradeRequest req, Project project) {
         List<AssessmentItem> assessments = project == null
                 ? java.util.Collections.emptyList() : parseAssessments(project.getAssessments());
         int weight = assessments.stream()
@@ -173,7 +180,7 @@ public class SubmissionService {
 
         // 综合判定:每个考核项取最新一次已评分的提交
         if (assessments.isEmpty()) {
-            return;
+            return weight;
         }
         List<Submission> mine = submissionRepository
                 .findByUserIdAndProjectIdOrderBySubmittedAtDesc(s.getUserId(), s.getProjectId());
@@ -183,7 +190,7 @@ public class SubmissionService {
                     .filter(x -> item.name.equals(x.getAssessmentName()) && "GRADED".equals(x.getStatus()))
                     .findFirst().orElse(null);
             if (latestGraded == null) {
-                return; // 还有考核项未评分,暂不综合
+                return weight; // 还有考核项未评分,暂不综合
             }
             total += latestGraded.getScore() * item.weight / 100.0;
         }
@@ -195,6 +202,7 @@ public class SubmissionService {
         notificationService.create(s.getUserId(), "project", "综合评分出炉",
                 "《" + s.getProjectTitle() + "》全部考核项已评完,加权综合 " + overall + " 分"
                         + (pass ? ",项目已判定完成!" : ",未达 60 分,可完善后重新提交薄弱项。"));
+        return weight;
     }
 
     private void completeEnrollment(Long userId, Long projectId) {

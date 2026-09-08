@@ -48,8 +48,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Bell, ClipboardCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
-  MessageSquareText, Rocket, Settings, ShieldCheck, Sparkles, UserRoundCheck, Users, Wrench
+  Bell, Bot, ClipboardCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
+  MessageSquareText, Radar, Rocket, Settings, ShieldCheck, Sparkles, Store, UserRoundCheck, Users, Wrench
 } from 'lucide-vue-next'
 import { adminStats } from '../../api'
 import { useAuthStore } from '../../stores/auth'
@@ -66,9 +66,12 @@ const menus = [
   { path: '/admin/projects', icon: Rocket, title: '项目管理' },
   { path: '/admin/enrollments', icon: UserRoundCheck, title: '报名进度' },
   { path: '/admin/submissions', icon: ClipboardCheck, title: '成果评审' },
+  { path: '/admin/skill-dimensions', icon: Radar, title: '技能维度' },
   { path: '/admin/notifications', icon: Bell, title: '通知管理' },
   { path: '/admin/discussions', icon: MessageSquareText, title: '讨论管理' },
   { path: '/admin/users', icon: Users, title: '用户管理' },
+  { path: '/admin/store', icon: Store, title: '项目商店' },
+  { path: '/admin/ai-center', icon: Bot, title: 'AI 中心' },
   { path: '/admin/ai-settings', icon: Sparkles, title: 'AI 设置' },
   { path: '/admin/site-settings', icon: Settings, title: '站点设置' }
 ]

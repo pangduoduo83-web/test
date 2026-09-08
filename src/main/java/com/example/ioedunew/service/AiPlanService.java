@@ -7,6 +7,7 @@ import com.example.ioedunew.entity.SkillScore;
 import com.example.ioedunew.repository.EnrollmentRepository;
 import com.example.ioedunew.repository.ProjectRepository;
 import com.example.ioedunew.repository.SkillScoreRepository;
+import com.example.ioedunew.tenant.TenantContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -53,8 +54,9 @@ public class AiPlanService {
     private final AiClient aiClient;
     private final ObjectMapper objectMapper;
 
-    private final Map<Long, CachedPlan> planCache = new ConcurrentHashMap<>();
-    private final Map<Long, Deque<Long>> generateHistory = new ConcurrentHashMap<>();
+    /** 键为 "租户:用户id":各租户库的用户 id 会重复,必须带租户前缀 */
+    private final Map<String, CachedPlan> planCache = new ConcurrentHashMap<>();
+    private final Map<String, Deque<Long>> generateHistory = new ConcurrentHashMap<>();
 
     public AiPlanService(SkillScoreRepository skillScoreRepository,
                          ProjectRepository projectRepository,
@@ -70,7 +72,7 @@ public class AiPlanService {
 
     /** 读取缓存中的学习计划,没有或已过期返回 null */
     public Map<String, Object> getCached(Long userId) {
-        CachedPlan cached = planCache.get(userId);
+        CachedPlan cached = planCache.get(cacheKey(userId));
         if (cached == null || System.currentTimeMillis() - cached.cachedAt > CACHE_TTL_MS) {
             return null;
         }
@@ -81,7 +83,11 @@ public class AiPlanService {
 
     /** 技能重新测评后使计划失效 */
     public void evict(Long userId) {
-        planCache.remove(userId);
+        planCache.remove(cacheKey(userId));
+    }
+
+    private String cacheKey(Long userId) {
+        return TenantContext.require() + ":" + userId;
     }
 
     /** 生成学习计划(AI 优先,失败降级规则) */
@@ -114,7 +120,7 @@ public class AiPlanService {
         }
         plan.put("generatedAt", LocalDateTime.now().format(TIME_FMT));
         plan.put("cached", false);
-        planCache.put(userId, new CachedPlan(plan));
+        planCache.put(cacheKey(userId), new CachedPlan(plan));
         return plan;
     }
 
@@ -354,7 +360,7 @@ public class AiPlanService {
 
     private void checkRate(Long userId) {
         long now = System.currentTimeMillis();
-        Deque<Long> history = generateHistory.computeIfAbsent(userId, (k) -> new ArrayDeque<>());
+        Deque<Long> history = generateHistory.computeIfAbsent(cacheKey(userId), (k) -> new ArrayDeque<>());
         synchronized (history) {
             while (!history.isEmpty() && now - history.peekFirst() > 24 * 3600_000L) {
                 history.pollFirst();

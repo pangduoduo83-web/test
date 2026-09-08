@@ -1,11 +1,14 @@
 <template>
   <view class="page">
     <view class="card intro-card">
-      <text class="intro-title">能力自测评</text>
-      <text class="intro-desc">请根据自己的真实水平拖动滑块打分(0-100),提交后将更新技能画像与学习建议。</text>
+      <text class="intro-title">能力自评</text>
+      <text class="intro-desc">请根据自己的真实水平拖动滑块打分(0-100)。自评只是起点,已有项目评审实证的维度,综合分不会被自评改写。</text>
     </view>
 
     <view class="card block">
+      <view v-if="!form.length" class="empty-box">
+        <text>{{ loadError ? '技能维度加载失败,请稍后重试' : '正在加载技能维度...' }}</text>
+      </view>
       <view v-for="(item, i) in form" :key="item.name" class="assess-item">
         <view class="ai-head">
           <text class="ai-name">{{ item.name }}</text>
@@ -31,8 +34,8 @@
       </view>
     </view>
 
-    <button class="btn-gradient submit-btn" :disabled="submitting" @click="submit">
-      {{ submitting ? '提交中...' : '提交测评' }}
+    <button class="btn-gradient submit-btn" :disabled="submitting || !form.length" @click="submit">
+      {{ submitting ? '提交中...' : '提交自评' }}
     </button>
   </view>
 </template>
@@ -42,8 +45,9 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { fetchSkills, submitAssessment } from '@/api'
 
-const defaultDims = ['嵌入式开发', '编程能力', '通信技术', 'PCB设计', '信号处理', '硬件调试']
-const form = ref(defaultDims.map((name) => ({ name, score: 30 })))
+// 维度由后台配置,完全以接口返回为准;自评滑块默认停在上次自评(没有则停在当前综合分)
+const form = ref([])
+const loadError = ref(false)
 const submitting = ref(false)
 
 const levelText = (v) => (v >= 80 ? '精通' : v >= 60 ? '熟练' : v >= 40 ? '进阶' : '入门')
@@ -51,11 +55,12 @@ const levelText = (v) => (v >= 80 ? '精通' : v >= 60 ? '熟练' : v >= 40 ? '�
 onLoad(async () => {
   try {
     const d = await fetchSkills()
-    if (d.skills && d.skills.length) {
-      form.value = d.skills.map((s) => ({ name: s.skillName, score: s.score }))
-    }
+    form.value = (d.skills || []).map((s) => ({
+      name: s.skillName,
+      score: s.selfScore !== null && s.selfScore !== undefined ? s.selfScore : s.score
+    }))
   } catch (e) {
-    // 用默认维度
+    loadError.value = true
   }
 })
 
@@ -71,7 +76,7 @@ const submit = async () => {
       scores[item.name] = item.score
     })
     await submitAssessment(scores)
-    uni.showToast({ title: '测评完成,画像已更新', icon: 'success' })
+    uni.showToast({ title: '自评已更新', icon: 'success' })
     setTimeout(() => uni.navigateBack(), 600)
   } catch (e) {
     // 已提示

@@ -82,9 +82,19 @@
         <el-descriptions-item label="项目">{{ grading?.projectTitle }}</el-descriptions-item>
         <el-descriptions-item label="成果">{{ grading?.content }}</el-descriptions-item>
       </el-descriptions>
+      <div class="skill-req-bar">
+        <span class="skill-req-label">项目技能要求:</span>
+        <template v-if="gradingRequirements.length">
+          <span v-for="r in gradingRequirements" :key="r.name" class="badge badge-blue">
+            {{ r.name }} ≥ {{ r.required }}
+          </span>
+          <span class="sub-text">评分后将按要求自动校准学生对应维度的技能分</span>
+        </template>
+        <span v-else class="sub-text">该项目未设置技能要求,评分不会自动影响技能画像;可用 AI 预评审提取技能证据</span>
+      </div>
       <div class="ai-review-bar">
         <el-button size="small" :loading="aiReviewing" @click="runAiReview">
-          ✨ AI 预评审(生成建议分+评语草稿)
+          ✨ AI 预评审(建议分 + 评语草稿 + 技能证据)
         </el-button>
         <span v-if="aiResult" class="ai-review-tip">建议 {{ aiResult.suggestedScore }} 分,已填入下方,可修改</span>
       </div>
@@ -100,6 +110,18 @@
         </el-form-item>
         <el-form-item label="评语">
           <el-input v-model="gradeForm.feedback" type="textarea" :rows="4" placeholder="填写改进建议或评价" />
+        </el-form-item>
+        <el-form-item v-if="evidenceRows.length" label="技能证据">
+          <div class="evidence-list">
+            <div v-for="ev in evidenceRows" :key="ev.name" class="evidence-row">
+              <el-checkbox v-model="ev.accepted">{{ ev.name }}</el-checkbox>
+              <el-input-number v-model="ev.level" :min="0" :max="100" size="small" :disabled="!ev.accepted" />
+              <span class="evidence-basis" :title="ev.basis">{{ ev.basis }}</span>
+            </div>
+            <div class="evidence-tip">
+              勾选并确认后,这些维度水平会与项目要求一起计入学生技能画像;不勾选则忽略 AI 判断。
+            </div>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -127,6 +149,16 @@ const gradeForm = reactive({ score: 80, feedback: '' })
 const saving = ref(false)
 const aiReviewing = ref(false)
 const aiResult = ref(null)
+const evidenceRows = ref([])
+
+const arr = (v) => {
+  if (Array.isArray(v)) return v
+  try { return JSON.parse(v || '[]') } catch (e) { return [] }
+}
+const gradingRequirements = computed(() => {
+  const p = projects.value.find((x) => x.id === grading.value?.projectId)
+  return arr(p?.skillRequirements).filter((r) => r && r.name)
+})
 
 const runAiReview = async () => {
   aiReviewing.value = true
@@ -135,7 +167,10 @@ const runAiReview = async () => {
     aiResult.value = res
     gradeForm.score = res.suggestedScore
     if (res.feedbackDraft) gradeForm.feedback = res.feedbackDraft
-    ElMessage.success('AI 预评审完成,建议已填入,可自行调整')
+    evidenceRows.value = (res.skillEvidence || []).map((ev) => ({ ...ev, accepted: true }))
+    ElMessage.success(evidenceRows.value.length
+      ? `AI 预评审完成,建议已填入,并提取到 ${evidenceRows.value.length} 条技能证据,请核对`
+      : 'AI 预评审完成,建议已填入,可自行调整')
   } catch (e) { /* 已提示 */ } finally {
     aiReviewing.value = false
   }
@@ -164,17 +199,24 @@ const openGrade = (row) => {
   gradeForm.score = 80
   gradeForm.feedback = ''
   aiResult.value = null
+  evidenceRows.value = []
   gradeVisible.value = true
 }
 
 const submitGrade = async () => {
+  const accepted = evidenceRows.value.filter((ev) => ev.accepted)
   await ElMessageBox.confirm(
-    `确认给该成果评 ${gradeForm.score} 分?评分后不可重复操作。`,
+    `确认给该成果评 ${gradeForm.score} 分?评分后不可重复操作。`
+      + (accepted.length ? `同时确认 ${accepted.length} 条技能证据计入学生画像。` : ''),
     '提交评分', { type: 'warning' })
   saving.value = true
   try {
-    await adminGradeSubmission(grading.value.id, gradeForm)
-    ElMessage.success('评分完成,学生已收到通知')
+    await adminGradeSubmission(grading.value.id, {
+      score: gradeForm.score,
+      feedback: gradeForm.feedback,
+      skillEvidence: accepted.map((ev) => ({ name: ev.name, level: ev.level }))
+    })
+    ElMessage.success('评分完成,学生已收到通知,技能画像已同步更新')
     gradeVisible.value = false
     await load()
   } finally {
@@ -209,4 +251,14 @@ onMounted(async () => {
 .ai-review-line.good { color: #16a34a; }
 .ai-review-line.bad { color: #ca8a04; }
 .ai-review-note { font-size: 11px; color: #9ca3af; }
+.skill-req-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px; }
+.skill-req-label { color: var(--text-secondary); }
+.evidence-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.evidence-row { display: flex; align-items: center; gap: 10px; }
+.evidence-row :deep(.el-checkbox) { width: 96px; margin-right: 0; }
+.evidence-basis {
+  flex: 1; min-width: 0; font-size: 12px; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.evidence-tip { font-size: 11px; color: #9ca3af; line-height: 1.5; }
 </style>

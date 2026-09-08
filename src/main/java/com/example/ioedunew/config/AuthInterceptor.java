@@ -2,6 +2,7 @@ package com.example.ioedunew.config;
 
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.UserRepository;
+import com.example.ioedunew.tenant.TenantContext;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -65,6 +66,13 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
             return reject(response, 401, "令牌无效或已过期");
         }
+        // 令牌必须在当前站点(租户)签发:各租户库的用户 id 会重复,跨站点使用即越权
+        if (!TenantContext.require().equals(user.getTenant())) {
+            if (publicBrowse) {
+                return true;
+            }
+            return reject(response, 401, "令牌与当前站点不匹配,请重新登录");
+        }
         User current = userRepository.findById(user.getId()).orElse(null);
         if (current == null) {
             if (publicBrowse) {
@@ -79,7 +87,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             return reject(response, 401, "账号已被禁用,请联系管理员");
         }
         // JWT 仅用于确认身份,角色权限始终以数据库中的当前值为准。
-        user = new AuthUser(current.getId(), current.getRole());
+        user = new AuthUser(current.getId(), current.getRole(), user.getTenant());
         if (uri.startsWith("/api/admin/") && !user.isAdmin()) {
             return reject(response, 403, "需要管理员权限");
         }

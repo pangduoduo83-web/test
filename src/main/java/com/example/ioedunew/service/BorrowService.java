@@ -227,9 +227,25 @@ public class BorrowService {
         return br;
     }
 
+    /**
+     * 借阅编号:BR + 日期 + 6 位随机大写字母数字(去除易混淆字符)。
+     * 不依赖行数,并发申请或历史记录被删除后也不会撞唯一键;极小概率重复时重新生成。
+     */
     private String generateRequestNo() {
         String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long seq = borrowRepository.count() + 1;
-        return "BR" + date + String.format("%04d", seq);
+        for (int attempt = 0; attempt < 5; attempt++) {
+            StringBuilder sb = new StringBuilder("BR").append(date);
+            for (int i = 0; i < 6; i++) {
+                sb.append(REQUEST_NO_ALPHABET.charAt(RANDOM.nextInt(REQUEST_NO_ALPHABET.length())));
+            }
+            String candidate = sb.toString();
+            if (!borrowRepository.existsByRequestNo(candidate)) {
+                return candidate;
+            }
+        }
+        throw new BusinessException(500, "借阅编号生成失败,请重试");
     }
+
+    private static final String REQUEST_NO_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
 }

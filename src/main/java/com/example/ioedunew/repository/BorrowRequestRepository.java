@@ -22,5 +22,7 @@ public interface BorrowRequestRepository extends JpaRepository<BorrowRequest, Lo
 
     boolean existsByUserId(Long userId);
 
+    boolean existsByRequestNo(String requestNo);
+
     void deleteByUserId(Long userId);
 }

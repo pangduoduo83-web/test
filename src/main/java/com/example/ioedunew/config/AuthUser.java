@@ -5,6 +5,7 @@ import lombok.Data;
 
 /**
  * 认证上下文用户:由拦截器解析 JWT 后写入请求属性。
+ * tenant 为签发令牌时所在的租户编码,拦截器会校验它与当前请求解析出的租户一致。
  */
 @Data
 @AllArgsConstructor
@@ -14,6 +15,7 @@ public class AuthUser {
 
     private Long id;
     private String role;
+    private String tenant;
 
     public boolean isAdmin() {
         return "ADMIN".equals(role);

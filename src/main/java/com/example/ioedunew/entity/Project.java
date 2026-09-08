@@ -164,6 +164,11 @@ public class Project {
     @Column(nullable = false, length = 20)
     private String status = "PUBLISHED";
 
+    /** 来自项目商店的条目 id 与安装/发布时的版本号(上游指针);本地原创项目为空 */
+    private Long hubItemId;
+
+    private Integer hubVersionNo;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

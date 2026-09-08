@@ -134,7 +134,12 @@
               <el-button size="small" plain @click="skillRows.push({ name: '', required: 50 })">+ 添加技能</el-button>
             </div>
             <div v-for="(s, i) in skillRows" :key="i" class="adv-row">
-              <el-input v-model="s.name" placeholder="技能名称,如: 嵌入式开发" class="grow" />
+              <el-select v-model="s.name" placeholder="选择技能维度(在「技能维度」中维护)" filterable class="grow">
+                <el-option v-for="d in skillDimensionOptions" :key="d.name" :label="d.name" :value="d.name">
+                  <span>{{ d.name }}</span>
+                  <span v-if="!d.enabled" class="option-muted">(已停用)</span>
+                </el-option>
+              </el-select>
               <span class="row-label">掌握度</span>
               <el-input-number v-model="s.required" :min="0" :max="100" :step="5" class="num-narrow" />
               <el-button size="small" text type="danger" @click="skillRows.splice(i, 1)">删除</el-button>
@@ -219,7 +224,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  adminCreateProject, adminDeleteProject, adminListProjects, adminListUsers,
+  adminCreateProject, adminDeleteProject, adminListProjects, adminListSkillDimensions, adminListUsers,
   adminUpdateProject, fetchEquipment, uploadDocFile
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
@@ -260,6 +265,16 @@ const skillRows = ref([])      // {name, required}
 const syllabusRows = ref([])   // {phase, title, content, hours}
 const bomRows = ref([])        // {ref, name, qty, footprint, price}
 const resourceRows = ref([])   // {type, name, url}
+
+// 技能维度来自后台配置;老项目里若引用了已不存在的名称,仍作为选项保留以免保存时丢失
+const skillDimensions = ref([])
+const skillDimensionOptions = computed(() => {
+  const list = [...skillDimensions.value]
+  skillRows.value.forEach((s) => {
+    if (s.name && !list.some((d) => d.name === s.name)) list.push({ name: s.name, enabled: false })
+  })
+  return list
+})
 
 const splitText = (t) => t ? t.split(/[,，]/).map((s) => s.trim()).filter(Boolean) : []
 const joinArr = (v) => Array.isArray(v) ? v.join(',') : ''
@@ -449,6 +464,9 @@ onMounted(() => {
   loadSiteConfig()
   load()
   loadTeachers()
+  adminListSkillDimensions()
+    .then((list) => { skillDimensions.value = list })
+    .catch(() => {})
   fetchEquipment({})
     .then((list) => {
       equipmentOptions.value = list.map((e) => e.name)
@@ -481,6 +499,7 @@ onMounted(() => {
 .adv-row .num-narrow { width: 110px; flex-shrink: 0; }
 .adv-row .res-type-sel { width: 100px; flex-shrink: 0; }
 .row-label { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
+.option-muted { margin-left: 6px; font-size: 12px; color: #9ca3af; }
 .syllabus-item { padding: 10px 12px; background: #f9fafb; border-radius: 8px; margin-bottom: 10px; }
 .empty-hint { font-size: 12px; color: #9ca3af; margin: 0; }
 </style>

@@ -2,11 +2,9 @@ package com.example.ioedunew.service;
 
 import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.entity.Enrollment;
-import com.example.ioedunew.entity.SkillScore;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.BorrowRequestRepository;
 import com.example.ioedunew.repository.EnrollmentRepository;
-import com.example.ioedunew.repository.SkillScoreRepository;
 import com.example.ioedunew.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
@@ -25,16 +23,16 @@ public class DashboardService {
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final BorrowRequestRepository borrowRepository;
-    private final SkillScoreRepository skillScoreRepository;
+    private final SkillService skillService;
 
     public DashboardService(UserRepository userRepository,
                             EnrollmentRepository enrollmentRepository,
                             BorrowRequestRepository borrowRepository,
-                            SkillScoreRepository skillScoreRepository) {
+                            SkillService skillService) {
         this.userRepository = userRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.borrowRepository = borrowRepository;
-        this.skillScoreRepository = skillScoreRepository;
+        this.skillService = skillService;
     }
 
     public Map<String, Object> overview(Long userId) {
@@ -45,8 +43,7 @@ public class DashboardService {
         long completedCount = enrollmentRepository.countByUserIdAndStatus(userId, "COMPLETED");
         long borrowTotal = borrowRepository.countByUserId(userId);
 
-        List<SkillScore> skills = skillScoreRepository.findByUserId(userId);
-        int skillAvg = (int) Math.round(skills.stream().mapToInt(SkillScore::getScore).average().orElse(0));
+        int skillAvg = skillService.overall(userId);
 
         List<Map<String, Object>> achievements = buildAchievements(enrollCount, borrowTotal, completedCount);
         long unlocked = achievements.stream().filter(a -> Boolean.TRUE.equals(a.get("unlocked"))).count();

@@ -1,6 +1,7 @@
 package com.example.ioedunew.service;
 
 import com.example.ioedunew.common.BusinessException;
+import com.example.ioedunew.common.SecretCrypto;
 import com.example.ioedunew.entity.SystemSetting;
 import com.example.ioedunew.repository.SystemSettingRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,7 @@ public class AiConfigService {
     private static final String KEY_READ_TIMEOUT = "ai.readTimeoutMs";
 
     private final SystemSettingRepository repository;
+    private final SecretCrypto crypto;
 
     @Value("${ioedu.ai.base-url}")
     private String envBaseUrl;
@@ -46,17 +48,19 @@ public class AiConfigService {
     @Value("${ioedu.ai.read-timeout-ms}")
     private int envReadTimeoutMs;
 
-    public AiConfigService(SystemSettingRepository repository) {
+    public AiConfigService(SystemSettingRepository repository, SecretCrypto crypto) {
         this.repository = repository;
+        this.crypto = crypto;
     }
 
-    /** 当前生效配置(DB 优先,env 兜底) */
+    /** 当前生效配置(DB 优先,env 兜底);库内 API Key 加密存储,历史明文仍可读 */
     public AiConfig effective() {
         Map<String, String> db = loadAll();
         AiConfig cfg = new AiConfig();
         cfg.baseUrl = firstNonBlank(db.get(KEY_BASE_URL), envBaseUrl);
-        cfg.apiKey = firstNonBlank(db.get(KEY_API_KEY), envApiKey);
-        cfg.apiKeySource = isBlank(db.get(KEY_API_KEY)) ? (isBlank(envApiKey) ? "NONE" : "ENV") : "DB";
+        String dbKey = crypto.decrypt(db.get(KEY_API_KEY));
+        cfg.apiKey = firstNonBlank(dbKey, envApiKey);
+        cfg.apiKeySource = isBlank(dbKey) ? (isBlank(envApiKey) ? "NONE" : "ENV") : "DB";
         cfg.model = firstNonBlank(db.get(KEY_MODEL), envModel);
         cfg.maxTokens = parseInt(db.get(KEY_MAX_TOKENS), 2000);
         cfg.temperature = parseDouble(db.get(KEY_TEMPERATURE), 0.4);
@@ -112,7 +116,7 @@ public class AiConfigService {
         if (body.get("apiKey") != null) {
             String v = String.valueOf(body.get("apiKey")).trim();
             if (!v.isEmpty()) {
-                put(KEY_API_KEY, v);
+                put(KEY_API_KEY, crypto.encrypt(v));
             }
         }
         if (body.get("maxTokens") != null) {

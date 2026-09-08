@@ -14,21 +14,25 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.mindrot.jbcrypt.BCrypt;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
+import java.security.SecureRandom;
 
 /**
- * 启动种子数据:首次启动(用户表为空)时初始化管理员、演示学生、
- * 参考站的 10 个开源硬件项目与 10 台实验设备。
- * 幂等性:任何一次成功初始化后不再重复执行。
+ * 租户库初始数据(由 PlatformBootstrap 在启动时对每个租户、由 TenantProvisioningService 在开通时调用,
+ * 调用方负责先绑定 TenantContext)。
+ * 用户表为空时创建初始管理员:密码未给出则随机生成并以 WARN 打印一次,生产环境不再有固定默认口令。
+ * 演示数据(演示师生账号、10 个开源硬件项目、12 台设备)仅在 demo=true 时写入,
+ * 老库的演示数据字段回填也只在该开关打开时进行,避免把客户删掉的演示账号/设备补回来。
  */
 @Slf4j
 @Component
-public class DataSeeder implements CommandLineRunner {
+public class DataSeeder {
+
+    private static final String PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
 
     private final UserRepository userRepository;
     private final EquipmentRepository equipmentRepository;
@@ -51,25 +55,48 @@ public class DataSeeder implements CommandLineRunner {
         this.objectMapper = objectMapper;
     }
 
-    @Override
+    /**
+     * 对当前租户库执行初始化:用户表为空时创建管理员(及可选演示数据),
+     * 否则仅在演示模式下做演示数据的字段回填。返回实际使用的管理员初始密码(仅新建时非 null)。
+     */
     @Transactional
-    public void run(String... args) throws Exception {
+    public String seedIfEmpty(String email, String password, boolean demo) throws Exception {
         if (userRepository.count() > 0) {
-            upgradeExistingData();
-            return;
+            if (demo) {
+                upgradeDemoData();
+            }
+            return null;
         }
-        log.info("首次启动,开始初始化种子数据...");
+        String effectivePassword = seedAdmin(email, password);
+        if (demo) {
+            seedDemoData();
+        }
+        return effectivePassword;
+    }
 
+    private String seedAdmin(String email, String password) {
+        boolean generated = password == null || password.trim().isEmpty();
+        String effective = generated ? randomPassword(16) : password.trim();
         User admin = new User();
         admin.setName("系统管理员");
-        admin.setEmail("admin@ioedu.cn");
-        admin.setPasswordHash(BCrypt.hashpw("admin123", BCrypt.gensalt()));
+        admin.setEmail(email == null || email.trim().isEmpty() ? "admin@ioedu.cn" : email.trim());
+        admin.setPasswordHash(BCrypt.hashpw(effective, BCrypt.gensalt()));
         admin.setRole("ADMIN");
         admin.setMajor("实验室管理");
         admin.setGrade("教师");
         admin.setStudentNo("T0001");
         userRepository.save(admin);
+        if (generated) {
+            log.warn("首次启动已创建管理员 {},随机初始密码为: {}  —— 请立即登录修改,本密码只显示这一次",
+                    admin.getEmail(), effective);
+        } else {
+            log.info("首次启动已创建管理员 {}(密码来自配置)", admin.getEmail());
+        }
+        return effective;
+    }
 
+    private void seedDemoData() throws Exception {
+        log.info("演示模式:开始写入演示数据...");
         User student = new User();
         student.setName("张同学");
         student.setEmail("zhang@stu.ioedu.cn");
@@ -102,7 +129,16 @@ public class DataSeeder implements CommandLineRunner {
         notificationService.create(student.getId(), "project", "新项目上线:ESP32-S3 AI开发板",
                 "边缘 AI + 语音识别挑战项目已上线,快去项目中心看看!");
 
-        log.info("种子数据初始化完成:设备 {} 台,项目 {} 个", equipmentRepository.count(), projectRepository.count());
+        log.info("演示数据写入完成:设备 {} 台,项目 {} 个", equipmentRepository.count(), projectRepository.count());
+    }
+
+    private String randomPassword(int length) {
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(PASSWORD_ALPHABET.charAt(random.nextInt(PASSWORD_ALPHABET.length())));
+        }
+        return sb.toString();
     }
 
     /** 演示教师账号:与种子项目的 mentor 字段一一对应 */
@@ -139,28 +175,10 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     /**
-     * 老库升级:种子已初始化过时,按名称/标题回填新增字段(封面图、Fork 数、PCB 尺寸、
-     * 分类改名、讲师账号与 mentorId),并插入种子中新增而库里缺失的设备。
-     * 仅补空值,不覆盖管理员已改的数据。
+     * 演示库升级:按名称/标题回填种子中新增的字段(封面图、Fork 数、PCB 尺寸、分类改名、mentorId),
+     * 并插入种子中新增而库里缺失的设备。仅补空值,不覆盖管理员已改的数据;不再补建被删除的演示账号。
      */
-    private void upgradeExistingData() throws Exception {
-        // 补建缺失的教师账号(按邮箱判重)
-        for (String[] t : TEACHERS) {
-            if (!userRepository.findByEmail(t[1]).isPresent()) {
-                User teacher = new User();
-                teacher.setName(t[0]);
-                teacher.setEmail(t[1]);
-                teacher.setPasswordHash(BCrypt.hashpw("123456", BCrypt.gensalt()));
-                teacher.setRole("TEACHER");
-                teacher.setStudentNo(t[2]);
-                teacher.setMajor("电子信息工程");
-                teacher.setGrade("教师");
-                userRepository.save(teacher);
-                log.info("老库升级:补建教师账号 {}", t[1]);
-            }
-        }
-
-        // 回填项目 mentorId(按讲师姓名匹配)
+    private void upgradeDemoData() throws Exception {
         for (Project p : projectRepository.findAll()) {
             if (p.getMentorId() == null && p.getMentor() != null) {
                 Long mentorId = teacherIdByName(p.getMentor());

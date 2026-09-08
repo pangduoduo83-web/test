@@ -6,7 +6,6 @@ import com.example.ioedunew.entity.Discussion;
 import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.Equipment;
 import com.example.ioedunew.entity.Project;
-import com.example.ioedunew.entity.SkillScore;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.BorrowRequestRepository;
 import com.example.ioedunew.repository.DiscussionRepository;
@@ -16,6 +15,7 @@ import com.example.ioedunew.repository.EnrollmentRepository;
 import com.example.ioedunew.repository.FavoriteRepository;
 import com.example.ioedunew.repository.NotificationRepository;
 import com.example.ioedunew.repository.ProjectRepository;
+import com.example.ioedunew.repository.SkillScoreEventRepository;
 import com.example.ioedunew.repository.SkillScoreRepository;
 import com.example.ioedunew.repository.SubmissionRepository;
 import com.example.ioedunew.repository.UserRepository;
@@ -48,6 +48,8 @@ public class AdminService {
     private final FavoriteRepository favoriteRepository;
     private final DiscussionRepository discussionRepository;
     private final SkillScoreRepository skillScoreRepository;
+    private final SkillScoreEventRepository skillScoreEventRepository;
+    private final SkillService skillService;
     private final NotificationRepository notificationRepository;
     private final EquipmentFavoriteRepository equipmentFavoriteRepository;
     private final ProjectService projectService;
@@ -63,6 +65,8 @@ public class AdminService {
                         FavoriteRepository favoriteRepository,
                         DiscussionRepository discussionRepository,
                         SkillScoreRepository skillScoreRepository,
+                        SkillScoreEventRepository skillScoreEventRepository,
+                        SkillService skillService,
                         NotificationRepository notificationRepository,
                         EquipmentFavoriteRepository equipmentFavoriteRepository,
                         ProjectService projectService,
@@ -77,6 +81,8 @@ public class AdminService {
         this.favoriteRepository = favoriteRepository;
         this.discussionRepository = discussionRepository;
         this.skillScoreRepository = skillScoreRepository;
+        this.skillScoreEventRepository = skillScoreEventRepository;
+        this.skillService = skillService;
         this.notificationRepository = notificationRepository;
         this.equipmentFavoriteRepository = equipmentFavoriteRepository;
         this.projectService = projectService;
@@ -188,13 +194,7 @@ public class AdminService {
         user.setEnabled(req.getEnabled() == null || req.getEnabled());
         userRepository.save(user);
 
-        for (String dimension : AuthService.SKILL_DIMENSIONS) {
-            SkillScore score = new SkillScore();
-            score.setUserId(user.getId());
-            score.setSkillName(dimension);
-            score.setScore(30);
-            skillScoreRepository.save(score);
-        }
+        skillService.initUser(user.getId());
         return user;
     }
 
@@ -272,6 +272,7 @@ public class AdminService {
         equipmentFavoriteRepository.deleteByUserId(id);
         discussionRepository.deleteByUserId(id);
         skillScoreRepository.deleteByUserId(id);
+        skillScoreEventRepository.deleteByUserId(id);
         notificationRepository.deleteByUserId(id);
         userRepository.delete(user);
     }

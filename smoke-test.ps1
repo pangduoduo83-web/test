@@ -1,6 +1,9 @@
 ﻿# 端到端冒烟测试:跑通学生 + 管理员全部核心链路(对本地 8080)
+# 后端需以 dev profile 启动(含演示数据);管理员账号可用环境变量 IOEDU_ADMIN_EMAIL / IOEDU_ADMIN_PASSWORD 覆盖
 $ErrorActionPreference = 'Stop'
-$base = 'http://localhost:8080/api'
+$base = if ($env:IOEDU_SMOKE_BASE) { $env:IOEDU_SMOKE_BASE } else { 'http://localhost:8080/api' }
+$adminEmail = if ($env:IOEDU_ADMIN_EMAIL) { $env:IOEDU_ADMIN_EMAIL } else { 'admin@ioedu.cn' }
+$adminPassword = if ($env:IOEDU_ADMIN_PASSWORD) { $env:IOEDU_ADMIN_PASSWORD } else { 'admin123' }
 $pass = @()
 $fail = @()
 
@@ -21,7 +24,7 @@ $pass += '学生登录'
 
 # 2. 管理员登录
 $a = Invoke-RestMethod "$base/auth/login" -Method Post -ContentType 'application/json' `
-  -Body '{"email":"admin@ioedu.cn","password":"admin123"}'
+  -Body (@{ email = $adminEmail; password = $adminPassword } | ConvertTo-Json)
 $ah = @{ Authorization = "Bearer $($a.data.token)" }
 $pass += '管理员登录'
 
