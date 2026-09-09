@@ -1,0 +1,3 @@
+# Optional: connect to a *separately running* kcaa MCP server (KCAA_MODE=mcp).
+# NOTE: conflicts with the `kcaa` package (needs mcp<2); use a venv without kcaa.
+langchain-mcp-adapters>=0.3.2

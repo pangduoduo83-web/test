@@ -45,12 +45,14 @@ public class BigScreenService {
     private final LearningActivityRepository activityRepository;
     private final AiUsageDailyRepository aiUsageRepository;
     private final SiteConfigService siteConfigService;
+    private final KicadAiClient kicadAiClient;
 
     public BigScreenService(UserRepository userRepository, ProjectRepository projectRepository,
                             EnrollmentRepository enrollmentRepository, SubmissionRepository submissionRepository,
                             BorrowRequestRepository borrowRepository, EquipmentRepository equipmentRepository,
                             LearningActivityRepository activityRepository, AiUsageDailyRepository aiUsageRepository,
-                            SiteConfigService siteConfigService) {
+                            SiteConfigService siteConfigService, KicadAiClient kicadAiClient) {
+        this.kicadAiClient = kicadAiClient;
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
         this.enrollmentRepository = enrollmentRepository;
@@ -146,6 +148,8 @@ public class BigScreenService {
             }
         }
         out.put("ai", map("runsToday", aiRunsToday, "runsMonth", aiRunsMonth, "tokensMonth", aiTokensMonth));
+        // KiCad AI 设计助手(独立服务,按站点隔离);未部署或不可达为 null
+        out.put("kicad", kicadAiClient.tenantStats());
 
         // ---------- 特别提醒 ----------
         List<Map<String, Object>> alerts = new ArrayList<>();

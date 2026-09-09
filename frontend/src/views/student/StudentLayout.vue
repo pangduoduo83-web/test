@@ -146,6 +146,14 @@
               <span class="menu-desc">{{ m.desc }}</span>
             </span>
           </router-link>
+          <!-- KiCad AI 设计助手是独立子系统,同域 /kicad/ 下,复用本站登录态,新标签打开 -->
+          <a href="/kicad/app" target="_blank" class="menu-item menu-external">
+            <span class="menu-icon"><CircuitBoard :size="19" /></span>
+            <span class="menu-text">
+              <span class="menu-title">KiCad 设计助手 ↗</span>
+              <span class="menu-desc">AI 画原理图与 PCB</span>
+            </span>
+          </a>
         </nav>
 
         <!-- 本周学习统计(来自学习活动日志) -->
@@ -219,7 +227,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  BarChart3, Bell, BookOpen, Bookmark, Bot, ClipboardList, GraduationCap,
+  BarChart3, Bell, BookOpen, Bookmark, Bot, CircuitBoard, ClipboardList, GraduationCap,
   HelpCircle, LogOut, Megaphone, Package, Rocket, School, Search, Settings, User, Wrench
 } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
@@ -494,6 +502,8 @@ onUnmounted(() => {
 }
 .menu-item:hover { background: #f9fafb; }
 .menu-item.active { background: #eff6ff; }
+.menu-external { text-decoration: none; border-top: 1px dashed var(--border); border-radius: 0 0 10px 10px; margin-top: 4px; padding-top: 12px; }
+.menu-external .menu-icon { color: #0e7490; }
 .menu-item.active .menu-title { color: #1d4ed8; }
 .menu-item.active .menu-desc { color: #3b82f6; }
 .menu-icon { color: #6b7280; display: flex; align-items: center; }

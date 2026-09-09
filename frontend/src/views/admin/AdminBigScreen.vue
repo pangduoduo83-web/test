@@ -149,6 +149,9 @@
                 <div class="kv"><b><CountUp :value="data.ai.runsToday" /></b><span>今日 AI</span></div>
                 <div class="kv"><b>{{ fmtK(data.ai.tokensMonth) }}</b><span>本月 Token</span></div>
                 <div class="kv"><b><CountUp :value="data.users.newThisWeek" /></b><span>本周新用户</span></div>
+                <div class="kv kicad"><b>{{ data.kicad ? data.kicad.conversations : '–' }}</b><span>KiCad 设计对话</span></div>
+                <div class="kv kicad"><b>{{ data.kicad ? fmtK(data.kicad.toolCalls) : '–' }}</b><span>KiCad 工具调用</span></div>
+                <div class="kv kicad"><b>{{ data.kicad ? data.kicad.online : '–' }}</b><span>KiCad 在线</span></div>
               </div>
             </div>
           </div>
@@ -196,6 +199,7 @@ const empty = () => ({
   grades: { submitted: 0, pending: 0, returned: 0, graded: 0, avgScore: 0, failing: 0, excellent: 0, passRate: 0 },
   equipment: { kinds: 0, totalUnits: 0, availableUnits: 0, utilization: 0, borrowing: 0, pending: 0, overdue: 0, outOfStock: 0 },
   ai: { runsToday: 0, runsMonth: 0, tokensMonth: 0 },
+  kicad: null,
   alerts: [], students: [], projectCards: [], trend: [], feed: []
 })
 const data = ref(empty())
@@ -496,12 +500,13 @@ b, .num b, .kv b, .alert-count, .time, .pct { font-family: 'Bahnschrift', 'DIN A
 .box-title em { font-style: normal; font-size: 10px; letter-spacing: 2px; color: rgba(143, 182, 214, .6); font-weight: 400; margin-left: auto; padding-right: 30px; background: repeating-linear-gradient(-45deg, rgba(34, 225, 255, .35) 0 2px, transparent 2px 6px) right center / 24px 10px no-repeat; }
 .chart-box { display: flex; flex-direction: column; }
 .chart { flex: 1; min-height: 0; margin: 4px 8px 6px; }
-.gauge-row { display: grid; grid-template-columns: 1fr 190px; height: 186px; }
+.gauge-row { display: grid; grid-template-columns: 1fr 210px; height: 186px; }
 .gauges { width: 100%; height: 100%; }
-.kv-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 4px; padding: 10px 12px 8px 0; align-content: center; }
+.kv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 2px; padding: 8px 10px 6px 0; align-content: center; }
 .kv { text-align: center; }
-.kv b { display: block; font-size: 24px; line-height: 1; color: var(--cy); }
-.kv > span { display: block; margin-top: 4px; font-size: 11px; color: var(--txt-dim); }
+.kv b { display: block; font-size: 20px; line-height: 1; color: var(--cy); }
+.kv > span { display: block; margin-top: 3px; font-size: 10px; color: var(--txt-dim); white-space: nowrap; }
+.kv.kicad b { color: var(--grn); }
 .kv.warn b { color: var(--amb); } .kv.bad b { color: var(--red); animation: pulse 1.6s infinite; }
 .feed-box { min-height: 0; display: flex; flex-direction: column; }
 .feed-viewport { flex: 1; min-height: 0; overflow: hidden; margin: 6px 0 8px; mask-image: linear-gradient(180deg, transparent, #000 8%, #000 92%, transparent); }

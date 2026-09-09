@@ -1,0 +1,53 @@
+{
+  "board": {
+    "design_settings": {
+      "defaults": {
+        "board_outline_line_width": 0.05,
+        "copper_line_width": 0.2,
+        "silk_line_width": 0.12
+      },
+      "rules": {
+        "min_clearance": 0.2,
+        "min_copper_edge_clearance": 0.5,
+        "min_hole_clearance": 0.25,
+        "min_track_width": 0.2,
+        "min_via_diameter": 0.6,
+        "min_via_annular_width": 0.1
+      }
+    }
+  },
+  "meta": {
+    "filename": "power_module.kicad_pro",
+    "version": 3
+  },
+  "net_settings": {
+    "classes": [
+      {
+        "name": "Default",
+        "clearance": 0.2,
+        "track_width": 0.25,
+        "via_diameter": 0.8,
+        "via_drill": 0.4
+      },
+      {
+        "name": "Power",
+        "clearance": 0.25,
+        "track_width": 0.5,
+        "via_diameter": 1.0,
+        "via_drill": 0.5
+      }
+    ],
+    "meta": { "version": 4 },
+    "netclass_patterns": [
+      { "netclass": "Power", "pattern": "VIN" },
+      { "netclass": "Power", "pattern": "+3V3" },
+      { "netclass": "Power", "pattern": "GND" }
+    ]
+  },
+  "schematic": {
+    "legacy_lib_dir": "",
+    "legacy_lib_list": []
+  },
+  "sheets": [["00000000-0000-0000-0000-000000000000", "Root"]],
+  "text_variables": {}
+}

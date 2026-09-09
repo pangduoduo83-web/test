@@ -1,0 +1,26 @@
+# Overlay: PostgreSQL for application tables + LangGraph checkpoints/store.
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kicad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kicad}
+      POSTGRES_DB: ${POSTGRES_DB:-kicad_ai}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kicad}"]
+      interval: 5s
+      retries: 12
+
+  app:
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-kicad}:${POSTGRES_PASSWORD:-kicad}@db:5432/${POSTGRES_DB:-kicad_ai}
+
+volumes:
+  pgdata:

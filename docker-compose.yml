@@ -42,6 +42,8 @@ services:
       IOEDU_PLATFORM_DB: ${PLATFORM_DB:-ioedu_platform}
       # 项目商店:后端调用 hub 的内网地址;库内密钥加密主密钥(保存商店 API Key / 大模型 Key 时必需)
       IOEDU_HUB_BASE_URL: ${HUB_BASE_URL:-http://hub:8081}
+      # KiCad AI 设计助手内网地址(大屏 / 管理端拉用量),内部令牌与 PLATFORM_TOKEN 相同
+      IOEDU_KICAD_AI_URL: ${KICAD_AI_URL:-http://kicad-ai:8000}
       IOEDU_MASTER_KEY: ${MASTER_KEY:-}
       # 微信小程序(不用小程序可留空)
       IOEDU_WECHAT_APPID: ${WECHAT_APPID:-}
@@ -108,6 +110,50 @@ services:
           memory: ${HUB_MEMORY:-1024M}
     restart: unless-stopped
 
+  # KiCad AI 设计助手:独立 Python 服务(FastAPI + LangGraph + kicad-cli,官方 KiCad 10 镜像),
+  # 挂在同域 /kicad/ 子路径,复用本站登录态(接受主系统 JWT),用户 / 工程 / 对话按站点隔离
+  kicad-ai:
+    image: ${IOEDU_KICAD_IMAGE:-ioedu-kicad-ai:latest}
+    build:
+      context: ./kicad-ai
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com/}
+        KICAD_IMAGE_TAG: ${KICAD_IMAGE_TAG:-10.0.5}
+        APT_MIRROR: ${APT_MIRROR:-mirrors.aliyun.com}
+    container_name: ioedu-kicad-ai
+    environment:
+      TZ: Asia/Shanghai
+      DATA_DIR: /data
+      WORKSPACE_ROOT: /data/workspaces
+      CORS_ORIGINS: '["*"]'
+      # 账号全部来自主系统单点登录,关闭本地注册
+      ALLOW_REGISTRATION: "false"
+      JWT_SECRET: ${KICAD_JWT_SECRET:-${JWT_SECRET}}
+      IOEDU_JWT_SECRET: ${JWT_SECRET}
+      IOEDU_API_URL: http://backend:8080
+      IOEDU_INTERNAL_TOKEN: ${PLATFORM_TOKEN:-}
+      IOEDU_DEFAULT_TENANT: default
+      # 大模型:默认沿用主系统的 DeepSeek 配置,也可用 KICAD_LLM_* 单独指定
+      LLM_PROVIDER: ${KICAD_LLM_PROVIDER:-custom}
+      LLM_BASE_URL: ${KICAD_LLM_BASE_URL:-https://api.deepseek.com}
+      LLM_API_KEY: ${KICAD_LLM_API_KEY:-${AI_API_KEY:-}}
+      LLM_MODEL: ${KICAD_LLM_MODEL:-${AI_MODEL:-deepseek-chat}}
+      LLM_THINKING: ${KICAD_LLM_THINKING:-off}
+      KCAA_MODE: ${KCAA_MODE:-direct}
+      KICAD_VERSION: "10.0"
+      KICAD_APP_PATH: /usr/share/kicad
+    volumes:
+      - ioedu-kicad-data:/data
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: ${KICAD_MEMORY:-3072M}
+    restart: unless-stopped
+
   frontend:
     build: ./frontend
     container_name: ioedu-frontend
@@ -124,3 +170,4 @@ volumes:
   ioedu-mysql-data:
   ioedu-uploads:
   ioedu-hub-assets:
+  ioedu-kicad-data:

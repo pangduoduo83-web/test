@@ -1,0 +1,5 @@
+# Optional: production persistence on PostgreSQL
+# pip install -r requirements-postgres.txt
+langgraph-checkpoint-postgres>=3.1.2
+psycopg[binary,pool]>=3.2
+asyncpg>=0.30

@@ -1,0 +1,31 @@
+# KiCad AI Assistant — production compose (single app container, SQLite on a named volume).
+# The upstream KiCad-AI-Assistant (kcaa) tools run in-process inside `app` — no MCP server needed.
+#   docker compose up -d --build
+# Add PostgreSQL:  docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d --build
+services:
+  app:
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+        # Official KiCad runtime tag. Pin a patch for reproducible production builds.
+        KICAD_IMAGE_TAG: ${KICAD_IMAGE_TAG:-10.0.5}
+        # Debian mirror host for the Python runtime packages; empty = deb.debian.org
+        APT_MIRROR: ${APT_MIRROR:-}
+    image: ki-agent/app:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      WORKSPACE_ROOT: /data/workspaces
+      CORS_ORIGINS: '["*"]'
+      KCAA_MODE: ${KCAA_MODE:-direct}
+      KICAD_VERSION: ${KICAD_VERSION:-10.0}
+    volumes:
+      - appdata:/data
+    ports:
+      - "${APP_PORT:-8000}:8000"
+
+volumes:
+  appdata:

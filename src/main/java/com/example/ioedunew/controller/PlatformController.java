@@ -36,15 +36,21 @@ public class PlatformController {
     private final TenantRegistry registry;
     private final TenantProvisioningService provisioning;
     private final com.example.ioedunew.tenant.TenantQuotaService quota;
+    private final com.example.ioedunew.repository.UserRepository userRepository;
+    private final com.example.ioedunew.service.AiConfigService aiConfigService;
 
     @Value("${ioedu.upload-dir}")
     private String uploadDir;
 
     public PlatformController(TenantRegistry registry, TenantProvisioningService provisioning,
-                              com.example.ioedunew.tenant.TenantQuotaService quota) {
+                              com.example.ioedunew.tenant.TenantQuotaService quota,
+                              com.example.ioedunew.repository.UserRepository userRepository,
+                              com.example.ioedunew.service.AiConfigService aiConfigService) {
         this.registry = registry;
         this.provisioning = provisioning;
         this.quota = quota;
+        this.userRepository = userRepository;
+        this.aiConfigService = aiConfigService;
     }
 
     @GetMapping("/tenants")
@@ -127,6 +133,48 @@ public class PlatformController {
         }
         provisioning.deprovision(code, dropData, Paths.get(uploadDir).toAbsolutePath().normalize());
         return ApiResponse.ok();
+    }
+
+    /**
+     * 供子系统(KiCad AI 设计助手等)单点登录时拉取用户资料:按站点编码切库查用户,只返回展示字段。
+     * 与其他平台接口一样凭平台令牌访问,不依赖 Host 解析租户。
+     */
+    @GetMapping("/users/{code}/{userId}")
+    public ApiResponse<Map<String, Object>> userProfile(@PathVariable String code, @PathVariable Long userId) {
+        Tenant t = registry.findByCode(code).orElseThrow(() -> new BusinessException(404, "租户不存在: " + code));
+        return ApiResponse.ok(com.example.ioedunew.tenant.TenantContext.runAs(t.getCode(), () -> {
+            com.example.ioedunew.entity.User u = userRepository.findById(userId)
+                    .orElseThrow(() -> new BusinessException(404, "用户不存在"));
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", u.getId());
+            m.put("name", u.getName());
+            m.put("email", u.getEmail());
+            m.put("role", u.getRole());
+            m.put("studentNo", u.getStudentNo());
+            m.put("major", u.getMajor());
+            m.put("enabled", u.getEnabled());
+            m.put("tenant", t.getCode());
+            return m;
+        }));
+    }
+
+    /**
+     * 某站点当前生效的大模型配置(含明文 Key),仅供内网子系统(KiCad AI 助手)启动时复用本站的 AI 设置,
+     * 免得同一把 DeepSeek Key 配两遍。凭平台令牌访问,不要暴露到公网 nginx。
+     */
+    @GetMapping("/ai-config/{code}")
+    public ApiResponse<Map<String, Object>> aiConfig(@PathVariable String code) {
+        Tenant t = registry.findByCode(code).orElseThrow(() -> new BusinessException(404, "租户不存在: " + code));
+        return ApiResponse.ok(com.example.ioedunew.tenant.TenantContext.runAs(t.getCode(), () -> {
+            com.example.ioedunew.service.AiConfigService.AiConfig cfg = aiConfigService.effective();
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("enabled", cfg.enabled);
+            m.put("baseUrl", cfg.baseUrl);
+            m.put("model", cfg.model);
+            m.put("apiKey", cfg.apiKey);
+            m.put("temperature", cfg.temperature);
+            return m;
+        }));
     }
 
     /** 多副本部署时,其他副本开通的租户可通过此接口立即刷新本副本缓存(否则最多延迟到下一次未命中回源) */

@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+frontend/dist/
+*.local
+
+# App data (databases, user workspaces)
+backend/data/
+*.sqlite
+*.sqlite-*
+*.db
+
+# Env
+.env
+!.env.example
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

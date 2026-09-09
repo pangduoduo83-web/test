@@ -39,3 +39,10 @@ frontend/dist/
 ### 运行时产物 ###
 uploads/
 .env
+
+# KiCad AI 子系统的本地运行产物
+kicad-ai/backend/data/
+kicad-ai/backend/*.db
+kicad-ai/backend/**/__pycache__/
+kicad-ai/frontend/node_modules/
+kicad-ai/frontend/dist/
