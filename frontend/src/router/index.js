@@ -20,6 +20,7 @@ const router = createRouter({
         { path: 'equipment', name: 'equipment', component: () => import('../views/student/EquipmentView.vue') },
         { path: 'borrowing', name: 'borrowing', component: () => import('../views/student/BorrowingView.vue') },
         { path: 'skills', name: 'skills', component: () => import('../views/student/SkillsView.vue') },
+        { path: 'classes', name: 'my-classes', component: () => import('../views/student/MyClassesView.vue') },
         { path: 'ai', name: 'ai-assistant', component: () => import('../views/student/AiAssistantView.vue') }
       ]
     },
@@ -29,7 +30,9 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresTeacher: true },
       children: [
         { path: '', redirect: '/teacher/workbench' },
-        { path: 'workbench', name: 'teacher-workbench', component: () => import('../views/teacher/TeacherWorkbench.vue') }
+        { path: 'workbench', name: 'teacher-workbench', component: () => import('../views/teacher/TeacherWorkbench.vue') },
+        { path: 'classes', name: 'teacher-classes', component: () => import('../views/teacher/TeacherClasses.vue') },
+        { path: 'submissions', name: 'teacher-submissions', component: () => import('../views/teacher/TeacherSubmissions.vue') }
       ]
     },
     {
@@ -51,7 +54,9 @@ const router = createRouter({
         { path: 'site-settings', name: 'admin-site-settings', component: () => import('../views/admin/AdminSiteSettings.vue') },
         { path: 'store', name: 'admin-store', component: () => import('../views/admin/AdminStore.vue') },
         { path: 'ai-center', name: 'admin-ai-center', component: () => import('../views/admin/AdminAiCenter.vue') },
-        { path: 'users', name: 'admin-users', component: () => import('../views/admin/AdminUsers.vue') }
+        { path: 'users', name: 'admin-users', component: () => import('../views/admin/AdminUsers.vue') },
+        { path: 'classes', name: 'admin-classes', component: () => import('../views/admin/AdminClasses.vue') },
+        { path: 'audit-logs', name: 'admin-audit-logs', component: () => import('../views/admin/AdminAuditLogs.vue') }
       ]
     },
     // 项目商店平台管理端:独立登录(商店服务的平台管理员),与客户站点账号无关
@@ -61,7 +66,8 @@ const router = createRouter({
       component: () => import('../views/platform/PlatformLayout.vue'),
       meta: { requiresHubAdmin: true },
       children: [
-        { path: '', redirect: '/platform/items' },
+        { path: '', redirect: '/platform/home' },
+        { path: 'home', name: 'platform-home', component: () => import('../views/platform/PlatformHome.vue') },
         { path: 'items', name: 'platform-items', component: () => import('../views/platform/PlatformItems.vue') },
         { path: 'sites', name: 'platform-sites', component: () => import('../views/platform/PlatformSites.vue') },
         { path: 'tenants', redirect: '/platform/sites' }
@@ -75,7 +81,10 @@ router.beforeEach((to) => {
   const token = getToken()
   const user = getUser()
   if (to.meta.requiresAuth && !token) return '/auth'
-  if (to.meta.requiresAdmin && user?.role !== 'ADMIN') return '/app/dashboard'
+  if (to.meta.requiresAdmin && user?.role !== 'ADMIN' && user?.role !== 'LAB_ADMIN') return '/app/dashboard'
+  // 实验室管理员只能进设备与借阅相关页面,其余后台页面回到看板
+  if (to.meta.requiresAdmin && user?.role === 'LAB_ADMIN'
+      && !/^\/admin\/(dashboard|equipment|borrows)/.test(to.path)) return '/admin/dashboard'
   if (to.meta.requiresTeacher && user?.role !== 'TEACHER' && user?.role !== 'ADMIN') return '/app/dashboard'
   return true
 })

@@ -3,14 +3,20 @@ package com.example.ioedunew.ai.tool;
 import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.dto.BorrowDtos;
 import com.example.ioedunew.entity.BorrowRequest;
+import com.example.ioedunew.entity.Discussion;
+import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.Equipment;
 import com.example.ioedunew.entity.Project;
 import com.example.ioedunew.entity.SkillScore;
+import com.example.ioedunew.entity.Submission;
 import com.example.ioedunew.repository.BorrowRequestRepository;
+import com.example.ioedunew.repository.EnrollmentRepository;
 import com.example.ioedunew.repository.EquipmentRepository;
 import com.example.ioedunew.repository.ProjectRepository;
 import com.example.ioedunew.repository.SkillScoreRepository;
+import com.example.ioedunew.repository.SubmissionRepository;
 import com.example.ioedunew.service.BorrowService;
+import com.example.ioedunew.service.ProjectService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -234,7 +240,7 @@ public final class BuiltinTools {
         }
 
         public String description() {
-            return "按项目 id 查看项目详情:学习目标、前置要求、教学大纲、BOM 与所需设备。";
+            return "按项目 id 查看项目详情:学习目标、前置要求、教学大纲(分阶段)、成果考核项、技能要求、BOM、所需设备与教学资料。";
         }
 
         public JsonNode inputSchema() {
@@ -249,13 +255,199 @@ public final class BuiltinTools {
             n.put("summary", p.getSummary());
             n.put("difficulty", p.getDifficulty());
             n.put("duration", p.getDuration());
+            n.put("teamSize", p.getTeamSize());
             n.put("mentor", p.getMentor());
             n.put("learningGoals", cut(p.getLearningGoals(), 400));
             n.put("prerequisites", cut(p.getPrerequisites(), 300));
-            n.put("syllabus", cut(p.getSyllabus(), 800));
-            n.put("bom", cut(p.getBom(), 500));
+            n.set("syllabus", parseJson(om, p.getSyllabus()));
+            n.set("assessments", parseJson(om, p.getAssessments()));
+            n.set("skillRequirements", parseJson(om, p.getSkillRequirements()));
+            n.put("bom", cut(p.getBom(), 800));
             n.put("equipmentNames", cut(p.getEquipmentNames(), 200));
-            n.put("description", cut(p.getDescription(), 800));
+            n.set("resources", parseJson(om, p.getResources()));
+            n.put("description", cut(p.getDescription(), 1200));
+            return n;
+        }
+    }
+
+    static JsonNode parseJson(ObjectMapper om, String json) {
+        try {
+            JsonNode n = om.readTree(json == null || json.trim().isEmpty() ? "[]" : json);
+            return n.isArray() ? n : om.createArrayNode();
+        } catch (Exception e) {
+            return om.createArrayNode();
+        }
+    }
+
+    @Component
+    public static class EnrollmentMyList implements AiTool {
+        private final EnrollmentRepository repo;
+        private final ObjectMapper om;
+
+        public EnrollmentMyList(EnrollmentRepository repo, ObjectMapper om) {
+            this.repo = repo;
+            this.om = om;
+        }
+
+        public String name() {
+            return "enrollment.my_list";
+        }
+
+        public String description() {
+            return "查看当前用户已报名的项目及学习状态:进度百分比、当前任务、截止日期、是否已通过评审完成。";
+        }
+
+        public JsonNode inputSchema() {
+            return schema(om, "projectId", "integer", "只看某个项目,可为空");
+        }
+
+        public JsonNode execute(ToolContext ctx, JsonNode args) {
+            long only = args == null ? 0 : args.path("projectId").asLong(0);
+            ArrayNode out = om.createArrayNode();
+            for (Enrollment e : repo.findByUserIdOrderByEnrolledAtDesc(ctx.getUserId())) {
+                if (only > 0 && !e.getProjectId().equals(only)) {
+                    continue;
+                }
+                ObjectNode n = out.addObject();
+                n.put("projectId", e.getProjectId());
+                n.put("projectTitle", e.getProjectTitle());
+                n.put("status", e.getStatus());
+                n.put("progress", e.getProgress() == null ? 0 : e.getProgress());
+                n.put("currentTask", e.getCurrentTask());
+                n.put("completedPhases", e.getCompletedPhases() == null ? "[]" : e.getCompletedPhases());
+                n.put("deadline", e.getDeadline() == null ? null : e.getDeadline().toString());
+                n.put("enrolledAt", e.getEnrolledAt() == null ? null : e.getEnrolledAt().toString());
+            }
+            return out;
+        }
+    }
+
+    @Component
+    public static class EnrollmentUpdateProgress implements AiTool {
+        private final ProjectService projectService;
+        private final ObjectMapper om;
+
+        public EnrollmentUpdateProgress(ProjectService projectService, ObjectMapper om) {
+            this.projectService = projectService;
+            this.om = om;
+        }
+
+        public String name() {
+            return "enrollment.update_progress";
+        }
+
+        public String description() {
+            return "更新当前用户在某个已报名项目上的学习进度(需要用户确认)。项目有教学大纲时优先传 completedPhases(已完成阶段序号,从 1 开始),"
+                    + "进度会按阶段数自动折算;没有大纲时传 progress 百分比。进度到 100 不等于完成,完成需提交成果并通过评审。";
+        }
+
+        public JsonNode inputSchema() {
+            ObjectNode s = schema(om, "*projectId", "integer", "项目 id", "progress", "integer", "新的进度百分比 0~100(无大纲时使用)",
+                    "currentTask", "string", "接下来要做的任务,一句话,可省略由系统按大纲填");
+            ObjectNode phases = ((ObjectNode) s.get("properties")).putObject("completedPhases");
+            phases.put("type", "array");
+            phases.put("description", "已完成的大纲阶段序号列表,从 1 开始,例如 [1,2] 表示前两个阶段已完成");
+            phases.putObject("items").put("type", "integer");
+            return s;
+        }
+
+        public boolean readOnly() {
+            return false;
+        }
+
+        public JsonNode execute(ToolContext ctx, JsonNode args) {
+            java.util.List<Integer> phases = null;
+            if (args.has("completedPhases") && args.get("completedPhases").isArray()) {
+                phases = new java.util.ArrayList<>();
+                for (JsonNode p : args.get("completedPhases")) {
+                    phases.add(p.asInt());
+                }
+            }
+            Enrollment e = projectService.updateProgress(ctx.getUserId(), args.path("projectId").asLong(),
+                    args.path("progress").asInt(0), text(args, "currentTask"), phases);
+            ObjectNode n = om.createObjectNode();
+            n.put("projectTitle", e.getProjectTitle());
+            n.put("progress", e.getProgress());
+            n.put("currentTask", e.getCurrentTask());
+            n.put("status", e.getStatus());
+            n.put("message", e.getProgress() >= 100 ? "进度已到 100%,请提醒学生到项目页提交成果等待评审" : "进度已更新");
+            return n;
+        }
+    }
+
+    @Component
+    public static class SubmissionMyList implements AiTool {
+        private final SubmissionRepository repo;
+        private final ObjectMapper om;
+
+        public SubmissionMyList(SubmissionRepository repo, ObjectMapper om) {
+            this.repo = repo;
+            this.om = om;
+        }
+
+        public String name() {
+            return "submission.my_list";
+        }
+
+        public String description() {
+            return "查看当前用户在某个项目提交过的成果及评审结果(考核项、状态、分数、教师评语)。";
+        }
+
+        public JsonNode inputSchema() {
+            return schema(om, "*projectId", "integer", "项目 id");
+        }
+
+        public JsonNode execute(ToolContext ctx, JsonNode args) {
+            ArrayNode out = om.createArrayNode();
+            for (Submission s : repo.findByUserIdAndProjectIdOrderBySubmittedAtDesc(ctx.getUserId(), args.path("projectId").asLong())) {
+                ObjectNode n = out.addObject();
+                n.put("id", s.getId());
+                n.put("assessmentName", s.getAssessmentName() == null ? "整体成果" : s.getAssessmentName());
+                n.put("status", s.getStatus());
+                n.put("score", s.getScore());
+                n.put("feedback", s.getFeedback());
+                n.put("content", cut(s.getContent(), 200));
+                n.put("submittedAt", s.getSubmittedAt() == null ? null : s.getSubmittedAt().toString());
+                if (out.size() >= 10) {
+                    break;
+                }
+            }
+            return out;
+        }
+    }
+
+    @Component
+    public static class DiscussionPost implements AiTool {
+        private final ProjectService projectService;
+        private final ObjectMapper om;
+
+        public DiscussionPost(ProjectService projectService, ObjectMapper om) {
+            this.projectService = projectService;
+            this.om = om;
+        }
+
+        public String name() {
+            return "discussion.post";
+        }
+
+        public String description() {
+            return "以当前用户身份在项目讨论区发一条求助或问题(需要用户确认),指导教师和同学可以看到并回复。";
+        }
+
+        public JsonNode inputSchema() {
+            return schema(om, "*projectId", "integer", "项目 id", "*content", "string", "要发布的内容,100 字以内为宜");
+        }
+
+        public boolean readOnly() {
+            return false;
+        }
+
+        public JsonNode execute(ToolContext ctx, JsonNode args) {
+            Discussion d = projectService.postDiscussion(ctx.getUserId(), args.path("projectId").asLong(),
+                    text(args, "content"), null, null);
+            ObjectNode n = om.createObjectNode();
+            n.put("id", d.getId());
+            n.put("message", "已发布到项目讨论区");
             return n;
         }
     }

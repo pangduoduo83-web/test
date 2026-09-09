@@ -2,9 +2,12 @@
   <div class="admin-layout">
     <aside class="admin-side">
       <div class="admin-brand">
-        <span class="logo"><ShieldCheck :size="22" color="#fff" /></span>
+        <span class="logo">
+          <img v-if="site.logoUrl" :src="site.logoUrl" class="logo-img" alt="LOGO" />
+          <ShieldCheck v-else :size="22" color="#fff" />
+        </span>
         <div>
-          <div class="brand-name">项目驱动式教学平台</div>
+          <div class="brand-name">{{ site.title }}</div>
           <div class="brand-sub">管理员控制台</div>
         </div>
       </div>
@@ -33,7 +36,7 @@
           <span class="avatar">{{ (authStore.user?.name || '管')[0] }}</span>
           <div class="admin-user-text">
             <span class="au-name">{{ authStore.user?.name }}</span>
-            <span class="au-role">系统管理员</span>
+            <span class="au-role">{{ authStore.user?.role === 'LAB_ADMIN' ? '实验室管理员' : '系统管理员' }}</span>
           </div>
         </div>
       </header>
@@ -49,21 +52,23 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Bell, Bot, ClipboardCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
-  MessageSquareText, Radar, Rocket, Settings, ShieldCheck, Sparkles, Store, UserRoundCheck, Users, Wrench
+  MessageSquareText, Radar, Rocket, School, ScrollText, Settings, ShieldCheck, Sparkles, Store, UserRoundCheck, Users, Wrench
 } from 'lucide-vue-next'
 import { adminStats } from '../../api'
 import { useAuthStore } from '../../stores/auth'
+import { loadSiteConfig, siteConfig as site } from '../../utils/siteConfig'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const pendingCount = ref(0)
 
-const menus = [
-  { path: '/admin/dashboard', icon: LayoutDashboard, title: '数据看板' },
-  { path: '/admin/equipment', icon: Wrench, title: '设备管理' },
-  { path: '/admin/borrows', icon: ClipboardList, title: '借阅审批' },
+const allMenus = [
+  { path: '/admin/dashboard', icon: LayoutDashboard, title: '数据看板', lab: true },
+  { path: '/admin/equipment', icon: Wrench, title: '设备管理', lab: true },
+  { path: '/admin/borrows', icon: ClipboardList, title: '借阅审批', lab: true },
   { path: '/admin/projects', icon: Rocket, title: '项目管理' },
+  { path: '/admin/classes', icon: School, title: '班级管理' },
   { path: '/admin/enrollments', icon: UserRoundCheck, title: '报名进度' },
   { path: '/admin/submissions', icon: ClipboardCheck, title: '成果评审' },
   { path: '/admin/skill-dimensions', icon: Radar, title: '技能维度' },
@@ -73,11 +78,14 @@ const menus = [
   { path: '/admin/store', icon: Store, title: '项目商店' },
   { path: '/admin/ai-center', icon: Bot, title: 'AI 中心' },
   { path: '/admin/ai-settings', icon: Sparkles, title: 'AI 设置' },
-  { path: '/admin/site-settings', icon: Settings, title: '站点设置' }
+  { path: '/admin/site-settings', icon: Settings, title: '站点设置' },
+  { path: '/admin/audit-logs', icon: ScrollText, title: '操作日志' }
 ]
+// 实验室管理员只看设备与借阅相关入口
+const menus = computed(() => (authStore.user?.role === 'LAB_ADMIN' ? allMenus.filter((m) => m.lab) : allMenus))
 
 const currentTitle = computed(() =>
-  menus.find((m) => route.path.startsWith(m.path))?.title || '管理后台')
+  allMenus.find((m) => route.path.startsWith(m.path))?.title || '管理后台')
 
 const loadPending = async () => {
   try {
@@ -91,7 +99,10 @@ const logout = () => {
   router.push('/auth')
 }
 
-onMounted(loadPending)
+onMounted(() => {
+  loadSiteConfig()
+  loadPending()
+})
 </script>
 
 <style scoped>
@@ -108,11 +119,12 @@ onMounted(loadPending)
 }
 .admin-brand { display: flex; gap: 10px; align-items: center; padding: 0 8px 20px; }
 .logo {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 40px; height: 40px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
   background: var(--brand-gradient);
   display: flex; align-items: center; justify-content: center; font-size: 20px;
   box-shadow: var(--shadow-card);
 }
+.logo-img { width: 100%; height: 100%; object-fit: cover; }
 .brand-name { font-weight: 700; font-size: 14px; color: #111827; line-height: 1.3; }
 .brand-sub { font-size: 11px; color: #9ca3af; }
 

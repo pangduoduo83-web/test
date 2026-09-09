@@ -200,10 +200,6 @@ public class DataSeeder {
                             p.setCoverUrl(n.get("coverUrl").asText());
                             changed = true;
                         }
-                        if ((p.getForks() == null || p.getForks() == 0) && n.hasNonNull("forks")) {
-                            p.setForks(n.get("forks").asInt());
-                            changed = true;
-                        }
                         if (p.getPcbSize() == null && n.hasNonNull("pcbSize")) {
                             p.setPcbSize(n.get("pcbSize").asText());
                             changed = true;
@@ -260,8 +256,9 @@ public class DataSeeder {
         e.setImageUrl(n.hasNonNull("imageUrl") ? n.get("imageUrl").asText() : null);
         e.setTotalCount(n.path("totalCount").asInt(1));
         e.setAvailableCount(n.path("availableCount").asInt(1));
-        e.setRating(n.path("rating").asDouble(5.0));
-        e.setBorrowCount(n.path("borrowCount").asInt(0));
+        // 统计类字段一律从 0 开始,由真实借阅累计;种子里的历史数字不再采用
+        e.setRating(5.0);
+        e.setBorrowCount(0);
         e.setPrice(n.hasNonNull("price") ? n.get("price").asDouble() : null);
         e.setManufacturer(n.path("manufacturer").asText(null));
         e.setStatus("AVAILABLE");
@@ -293,13 +290,14 @@ public class DataSeeder {
             p.setPcbSize(n.hasNonNull("pcbSize") ? n.get("pcbSize").asText() : null);
             p.setCoverUrl(n.hasNonNull("coverUrl") ? n.get("coverUrl").asText() : null);
             p.setCost(n.hasNonNull("cost") ? n.get("cost").asDouble() : null);
-            p.setRating(n.path("rating").asDouble(5.0));
-            p.setEnrolledCount(n.path("enrolledCount").asInt(0));
-            p.setCompletionRate(n.path("completionRate").asInt(0));
-            p.setViews(n.path("views").asInt(0));
-            p.setFavoriteCount(n.path("favoriteCount").asInt(0));
-            p.setDownloads(n.path("downloads").asInt(0));
-            p.setForks(n.path("forks").asInt(0));
+            // 统计类字段一律从 0 开始,由真实报名/收藏/浏览累计;种子里的历史数字不再采用
+            p.setRating(5.0);
+            p.setEnrolledCount(0);
+            p.setCompletionRate(0);
+            p.setViews(0);
+            p.setFavoriteCount(0);
+            p.setDownloads(0);
+            p.setForks(0);
             p.setTags(n.path("tags").toString());
             p.setFeatures(n.path("features").toString());
             p.setLearningGoals(n.path("learningGoals").toString());

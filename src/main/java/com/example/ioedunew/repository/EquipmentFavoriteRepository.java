@@ -13,6 +13,8 @@ public interface EquipmentFavoriteRepository extends JpaRepository<EquipmentFavo
 
     Optional<EquipmentFavorite> findByUserIdAndEquipmentId(Long userId, Long equipmentId);
 
+    List<EquipmentFavorite> findByEquipmentId(Long equipmentId);
+
     void deleteByUserId(Long userId);
 
     void deleteByEquipmentId(Long equipmentId);

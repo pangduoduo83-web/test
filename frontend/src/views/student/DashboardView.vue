@@ -4,13 +4,19 @@
     <div class="welcome">
       <div>
         <h2 class="welcome-title">欢迎回来，{{ data.user.name }}! 👋</h2>
-        <p class="welcome-sub">本周已完成 {{ data.weeklyHours }} 小时实践学习，继续保持！</p>
+        <p class="welcome-sub">
+          {{ data.weeklyActivities > 0
+            ? `本周有 ${data.weeklyActiveDays} 天在学习,累计 ${data.weeklyActivities} 次学习动作,继续保持!`
+            : '这周还没有学习记录,去项目中心挑一个项目开始吧!' }}
+        </p>
       </div>
       <div class="welcome-level">
         <div class="wl-num">Lv.{{ data.level }}</div>
         <div class="wl-label">实践等级</div>
       </div>
     </div>
+
+    <DailyBriefCard :user-id="data.user.id" :ongoing="data.ongoingProjects" />
 
     <!-- 统计卡 -->
     <div class="stat-grid">
@@ -26,16 +32,24 @@
     </div>
 
     <div class="two-col">
-      <!-- 学习进度趋势 -->
+      <!-- 学习活跃度(来自学习活动日志) -->
       <div class="card">
         <div class="card-head">
-          <h3>学习进度趋势</h3>
+          <h3>学习活跃度</h3>
           <div class="trend-toggle">
-            <span class="pill" :class="{ active: trendMode === 'week' }" @click="trendMode = 'week'">本周</span>
-            <span class="pill" :class="{ active: trendMode === 'month' }" @click="trendMode = 'month'">本月</span>
+            <span class="pill" :class="{ active: trendMode === 'week' }" @click="trendMode = 'week'">近 7 天</span>
+            <span class="pill" :class="{ active: trendMode === 'month' }" @click="trendMode = 'month'">近 30 天</span>
           </div>
         </div>
         <div ref="trendRef" class="trend-chart"></div>
+        <div v-if="data.recentActivities?.length" class="recent">
+          <div class="recent-head">最近动态</div>
+          <div v-for="(a, i) in data.recentActivities.slice(0, 5)" :key="i" class="recent-item">
+            <span class="recent-dot" :class="'t-' + a.type"></span>
+            <span class="recent-title">{{ a.title || typeText(a.type) }}</span>
+            <span class="recent-time">{{ fmtTime(a.createdAt) }}</span>
+          </div>
+        </div>
       </div>
 
       <!-- 技能掌握度 -->
@@ -78,9 +92,11 @@
               <div class="ongoing-bar-inner" :style="{ width: p.progress + '%' }"></div>
             </div>
             <b class="ongoing-pct">{{ p.progress }}%</b>
-            <el-button size="small" type="primary" plain @click="advance(p)">推进 +10%</el-button>
+            <el-button v-if="p.progress < 100" size="small" type="primary" plain @click="$router.push(`/app/projects/${p.projectId}`)">继续做</el-button>
+            <el-button v-else size="small" type="success" plain @click="$router.push(`/app/projects/${p.projectId}`)">去提交成果</el-button>
           </div>
         </div>
+        <p v-if="data.ongoingProjects.length" class="ongoing-note">进度按教学大纲阶段打勾记录(项目页 → 我的学习进度);项目要提交成果、由教师评审通过后才算完成。</p>
       </div>
 
       <!-- 我的成就 -->
@@ -106,12 +122,12 @@
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
-import { ElMessage } from 'element-plus'
 import {
   Award, Clock, GraduationCap, Package, Rocket, Sprout, TrendingUp, Trophy
 } from 'lucide-vue-next'
-import { fetchDashboard, fetchSkills, updateProgress } from '../../api'
+import { fetchDashboard, fetchSkills } from '../../api'
 import { useAuthStore } from '../../stores/auth'
+import DailyBriefCard from '../../components/DailyBriefCard.vue'
 
 const authStore = useAuthStore()
 const data = ref(null)
@@ -124,10 +140,16 @@ const skillColors = ['#3b82f6', '#22c55e', '#eab308', '#9333ea', '#06b6d4', '#f9
 
 const statCards = computed(() => data.value ? [
   { icon: GraduationCap, label: '完成项目', value: data.value.completedProjects, bg: 'linear-gradient(135deg,#60a5fa,#2563eb)' },
-  { icon: Clock, label: '实践时长(小时)', value: data.value.weeklyHours, bg: 'linear-gradient(135deg,#4ade80,#16a34a)' },
+  { icon: Clock, label: '本周学习动作', value: data.value.weeklyActivities, bg: 'linear-gradient(135deg,#4ade80,#16a34a)' },
   { icon: Trophy, label: '获得成就', value: data.value.achievementCount, bg: 'linear-gradient(135deg,#facc15,#f97316)' },
   { icon: TrendingUp, label: '技能掌握度', value: data.value.skillAvg + '%', bg: 'linear-gradient(135deg,#c084fc,#9333ea)' }
 ] : [])
+
+const typeText = (t) => ({
+  ENROLL: '报名项目', PROGRESS: '更新进度', SUBMIT: '提交成果', GRADED: '成果评分', DISCUSS: '参与讨论',
+  BORROW: '申请借阅', AI_CHAT: 'AI 对话', SELF_ASSESS: '技能自评'
+}[t] || t)
+const fmtTime = (t) => (t || '').replace('T', ' ').slice(5, 16)
 
 // 成就图标:按成就名映射线性图标(后端 emoji 字段仅作兜底语义)
 const achIconMap = { '初出茅庐': Sprout, '借阅达人': Package, '项目先锋': Rocket, '技术大牛': Trophy }
@@ -139,36 +161,33 @@ const renderTrend = () => {
   if (!trendRef.value || !data.value) return
   if (!chart) chart = echarts.init(trendRef.value)
   const isWeek = trendMode.value === 'week'
-  const hours = isWeek ? data.value.weekTrend : data.value.monthTrend
+  const all = isWeek ? data.value.weekTrend : data.value.monthTrend
   const tasks = isWeek ? (data.value.weekTaskTrend || []) : (data.value.monthTaskTrend || [])
-  const labels = isWeek
-    ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-    : hours.map((_, i) => `${i + 1}日`)
+  // 序列最后一个点是今天,往前逐日推
+  const labels = all.map((_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - (all.length - 1 - i))
+    return isWeek ? ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()] : `${d.getMonth() + 1}/${d.getDate()}`
+  })
   chart.setOption({
     grid: { left: 36, right: 16, top: 34, bottom: 28 },
     tooltip: { trigger: 'axis' },
-    legend: { data: ['学习时长', '完成任务'], top: 0, right: 0, itemWidth: 14, textStyle: { color: '#6b7280', fontSize: 12 } },
-    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: '#e5e7eb' } }, axisLabel: { color: '#6b7280' } },
-    yAxis: { type: 'value', splitLine: { lineStyle: { color: '#f3f4f6' } } },
+    legend: { data: ['全部学习动作', '进度与成果'], top: 0, right: 0, itemWidth: 14, textStyle: { color: '#6b7280', fontSize: 12 } },
+    xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: '#e5e7eb' } }, axisLabel: { color: '#6b7280', interval: isWeek ? 0 : 4 } },
+    yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#f3f4f6' } } },
     series: [
       {
-        name: '学习时长',
-        type: 'line', data: hours, smooth: true, symbolSize: 6,
-        lineStyle: { width: 3, color: '#3b82f6' }, itemStyle: { color: '#3b82f6' },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(59,130,246,.2)' },
-            { offset: 1, color: 'rgba(59,130,246,0)' }
-          ])
-        }
+        name: '全部学习动作',
+        type: 'bar', data: all, barMaxWidth: 22,
+        itemStyle: { color: '#93c5fd', borderRadius: [6, 6, 0, 0] }
       },
       {
-        name: '完成任务',
+        name: '进度与成果',
         type: 'line', data: tasks, smooth: true, symbolSize: 6,
         lineStyle: { width: 3, color: '#22c55e' }, itemStyle: { color: '#22c55e' }
       }
     ]
-  })
+  }, true)
 }
 
 watch(trendMode, renderTrend)
@@ -182,13 +201,6 @@ const load = async () => {
   } catch (e) { /* 技能条加载失败不阻塞页面 */ }
   await nextTick()
   renderTrend()
-}
-
-const advance = async (p) => {
-  const next = Math.min(100, p.progress + 10)
-  await updateProgress(p.projectId, { progress: next, currentTask: p.currentTask })
-  ElMessage.success(next >= 100 ? '恭喜完成项目!' : `进度已更新到 ${next}%`)
-  await load()
 }
 
 onMounted(load)
@@ -239,7 +251,18 @@ window.addEventListener('resize', () => chart && chart.resize())
 .trend-toggle { display: flex; gap: 6px; }
 .trend-toggle .pill { padding: 4px 12px; font-size: 12px; }
 
-.trend-chart { height: 260px; }
+.trend-chart { height: 220px; }
+.recent { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
+.recent-head { font-size: 12px; color: #9ca3af; margin-bottom: 6px; }
+.recent-item { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+.recent-dot { width: 8px; height: 8px; border-radius: 50%; background: #93c5fd; flex-shrink: 0; }
+.recent-dot.t-SUBMIT, .recent-dot.t-GRADED { background: #22c55e; }
+.recent-dot.t-PROGRESS { background: #3b82f6; }
+.recent-dot.t-BORROW { background: #f59e0b; }
+.recent-dot.t-AI_CHAT { background: #a855f7; }
+.recent-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #374151; }
+.recent-time { font-size: 12px; color: #9ca3af; }
+.ongoing-note { font-size: 12px; color: #9ca3af; margin: 10px 0 0; }
 
 /* 技能掌握度进度条 */
 .skill-row { margin-bottom: 18px; }

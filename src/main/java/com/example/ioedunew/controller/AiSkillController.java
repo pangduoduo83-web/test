@@ -271,6 +271,7 @@ public class AiSkillController {
         req.conversationId = body.hasNonNull("conversationId") ? body.get("conversationId").asLong() : null;
         req.input = body.get("input");
         req.confirm = body.path("confirm").asBoolean(false);
+        req.context = body.get("context");
         return req;
     }
 

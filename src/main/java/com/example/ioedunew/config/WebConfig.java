@@ -15,10 +15,13 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
     private final PlatformTokenInterceptor platformTokenInterceptor;
+    private final AuditInterceptor auditInterceptor;
 
-    public WebConfig(AuthInterceptor authInterceptor, PlatformTokenInterceptor platformTokenInterceptor) {
+    public WebConfig(AuthInterceptor authInterceptor, PlatformTokenInterceptor platformTokenInterceptor,
+                     AuditInterceptor auditInterceptor) {
         this.authInterceptor = authInterceptor;
         this.platformTokenInterceptor = platformTokenInterceptor;
+        this.auditInterceptor = auditInterceptor;
     }
 
     @Override
@@ -27,6 +30,10 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/api/platform/**");
+        // 审计放在认证之后,能拿到已解析的 AuthUser;只覆盖管理 / 教师 / 平台 / 商店发布这些有权限意义的写接口
+        registry.addInterceptor(auditInterceptor)
+                .addPathPatterns("/api/admin/**", "/api/teacher/**", "/api/platform/**", "/api/store/publish/**",
+                        "/api/store/items/*/install", "/api/ai/skills/**");
     }
 
     @Override

@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface AiConversationRepository extends JpaRepository<AiConversation, Long> {
     List<AiConversation> findTop50ByUserIdOrderByUpdatedAtDesc(Long userId);
+
+    List<AiConversation> findByUserId(Long userId);
 }

@@ -37,15 +37,21 @@ public class BorrowService {
     private final EquipmentRepository equipmentRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final LearningActivityService activityService;
+    private final com.example.ioedunew.repository.EquipmentFavoriteRepository equipmentFavoriteRepository;
 
     public BorrowService(BorrowRequestRepository borrowRepository,
                          EquipmentRepository equipmentRepository,
                          UserRepository userRepository,
-                         NotificationService notificationService) {
+                         NotificationService notificationService,
+                         LearningActivityService activityService,
+                         com.example.ioedunew.repository.EquipmentFavoriteRepository equipmentFavoriteRepository) {
         this.borrowRepository = borrowRepository;
         this.equipmentRepository = equipmentRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.activityService = activityService;
+        this.equipmentFavoriteRepository = equipmentFavoriteRepository;
     }
 
     @Transactional
@@ -74,6 +80,8 @@ public class BorrowService {
         br.setDurationDays(req.getDurationDays());
         br.setRemark(req.getRemark());
         borrowRepository.save(br);
+        activityService.record(userId, com.example.ioedunew.entity.LearningActivity.BORROW, br.getId(),
+                "申请借阅「" + eq.getName() + "」× " + req.getQuantity());
         return br;
     }
 
@@ -207,6 +215,7 @@ public class BorrowService {
         }
         Equipment eq = equipmentRepository.findById(br.getEquipmentId())
                 .orElseThrow(() -> new BusinessException(404, "设备不存在"));
+        boolean wasOut = eq.getAvailableCount() <= 0;
         eq.setAvailableCount(Math.min(eq.getTotalCount(), eq.getAvailableCount() + br.getQuantity()));
         equipmentRepository.save(eq);
 
@@ -215,7 +224,18 @@ public class BorrowService {
         br.setReturnedAt(LocalDateTime.now());
         notificationService.create(br.getUserId(), "borrow", "归还验收完成",
                 "《" + br.getEquipmentName() + "》已完成归还验收,感谢按时归还。");
+        if (wasOut && eq.getAvailableCount() > 0) {
+            notifyRestock(eq);
+        }
         return borrowRepository.save(br);
+    }
+
+    /** 借完的设备重新有货:通知把它加进心愿单的同学(借出者本人除外) */
+    private void notifyRestock(Equipment eq) {
+        for (com.example.ioedunew.entity.EquipmentFavorite f : equipmentFavoriteRepository.findByEquipmentId(eq.getId())) {
+            notificationService.create(f.getUserId(), "borrow", "心愿单设备有货了",
+                    "你关注的《" + eq.getName() + "》已归还入库,现在可借 " + eq.getAvailableCount() + " 件,需要的话尽快到设备图书馆申请。");
+        }
     }
 
     private BorrowRequest getOwned(Long userId, Long requestId) {

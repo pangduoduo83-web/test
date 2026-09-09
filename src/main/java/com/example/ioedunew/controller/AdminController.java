@@ -63,6 +63,7 @@ public class AdminController {
     private final AiClient aiClient;
     private final SiteConfigService siteConfigService;
     private final SkillDimensionService skillDimensionService;
+    private final com.example.ioedunew.repository.AuditLogRepository auditLogRepository;
 
     public AdminController(AdminService adminService,
                            BorrowService borrowService,
@@ -75,7 +76,9 @@ public class AdminController {
                            AiConfigService aiConfigService,
                            AiClient aiClient,
                            SiteConfigService siteConfigService,
-                           SkillDimensionService skillDimensionService) {
+                           SkillDimensionService skillDimensionService,
+                           com.example.ioedunew.repository.AuditLogRepository auditLogRepository) {
+        this.auditLogRepository = auditLogRepository;
         this.adminService = adminService;
         this.borrowService = borrowService;
         this.authService = authService;
@@ -122,6 +125,37 @@ public class AdminController {
                                          @Valid @RequestBody MiscDtos.GradeRequest req,
                                          HttpServletRequest request) {
         return ApiResponse.ok(submissionService.grade(id, req, adminName(request)));
+    }
+
+    /** 退回修改,body: { feedback } */
+    @PostMapping("/submissions/{id}/return")
+    public ApiResponse<Submission> returnSubmission(@PathVariable Long id, @RequestBody Map<String, String> body,
+                                                    HttpServletRequest request) {
+        return ApiResponse.ok(submissionService.returnForRevision(id, body.get("feedback"), adminName(request)));
+    }
+
+    // ---------- 操作审计 ----------
+
+    @GetMapping("/audit-logs")
+    public ApiResponse<Map<String, Object>> auditLogs(@RequestParam(defaultValue = "0") int page,
+                                                      @RequestParam(defaultValue = "20") int size,
+                                                      @RequestParam(required = false) Long actorId,
+                                                      @RequestParam(required = false) String path) {
+        org.springframework.data.domain.PageRequest pr = org.springframework.data.domain.PageRequest.of(page, Math.min(Math.max(size, 1), 100));
+        org.springframework.data.domain.Page<com.example.ioedunew.entity.AuditLog> p;
+        if (actorId != null) {
+            p = auditLogRepository.findByActorIdOrderByIdDesc(actorId, pr);
+        } else if (path != null && !path.trim().isEmpty()) {
+            p = auditLogRepository.findByPathContainingOrderByIdDesc(path.trim(), pr);
+        } else {
+            p = auditLogRepository.findAllByOrderByIdDesc(pr);
+        }
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("items", p.getContent());
+        m.put("total", p.getTotalElements());
+        m.put("page", page);
+        m.put("size", pr.getPageSize());
+        return ApiResponse.ok(m);
     }
 
     // ---------- 设备管理 ----------

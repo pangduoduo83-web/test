@@ -47,7 +47,7 @@ public class User {
     @Column(length = 20)
     private String grade;
 
-    /** STUDENT / TEACHER / ADMIN */
+    /** STUDENT / TEACHER / LAB_ADMIN(实验室管理员:只管设备与借阅) / ADMIN */
     @Column(nullable = false, length = 20)
     private String role = "STUDENT";
 
@@ -65,6 +65,15 @@ public class User {
 
     @Column(nullable = false)
     private Boolean enabled = true;
+
+    /** 连续登录失败次数,登录成功清零 */
+    @JsonIgnore
+    @Column(nullable = false)
+    private Integer failedLogins = 0;
+
+    /** 连续失败达上限后锁定到该时刻 */
+    @JsonIgnore
+    private LocalDateTime lockedUntil;
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

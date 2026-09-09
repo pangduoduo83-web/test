@@ -29,10 +29,9 @@
         <SlidersHorizontal :size="14" style="margin-right:5px" /> 高级筛选
       </el-button>
       <el-select v-model="sort" class="sort" @change="load">
-        <el-option label="最热门" value="popular" />
-        <el-option label="评分最高" value="rating" />
+        <el-option label="最多人参与" value="popular" />
         <el-option label="最新更新" value="newest" />
-        <el-option label="下载最多" value="downloads" />
+        <el-option label="收藏最多" value="favorites" />
       </el-select>
     </div>
 
@@ -74,12 +73,10 @@
                @error="failedCovers.add(p.id)" />
           <div v-else class="pc-cover-fallback"><CircuitBoard :size="52" color="rgba(255,255,255,.85)" /></div>
           <span class="cover-badge" :class="diffColor(p.difficulty)" style="top:10px;left:10px">{{ p.difficulty }}</span>
-          <span class="cover-badge rating" style="top:10px;right:10px">
-            <Star :size="12" fill="#facc15" color="#facc15" /> {{ p.rating }}
-          </span>
-          <span class="cover-badge green" style="bottom:10px;left:10px">开源</span>
+          <span v-if="p.category" class="cover-badge rating" style="top:10px;right:10px">{{ p.category }}</span>
+          <span v-if="p.license" class="cover-badge green" style="bottom:10px;left:10px">{{ p.license }}</span>
           <span v-if="p.verified" class="cover-badge blue" style="bottom:10px;right:10px">
-            <BadgeCheck :size="12" /> 已验证
+            <BadgeCheck :size="12" /> 硬件已验证
           </span>
         </div>
 
@@ -92,10 +89,9 @@
           </div>
 
           <div class="pc-stats">
-            <span><Eye :size="13" /> {{ fmtNum(p.views) }}</span>
-            <span><Star :size="13" /> {{ fmtNum(p.favoriteCount) }}</span>
-            <span><GitFork :size="13" /> {{ fmtNum(p.forks || 0) }}</span>
-            <span><Download :size="13" /> {{ fmtNum(p.downloads) }}</span>
+            <span><Eye :size="13" /> {{ fmtNum(p.views) }} 浏览</span>
+            <span><Star :size="13" /> {{ fmtNum(p.favoriteCount) }} 收藏</span>
+            <span><MessageSquareText :size="13" /> {{ arr(p.syllabus).length }} 个阶段</span>
           </div>
           <div class="pc-meta-row">
             <span><Clock :size="13" /> {{ p.duration }}</span>
@@ -104,18 +100,18 @@
           </div>
 
           <div class="pc-author">
-            <span class="pc-avatar">{{ (p.author || '匿')[0] }}</span>
-            <span class="pc-author-name">{{ p.author || '匿名' }}</span>
-            <span class="pc-license">{{ p.license }}</span>
+            <span class="pc-avatar">{{ (p.mentor || p.author || '师')[0] }}</span>
+            <span class="pc-author-name">{{ p.mentor ? '指导教师 ' + p.mentor : (p.author || '匿名') }}</span>
+            <span v-if="p.mentor && p.author" class="pc-license">作者 {{ p.author }}</span>
           </div>
 
           <div class="pc-heat">
             <div class="pc-heat-head">
-              <span>项目热度值</span>
-              <b>{{ p.completionRate }}%</b>
+              <span>{{ p.enrolledCount > 0 ? '参与者完成率' : '暂无参与者' }}</span>
+              <b>{{ p.enrolledCount > 0 ? p.completionRate + '%' : '–' }}</b>
             </div>
             <div class="pc-heat-bar">
-              <div class="pc-heat-inner" :style="{ width: p.completionRate + '%' }"></div>
+              <div class="pc-heat-inner" :style="{ width: (p.enrolledCount > 0 ? p.completionRate : 0) + '%' }"></div>
             </div>
           </div>
 
@@ -151,15 +147,15 @@
           </div>
           <p class="pc-summary">{{ cardSummary(p) }}</p>
           <div class="pc-stats">
-            <span><Eye :size="13" /> {{ fmtNum(p.views) }}</span>
-            <span><Star :size="13" /> {{ fmtNum(p.favoriteCount) }}</span>
-            <span><GitFork :size="13" /> {{ fmtNum(p.forks || 0) }}</span>
-            <span><Download :size="13" /> {{ fmtNum(p.downloads) }}</span>
+            <span><Eye :size="13" /> {{ fmtNum(p.views) }} 浏览</span>
+            <span><Star :size="13" /> {{ fmtNum(p.favoriteCount) }} 收藏</span>
             <span><Users :size="13" /> {{ (p.enrolledCount || 0).toLocaleString() }}人参与</span>
+            <span><Clock :size="13" /> {{ p.duration }}</span>
+            <span v-if="p.mentor">指导教师 {{ p.mentor }}</span>
           </div>
         </div>
         <div class="lc-right">
-          <span class="lc-rating"><Star :size="14" fill="#facc15" color="#facc15" /> {{ p.rating }}</span>
+          <span class="lc-rating">{{ p.enrolledCount > 0 ? `完成率 ${p.completionRate}%` : '暂无参与者' }}</span>
           <button class="pc-detail-btn slim" @click.stop="$router.push(`/app/projects/${p.id}`)">查看详情</button>
         </div>
       </div>
@@ -177,8 +173,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  BadgeCheck, CircuitBoard, Clock, Cog, Cpu, Download, Eye, Folder, Gauge,
-  GitFork, LayoutGrid, List, Radio, Search, ShoppingCart, SlidersHorizontal,
+  BadgeCheck, CircuitBoard, Clock, Cog, Cpu, Eye, Folder, Gauge,
+  LayoutGrid, List, MessageSquareText, Radio, Search, ShoppingCart, SlidersHorizontal,
   Star, Users, Wifi, Zap
 } from 'lucide-vue-next'
 import { fetchProjects } from '../../api'
@@ -427,7 +423,7 @@ onMounted(() => {
 .lc-main { flex: 1; min-width: 0; }
 .lc-title-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .lc-right { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; flex-shrink: 0; }
-.lc-rating { font-size: 13px; color: #374151; display: inline-flex; align-items: center; gap: 4px; }
+.lc-rating { font-size: 12px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px; }
 
 .pager { display: flex; justify-content: center; margin: 24px 0; }
 </style>

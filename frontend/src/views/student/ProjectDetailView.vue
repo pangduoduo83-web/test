@@ -2,6 +2,9 @@
   <div v-if="project">
     <a class="back-link" @click="$router.push('/app/projects')"><ArrowLeft :size="14" /> 返回项目列表</a>
 
+    <TutorPanel v-model="tutorVisible" :project-id="route.params.id" :project="project" :enrollment="detail.enrollment"
+                @enroll="doEnroll" @refresh="reloadDetail" @go-submit="goSubmit" />
+
     <!-- 大图 Hero -->
     <div class="hero">
       <img v-if="project.coverUrl && !coverFailed" :src="project.coverUrl" :alt="project.title"
@@ -14,7 +17,8 @@
           <span v-if="project.verified" class="cover-badge purple" style="position:static">
             <Zap :size="12" /> 硬件已验证
           </span>
-          <span class="cover-badge green" style="position:static">开源</span>
+          <span v-if="project.license" class="cover-badge green" style="position:static">{{ project.license }}</span>
+          <span v-if="project.category" class="cover-badge rating" style="position:static">{{ project.category }}</span>
         </div>
         <h1 class="hero-title">{{ project.title }}</h1>
         <p v-if="project.summary" class="hero-summary">{{ project.summary }}</p>
@@ -26,28 +30,45 @@
       <div class="meta-left">
         <span><Clock :size="14" /> {{ project.duration }}</span>
         <span><Users :size="14" /> 团队规模: {{ project.teamSize }}</span>
-        <span><Star :size="14" fill="#facc15" color="#facc15" /> {{ project.rating }} 分</span>
         <span><Eye :size="14" /> {{ fmtNum(project.views) }} 浏览</span>
+        <span><Clock :size="14" /> 更新 {{ (project.updatedAt || '').slice(0, 10) }}</span>
       </div>
       <div class="meta-actions">
-        <button class="circle-btn" @click="doFavorite">
-          <Heart :size="16" :fill="detail.favorited ? '#ef4444' : 'none'"
-                 :color="detail.favorited ? '#ef4444' : '#6b7280'" />
-        </button>
-        <button class="circle-btn" @click="doShare"><Share2 :size="15" color="#6b7280" /></button>
+        <button class="circle-btn" @click="doShare" title="复制链接"><Share2 :size="15" color="#6b7280" /></button>
         <el-button plain @click="doFavorite">
-          <Star :size="14" :fill="detail.favorited ? '#facc15' : 'none'"
-                :color="detail.favorited ? '#facc15' : 'currentColor'" style="margin-right:5px" />
+          <Heart :size="14" :fill="detail.favorited ? '#ef4444' : 'none'"
+                 :color="detail.favorited ? '#ef4444' : 'currentColor'" style="margin-right:5px" />
           {{ detail.favorited ? '已收藏' : '收藏项目' }}
         </el-button>
+        <button class="tutor-btn" @click="openTutor">
+          <Bot :size="15" /> AI 导师
+        </button>
         <button class="enroll-btn" :disabled="detail.enrolled || enrolling" @click="doEnroll">
           {{ detail.enrolled ? '✓ 已报名' : enrolling ? '处理中...' : '立即报名' }}
         </button>
       </div>
     </div>
 
-    <!-- 统计卡 -->
+    <!-- 统计卡:全部来自真实记录 -->
     <div class="stat-grid">
+      <div class="ref-stat-card">
+        <div class="ref-stat-icon" style="background:#dbeafe">
+          <Users :size="22" color="#2563eb" />
+        </div>
+        <div>
+          <div class="ref-stat-value">{{ fmtNum(project.enrolledCount) }}</div>
+          <div class="ref-stat-label">参与人数</div>
+        </div>
+      </div>
+      <div class="ref-stat-card">
+        <div class="ref-stat-icon" style="background:#dcfce7">
+          <Check :size="22" color="#16a34a" />
+        </div>
+        <div>
+          <div class="ref-stat-value">{{ project.enrolledCount > 0 ? project.completionRate + '%' : '–' }}</div>
+          <div class="ref-stat-label">参与者完成率</div>
+        </div>
+      </div>
       <div class="ref-stat-card">
         <div class="ref-stat-icon" style="background:#fce7f3">
           <Heart :size="22" color="#db2777" />
@@ -58,29 +79,11 @@
         </div>
       </div>
       <div class="ref-stat-card">
-        <div class="ref-stat-icon" style="background:#f3e8ff">
-          <GitFork :size="22" color="#9333ea" />
+        <div class="ref-stat-icon" style="background:#fef3c7">
+          <DollarSign :size="22" color="#d97706" />
         </div>
         <div>
-          <div class="ref-stat-value">{{ fmtNum(project.forks || 0) }}</div>
-          <div class="ref-stat-label">Fork数</div>
-        </div>
-      </div>
-      <div class="ref-stat-card">
-        <div class="ref-stat-icon" style="background:#dcfce7">
-          <Download :size="22" color="#16a34a" />
-        </div>
-        <div>
-          <div class="ref-stat-value">{{ fmtNum(project.downloads) }}</div>
-          <div class="ref-stat-label">下载量</div>
-        </div>
-      </div>
-      <div class="ref-stat-card">
-        <div class="ref-stat-icon" style="background:#dbeafe">
-          <DollarSign :size="22" color="#2563eb" />
-        </div>
-        <div>
-          <div class="ref-stat-value">¥{{ project.cost || '-' }}</div>
+          <div class="ref-stat-value">{{ project.cost ? '¥' + project.cost : '–' }}</div>
           <div class="ref-stat-label">预估成本</div>
         </div>
       </div>
@@ -92,26 +95,62 @@
         <span class="avatar big">{{ (project.mentor || '师')[0] }}</span>
         <div>
           <div class="mentor-name-row">
-            <b>{{ project.mentor || '待定' }}</b>
-            <span class="badge badge-blue">认证讲师</span>
+            <b>{{ project.mentor || '暂未指派' }}</b>
+            <span v-if="project.mentor" class="badge badge-blue">指导教师</span>
           </div>
-          <div class="mentor-role">讲师</div>
+          <div class="mentor-role">{{ project.mentor ? '负责本项目的成果评审与答疑,可在「项目讨论」里提问' : '有问题可在「项目讨论」里留言,管理员会跟进' }}</div>
         </div>
       </div>
       <div class="mentor-meta">
-        <span><User :size="14" /> 作者: {{ project.author || '-' }}</span>
-        <span><FileText :size="14" /> 协议: {{ project.license }}</span>
-        <span><Clock :size="14" /> 更新: {{ (project.updatedAt || '').slice(0, 10) }}</span>
+        <span v-if="project.author"><User :size="14" /> 作者: {{ project.author }}</span>
+        <span v-if="project.license"><FileText :size="14" /> 协议: {{ project.license }}</span>
+        <span v-if="pcbText"><Zap :size="14" /> {{ pcbText }}</span>
       </div>
     </div>
 
-    <!-- 我的进度(已报名时) -->
+    <!-- 我的进度(已报名时):进度是学习位置,完成由评审判定 -->
     <div v-if="detail.enrollment" class="card progress-bar-card">
       <div class="pg-head">
-        <b>我的学习进度</b>
+        <b>我的学习进度
+          <span class="badge" :class="detail.enrollment.status === 'COMPLETED' ? 'badge-green' : 'badge-blue'" style="margin-left:8px">
+            {{ detail.enrollment.status === 'COMPLETED' ? '已通过评审完成' : '进行中' }}
+          </span>
+        </b>
         <span class="pg-meta">当前任务: {{ detail.enrollment.currentTask || '-' }} · 截止: {{ detail.enrollment.deadline || '-' }}</span>
       </div>
       <el-progress :percentage="detail.enrollment.progress" :stroke-width="10" color="#3b82f6" />
+
+      <!-- 有教学大纲:按阶段打勾,进度自动折算 -->
+      <div v-if="detail.enrollment.status !== 'COMPLETED' && phases.length" class="phase-list">
+        <label v-for="(ph, i) in phases" :key="i" class="phase-item" :class="{ done: donePhases.has(i + 1), next: nextPhase === i + 1 }">
+          <el-checkbox :model-value="donePhases.has(i + 1)" :disabled="savingProgress" @change="(v) => togglePhase(i + 1, v)" />
+          <div class="phase-text">
+            <div class="phase-title"><span class="phase-no">{{ ph.phase || `第 ${i + 1} 阶段` }}</span>{{ ph.title }}<small v-if="ph.hours"> · {{ ph.hours }} 学时</small></div>
+            <div v-if="nextPhase === i + 1 && ph.content" class="phase-content">{{ ph.content }}</div>
+          </div>
+          <span v-if="nextPhase === i + 1" class="badge badge-blue">当前阶段</span>
+        </label>
+        <div class="pg-edit">
+          <el-button size="small" text @click="openTutor"><Bot :size="13" style="margin-right:4px" /> 让 AI 导师带我做当前阶段</el-button>
+          <span class="pg-meta">全部阶段打勾后,请在下方「项目成果」提交,评审通过才算完成</span>
+        </div>
+      </div>
+
+      <!-- 没有大纲:手动填百分比 -->
+      <div v-else-if="detail.enrollment.status !== 'COMPLETED'" class="pg-edit">
+        <template v-if="!editingProgress">
+          <el-button size="small" plain @click="startEditProgress">更新进度</el-button>
+          <el-button size="small" text @click="openTutor"><Bot :size="13" style="margin-right:4px" /> 让 AI 导师告诉我下一步</el-button>
+          <span class="pg-meta">进度到 100% 后,请在下方「项目成果」提交,评审通过才算完成</span>
+        </template>
+        <template v-else>
+          <el-slider v-model="progressForm.progress" :step="5" show-stops style="flex:1;max-width:320px" />
+          <b class="pg-pct">{{ progressForm.progress }}%</b>
+          <el-input v-model="progressForm.currentTask" size="small" placeholder="接下来要做的任务" style="width:240px" maxlength="60" />
+          <el-button size="small" type="primary" :loading="savingProgress" @click="saveProgress">保存</el-button>
+          <el-button size="small" text @click="editingProgress = false">取消</el-button>
+        </template>
+      </div>
     </div>
 
 
@@ -173,7 +212,7 @@
           <div class="notice-box">
             <div class="notice-title">设备使用提示</div>
             <ul>
-              <li>开发板类设备标准借用期限为2周</li>
+              <li>开发板类设备标准借用期限为 2 周,到期前 3 天可续借一次</li>
               <li>精密仪器需在指导老师监督下使用</li>
               <li>使用前请仔细阅读设备操作手册</li>
               <li>如遇设备故障请及时联系实验室管理员</li>
@@ -194,17 +233,24 @@
           </el-timeline>
           <div class="notice-box">
             <div class="notice-title">考核方式</div>
-            <div class="assess-row"><span>平时实践</span><span>40%</span></div>
-            <div class="assess-row"><span>项目成果</span><span>40%</span></div>
-            <div class="assess-row"><span>答辩展示</span><span>20%</span></div>
+            <template v-if="assessments.length">
+              <div v-for="a in assessments" :key="a.name" class="assess-row">
+                <span>{{ a.name }}<small v-if="a.desc" class="assess-desc-inline"> · {{ a.desc }}</small></span>
+                <span>{{ a.weight }}%</span>
+              </div>
+              <div class="assess-foot">每项在「项目成果」页签单独提交并评分,全部评完按权重计算综合分,≥60 分判定项目完成。</div>
+            </template>
+            <div v-else class="assess-foot">本项目按整体成果一次性提交评审,评分 ≥60 分判定完成。</div>
           </div>
         </el-tab-pane>
 
         <el-tab-pane label="BOM清单" name="bom">
           <div class="bom-head">
-            <span>BOM物料清单 · 预估成本: ¥{{ project.cost || '-' }}</span>
+            <span>BOM物料清单 · 预估成本: {{ project.cost ? '¥' + project.cost : '未填写' }}</span>
             <div>
-              <el-button size="small" @click="downloadGerber">下载Gerber文件</el-button>
+              <a v-for="f in designFiles" :key="f.name" :href="f.url" target="_blank" class="design-file">
+                <Download :size="13" /> {{ f.type }}: {{ f.name }}
+              </a>
               <el-button size="small" @click="exportBom">导出BOM表</el-button>
             </div>
           </div>
@@ -220,6 +266,7 @@
         </el-tab-pane>
 
         <el-tab-pane label="学习资源" name="resources">
+          <el-empty v-if="arr(project.resources).length === 0" description="教师尚未上传教学资料" />
           <div v-for="r in arr(project.resources)" :key="r.name" class="res-row">
             <span class="res-type badge badge-blue">{{ r.type }}</span>
             <span class="res-name">{{ r.name }}</span>
@@ -228,9 +275,6 @@
             </a>
             <el-button v-else size="small" text type="info" @click="downloadResource(r)">待上传</el-button>
           </div>
-          <h4>推荐阅读</h4>
-          <div class="book-row">《嵌入式系统设计》 王田苗 著 <span class="badge badge-gray">图书馆藏书中</span></div>
-          <div class="book-row">《物联网技术导论》 刘云浩 著 <span class="badge badge-gray">图书馆藏书中</span></div>
         </el-tab-pane>
 
         <el-tab-pane :label="`项目讨论(${topics.length})`" name="discussions">
@@ -283,8 +327,9 @@
                 <span class="chip">权重 {{ a.weight }}%</span>
                 <span v-if="latestFor(a.name)" class="badge"
                       :class="latestFor(a.name).status === 'GRADED'
-                        ? (latestFor(a.name).score >= 60 ? 'badge-green' : 'badge-red') : 'badge-yellow'">
-                  {{ latestFor(a.name).status === 'GRADED' ? `已评 ${latestFor(a.name).score} 分` : '评审中' }}
+                        ? (latestFor(a.name).score >= 60 ? 'badge-green' : 'badge-red')
+                        : latestFor(a.name).status === 'RETURNED' ? 'badge-red' : 'badge-yellow'">
+                  {{ latestFor(a.name).status === 'GRADED' ? `已评 ${latestFor(a.name).score} 分` : latestFor(a.name).status === 'RETURNED' ? '已退回,请修改' : '评审中' }}
                 </span>
                 <span v-else class="badge badge-gray">未提交</span>
                 <el-button v-if="canSubmitFor(a.name)" size="small" type="primary" plain class="assess-btn"
@@ -298,10 +343,10 @@
                 <div class="sub-content">{{ latestFor(a.name).content }}</div>
                 <img v-if="latestFor(a.name).attachmentUrl" :src="latestFor(a.name).attachmentUrl"
                      class="sub-shot" alt="成果截图" />
-                <div v-if="latestFor(a.name).status === 'GRADED' && latestFor(a.name).feedback"
-                     class="sub-grade" :class="{ pass: latestFor(a.name).score >= 60 }">
-                  评语: {{ latestFor(a.name).feedback }}
-                  <span class="sub-meta">{{ latestFor(a.name).graderName }} 评于 {{ fmtTime(latestFor(a.name).gradedAt) }}</span>
+                <div v-if="latestFor(a.name).status !== 'SUBMITTED' && latestFor(a.name).feedback"
+                     class="sub-grade" :class="{ pass: latestFor(a.name).status === 'GRADED' && latestFor(a.name).score >= 60 }">
+                  {{ latestFor(a.name).status === 'RETURNED' ? '老师退回修改意见' : '评语' }}: {{ latestFor(a.name).feedback }}
+                  <span class="sub-meta">{{ latestFor(a.name).graderName }} · {{ fmtTime(latestFor(a.name).gradedAt) }}</span>
                 </div>
               </div>
 
@@ -325,8 +370,8 @@
             <div class="pg-head">
               <b>我的成果</b>
               <span v-if="mySubmission" class="badge"
-                    :class="mySubmission.status === 'GRADED' ? (mySubmission.score >= 60 ? 'badge-green' : 'badge-red') : 'badge-yellow'">
-                {{ mySubmission.status === 'GRADED' ? `已评分 ${mySubmission.score} 分` : '评审中' }}
+                    :class="mySubmission.status === 'GRADED' ? (mySubmission.score >= 60 ? 'badge-green' : 'badge-red') : mySubmission.status === 'RETURNED' ? 'badge-red' : 'badge-yellow'">
+                {{ mySubmission.status === 'GRADED' ? `已评分 ${mySubmission.score} 分` : mySubmission.status === 'RETURNED' ? '已退回,请修改后重新提交' : '评审中' }}
               </span>
               <span v-else class="pg-meta">完成项目后提交成果,评分 ≥60 分自动判定项目完成并获得经验值</span>
             </div>
@@ -339,7 +384,12 @@
                 <template v-if="mySubmission.feedback">评语: {{ mySubmission.feedback }}</template>
                 <span class="sub-meta">{{ mySubmission.graderName }} 评于 {{ fmtTime(mySubmission.gradedAt) }}</span>
               </div>
-              <div v-else class="sub-waiting">已提交,等待管理员评审 · {{ fmtTime(mySubmission.submittedAt) }}</div>
+              <div v-else-if="mySubmission.status === 'RETURNED'" class="sub-grade">
+                <b>老师退回了这份成果,请按意见修改后重新提交。</b>
+                <template v-if="mySubmission.feedback">修改意见: {{ mySubmission.feedback }}</template>
+                <span class="sub-meta">{{ mySubmission.graderName }} · {{ fmtTime(mySubmission.gradedAt) }}</span>
+              </div>
+              <div v-else class="sub-waiting">已提交,等待老师评审 · {{ fmtTime(mySubmission.submittedAt) }}</div>
             </div>
 
             <div v-if="canSubmitWork" class="sub-form">
@@ -362,21 +412,25 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  ArrowLeft, Check, ClipboardList, Clock, DollarSign, Download, Eye, FileText,
-  GitFork, Heart, Pin, Share2, Star, Target, User, Users, Wrench, Zap
+  ArrowLeft, Bot, Check, ClipboardList, Clock, DollarSign, Download, Eye, FileText,
+  Heart, Pin, Share2, Target, User, Users, Wrench, Zap
 } from 'lucide-vue-next'
 import {
   enrollProject, fetchDiscussions, fetchMySubmission, fetchMySubmissions, fetchProjectDetail,
-  fetchSkills, postDiscussion, submitWork, toggleFavorite
+  fetchSkills, postDiscussion, submitWork, toggleFavorite, updateProgress
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
+import TutorPanel from '../../components/TutorPanel.vue'
 
 const route = useRoute()
 const detail = ref({ project: null, enrolled: false, favorited: false, enrollment: null })
+const editingProgress = ref(false)
+const savingProgress = ref(false)
+const progressForm = reactive({ progress: 0, currentTask: '' })
 const skills = ref([])
 const tab = ref('overview')
 const enrolling = ref(false)
@@ -402,6 +456,61 @@ const diffColor = (d) => d === '入门' ? 'green' : d === '进阶' ? 'blue' : 'r
 
 const project = computed(() => detail.value.project)
 const arr = (v) => Array.isArray(v) ? v : []
+const pcbText = computed(() => {
+  const parts = []
+  if (project.value?.layers) parts.push(project.value.layers + ' 层板')
+  if (project.value?.pcbSize) parts.push(project.value.pcbSize)
+  return parts.join(' · ')
+})
+// 教师在资源里上传的原理图 / LAYOUT / 3D 文件直接作为设计文件下载入口
+const designFiles = computed(() =>
+  arr(project.value?.resources).filter((r) => r.url && ['原理图', 'LAYOUT', '3D图'].includes(r.type)))
+
+// AI 导师是项目页内的面板,不跳走
+const tutorVisible = ref(false)
+const openTutor = () => { tutorVisible.value = true }
+const reloadDetail = async () => { detail.value = await fetchProjectDetail(route.params.id) }
+const goSubmit = () => { tutorVisible.value = false; tab.value = 'submission' }
+
+// ---------- 按大纲阶段打勾 ----------
+const phases = computed(() => arr(project.value?.syllabus))
+const donePhases = computed(() => {
+  try { return new Set(JSON.parse(detail.value.enrollment?.completedPhases || '[]')) } catch (e) { return new Set() }
+})
+const nextPhase = computed(() => {
+  for (let i = 1; i <= phases.value.length; i++) if (!donePhases.value.has(i)) return i
+  return null
+})
+const togglePhase = async (no, checked) => {
+  const set = new Set(donePhases.value)
+  if (checked) set.add(no); else set.delete(no)
+  savingProgress.value = true
+  try {
+    await updateProgress(route.params.id, { progress: 0, completedPhases: [...set] })
+    detail.value = await fetchProjectDetail(route.params.id)
+    if (set.size === phases.value.length) ElMessage.success('全部阶段已完成,去「项目成果」提交等待评审吧')
+  } catch (e) { /* 已提示 */ } finally {
+    savingProgress.value = false
+  }
+}
+
+const startEditProgress = () => {
+  progressForm.progress = detail.value.enrollment?.progress || 0
+  progressForm.currentTask = detail.value.enrollment?.currentTask || ''
+  editingProgress.value = true
+}
+
+const saveProgress = async () => {
+  savingProgress.value = true
+  try {
+    await updateProgress(route.params.id, { progress: progressForm.progress, currentTask: progressForm.currentTask })
+    ElMessage.success(progressForm.progress >= 100 ? '进度已到 100%,记得在「项目成果」提交等待评审' : '进度已更新')
+    editingProgress.value = false
+    detail.value = await fetchProjectDetail(route.params.id)
+  } catch (e) { /* 已提示 */ } finally {
+    savingProgress.value = false
+  }
+}
 // 富文本描述(后端已消毒);旧数据为纯文本。空编辑器占位 <p><br></p> 不当作有内容。
 const isRich = (v) => {
   if (typeof v !== 'string' || !v.includes('<')) return false
@@ -415,7 +524,7 @@ const mySkill = (name) => {
 }
 
 const canSubmitWork = computed(() =>
-  detail.value.enrollment && (!mySubmission.value || mySubmission.value.status === 'GRADED'))
+  detail.value.enrollment && (!mySubmission.value || mySubmission.value.status !== 'SUBMITTED'))
 
 // ---------- 分阶段考核 ----------
 const assessments = computed(() => arr(project.value?.assessments))
@@ -425,7 +534,7 @@ const latestFor = (name) =>
 
 const canSubmitFor = (name) => {
   const latest = latestFor(name)
-  return !latest || latest.status === 'GRADED'
+  return !latest || latest.status !== 'SUBMITTED'
 }
 
 const overallScore = computed(() => {
@@ -466,7 +575,7 @@ const doSubmitWork = async (assessName) => {
       attachmentUrl: workShot.value || undefined,
       assessmentName: assessName || undefined
     })
-    ElMessage.success('提交成功,等待管理员评审')
+    ElMessage.success('提交成功,等待老师评审')
     workContent.value = ''
     workShot.value = ''
     activeAssessment.value = ''
@@ -559,12 +668,8 @@ const exportBom = () => {
   ElMessage.success('BOM 表已导出')
 }
 
-const downloadGerber = () => {
-  ElMessage.info('该项目暂未上传 Gerber 制板文件,请在项目讨论区联系导师获取')
-}
-
 const downloadResource = (r) => {
-  ElMessage.info(`《${r.name}》暂未上传附件,教师在「教学资源管理」上传后这里即可直接下载`)
+  ElMessage.info(`《${r.name}》暂未上传附件,教师上传后这里即可直接下载`)
 }
 
 onMounted(load)
@@ -625,6 +730,27 @@ onMounted(load)
 }
 .enroll-btn:hover { background: #1d4ed8; }
 .enroll-btn:disabled { background: #93c5fd; cursor: not-allowed; box-shadow: none; }
+.tutor-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #7c3aed, #9333ea); color: #fff;
+  border: none; border-radius: 10px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  box-shadow: 0 6px 12px -2px rgba(147,51,234,.35); transition: opacity .15s;
+}
+.tutor-btn:hover { opacity: .9; }
+.pg-edit { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.phase-list { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.phase-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; }
+.phase-item.next { background: #eff6ff; border-color: #bfdbfe; }
+.phase-item.done .phase-title { color: #9ca3af; text-decoration: line-through; }
+.phase-text { flex: 1; min-width: 0; }
+.phase-title { font-size: 14px; color: #111827; }
+.phase-no { font-size: 12px; color: var(--brand-blue); font-weight: 600; margin-right: 8px; }
+.phase-title small { color: var(--text-secondary); font-weight: 400; }
+.phase-content { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.6; white-space: pre-wrap; }
+.pg-pct { font-size: 13px; width: 40px; }
+.assess-desc-inline { color: var(--text-secondary); font-weight: 400; }
+.assess-foot { font-size: 12px; color: var(--text-secondary); margin-top: 8px; line-height: 1.6; }
+.design-file { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--brand-blue); margin-right: 10px; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
 @media (max-width: 900px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }

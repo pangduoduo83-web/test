@@ -85,6 +85,10 @@ public class AiSkillService {
     public List<Map<String, Object>> visibleTo(AuthUser user) {
         List<Map<String, Object>> list = new ArrayList<>();
         for (AiSkill s : builtins.values()) {
+            // hidden 的内置 SKILL 只供页面内嵌调用(行动清单、今日建议等),不在对话页的 SKILL 列表里出现
+            if (spec(s).raw().path("hidden").asBoolean(false)) {
+                continue;
+            }
             list.add(view(s, user));
         }
         for (AiSkill s : skillRepo.findByScopeOrderByUpdatedAtDesc(AiSkill.SCOPE_TENANT)) {
@@ -98,9 +102,12 @@ public class AiSkillService {
         return list;
     }
 
-    /** 管理端:本站全部入库 SKILL(含所有人的个人 SKILL) */
+    /** 管理端:内置 SKILL(只读,随版本发布)+ 本站全部入库 SKILL(含所有人的个人 SKILL) */
     public List<Map<String, Object>> allStored(AuthUser admin) {
         List<Map<String, Object>> list = new ArrayList<>();
+        for (AiSkill s : builtins.values()) {
+            list.add(view(s, admin));
+        }
         for (AiSkill s : skillRepo.findAllByOrderByUpdatedAtDesc()) {
             list.add(view(s, admin));
         }
@@ -334,6 +341,12 @@ public class AiSkillService {
             examples.add(e.asText());
         }
         m.put("examples", examples);
+        List<String> contextTypes = new ArrayList<>();
+        for (JsonNode c : spec.raw().path("context")) {
+            contextTypes.add(c.asText());
+        }
+        m.put("contextTypes", contextTypes);
+        m.put("hidden", spec.raw().path("hidden").asBoolean(false));
         m.put("editable", viewer != null && !AiSkill.SCOPE_BUILTIN.equals(s.getScope()) && canManage(s, viewer));
         m.put("updatedAt", s.getUpdatedAt());
         return m;

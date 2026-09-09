@@ -56,6 +56,20 @@
         </el-dropdown>
       </header>
 
+      <!-- 项目上下文条:从项目页「AI 导师」进入时带上,新会话会把项目、进度、成果情况交给模型 -->
+      <div v-if="contextProject" class="context-bar" :class="{ muted: !!conversationId }">
+        <span class="ctx-icon">🧭</span>
+        <div class="ctx-text">
+          <b>{{ conversationId ? '本会话关联项目' : '正在辅导' }}:《{{ contextProject.title }}》</b>
+          <span class="ctx-sub">
+            <template v-if="contextProject.enrollment">进度 {{ contextProject.enrollment.progress }}% · 当前任务:{{ contextProject.enrollment.currentTask || '未设置' }}</template>
+            <template v-else>尚未报名 · AI 会先帮你判断是否适合</template>
+          </span>
+        </div>
+        <el-button size="small" text @click="$router.push(`/app/projects/${contextProject.id}`)">打开项目页</el-button>
+        <el-button size="small" text @click="clearContext">解除关联</el-button>
+      </div>
+
       <div ref="scroller" class="messages">
         <div v-if="messages.length === 0 && current" class="greeting">
           <div class="greeting-text">{{ current.greeting || '有什么可以帮你?' }}</div>
@@ -185,14 +199,16 @@
 
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   aiConversationMessages, aiConversations, aiCreateSkill, aiDeleteConversation, aiDeleteSkill,
-  aiDuplicateSkill, aiSkillDetail, aiSkills, aiTools, aiUpdateSkill
+  aiDuplicateSkill, aiSkillDetail, aiSkills, aiTools, aiUpdateSkill, fetchProjectDetail
 } from '../../api'
 import { streamChat } from '../../api/aiStream'
 import { useAuthStore } from '../../stores/auth'
 
+const route = useRoute()
 const authStore = useAuthStore()
 const isStaff = computed(() => ['ADMIN', 'TEACHER'].includes(authStore.user?.role))
 
@@ -233,9 +249,26 @@ const scrollToBottom = () => nextTick(() => { if (scroller.value) scroller.value
 
 const loadSkills = async () => {
   skills.value = await aiSkills()
-  if (!current.value && skills.value.length) current.value = skills.value[0]
+  if (!current.value && skills.value.length) {
+    // 项目页「AI 导师」、管理端「试用」等入口通过 ?skill=key 直接定位到某个 SKILL
+    const wanted = skills.value.find((s) => s.key === route.query.skill)
+    current.value = wanted || skills.value.find((s) => s.key === 'study-assistant') || skills.value[0]
+  }
 }
 const loadConversations = async () => { conversations.value = await aiConversations() }
+
+// ---------- 项目上下文(?projectId=) ----------
+const contextProject = ref(null)
+const contextBody = computed(() => (contextProject.value ? { projectId: contextProject.value.id } : undefined))
+const loadContext = async (projectId) => {
+  const id = Number(projectId ?? route.query.projectId)
+  if (!id) return
+  try {
+    const d = await fetchProjectDetail(id)
+    contextProject.value = { id: d.project.id, title: d.project.title, enrollment: d.enrollment }
+  } catch (e) { /* 项目不存在则忽略 */ }
+}
+const clearContext = () => { contextProject.value = null }
 
 const selectSkill = (s) => {
   current.value = s
@@ -249,6 +282,15 @@ const openConversation = async (c) => {
   conversationId.value = c.id
   const skill = skills.value.find((s) => s.key === c.skillKey)
   if (skill) current.value = skill
+  // 历史会话自带上下文(服务端已存),这里只用于展示关联条
+  if (c.context) {
+    try {
+      const pid = JSON.parse(c.context).projectId
+      if (pid && contextProject.value?.id !== pid) await loadContext(pid)
+    } catch (e) { /* 忽略 */ }
+  } else {
+    contextProject.value = null
+  }
   const list = await aiConversationMessages(c.id)
   messages.value = list.filter((m) => m.role === 'user' || (m.role === 'assistant' && m.content && !m.toolCalls))
     .map((m) => ({ role: m.role, content: m.content, tools: [] }))
@@ -280,6 +322,8 @@ const runStream = (body) => {
       if (d.conversationId) conversationId.value = d.conversationId
       if (!assistant.content && !assistant.confirm) assistant.content = d.content || ''
       await loadConversations()
+      // AI 可能刚更新了进度,刷新上下文条里的进度信息
+      if (contextProject.value) loadContext(contextProject.value.id)
       scrollToBottom()
     },
     onError: (msg) => {
@@ -296,7 +340,7 @@ const send = (text) => {
   if (!content || busy.value || !current.value) return
   draft.value = ''
   messages.value.push({ role: 'user', content, tools: [] })
-  runStream({ skillKey: current.value.key, conversationId: conversationId.value, input: content })
+  runStream({ skillKey: current.value.key, conversationId: conversationId.value, input: content, context: conversationId.value ? undefined : contextBody.value })
 }
 
 const sendForm = () => {
@@ -309,7 +353,7 @@ const sendForm = () => {
   }
   const summary = Object.entries(formInput).filter(([, v]) => v !== '' && v != null).map(([k, v]) => `${current.value.inputSchema.properties[k]?.title || k}:${v}`).join('\n')
   messages.value.push({ role: 'user', content: summary, tools: [] })
-  runStream({ skillKey: current.value.key, conversationId: conversationId.value, input: { ...formInput } })
+  runStream({ skillKey: current.value.key, conversationId: conversationId.value, input: { ...formInput }, context: conversationId.value ? undefined : contextBody.value })
 }
 
 const confirmTool = (m) => {
@@ -408,7 +452,7 @@ const onSkillCommand = async (cmd) => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadSkills(), loadConversations()])
+  await Promise.all([loadSkills(), loadConversations(), loadContext()])
 })
 </script>
 
@@ -436,6 +480,15 @@ onMounted(async () => {
 
 .chat { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .chat-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.context-bar {
+  display: flex; align-items: center; gap: 10px; padding: 10px 18px; font-size: 13px;
+  background: linear-gradient(to right, #faf5ff, #eff6ff); border-bottom: 1px solid #e9d5ff;
+}
+.context-bar.muted { background: #f9fafb; border-bottom-color: var(--border); }
+.ctx-icon { font-size: 18px; }
+.ctx-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ctx-text b { font-size: 13px; color: #4c1d95; }
+.ctx-sub { font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-head-text { flex: 1; min-width: 0; }
 .chat-title { font-weight: 700; }
 .chat-sub { font-size: 12px; color: #6b7280; }

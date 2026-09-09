@@ -7,8 +7,11 @@ import { fetchSiteConfig } from '../api'
  */
 export const siteConfig = reactive({
   title: 'AI未来实践中心',
+  slogan: '项目驱动教学实验平台',
   logoUrl: '',
   footerText: '',
+  contactEmail: '',
+  serviceHours: '',
   allowRegister: true,
   projectPageSize: 9,
   equipmentPageSize: 9,

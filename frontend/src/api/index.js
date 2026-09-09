@@ -63,11 +63,36 @@ export const markAllNotificationsRead = () => http.post('/notifications/read-all
 // ---------- 教师端 ----------
 export const teacherStats = () => http.get('/teacher/stats')
 export const teacherProjects = () => http.get('/teacher/projects')
+export const teacherCreateProject = (data) => http.post('/teacher/projects', data)
+export const teacherUpdateProject = (id, data) => http.put(`/teacher/projects/${id}`, data)
 export const teacherUpdateResources = (id, resources) =>
   http.put(`/teacher/projects/${id}/resources`, { resources })
 export const teacherUpdateCover = (id, coverUrl) =>
   http.put(`/teacher/projects/${id}/cover`, { coverUrl })
 export const teacherProjectStudents = (id) => http.get(`/teacher/projects/${id}/students`)
+export const teacherSkillDimensions = () => http.get('/teacher/skill-dimensions')
+export const teacherListSubmissions = (params) => http.get('/teacher/submissions', { params })
+export const teacherGradeSubmission = (id, data) => http.post(`/teacher/submissions/${id}/grade`, data)
+export const teacherReturnSubmission = (id, feedback) => http.post(`/teacher/submissions/${id}/return`, { feedback })
+export const teacherAiReview = (id) => http.post(`/teacher/submissions/${id}/ai-review`, null, { timeout: 120000 })
+export const teacherAnnounceProject = (id, data) => http.post(`/teacher/projects/${id}/announce`, data)
+export const teacherAtRisk = () => http.get('/teacher/at-risk')
+export const teacherRemindStudent = (projectId, studentId, message) => http.post(`/teacher/projects/${projectId}/remind/${studentId}`, { message })
+// 课程班(教师与管理员共用;管理员可指定授课教师)
+export const teacherClasses = () => http.get('/teacher/classes')
+export const teacherCreateClass = (data) => http.post('/teacher/classes', data)
+export const teacherClassDetail = (id) => http.get(`/teacher/classes/${id}`)
+export const teacherUpdateClass = (id, data) => http.put(`/teacher/classes/${id}`, data)
+export const teacherDeleteClass = (id) => http.delete(`/teacher/classes/${id}`)
+export const teacherAddClassMembers = (id, identifiers) => http.post(`/teacher/classes/${id}/members`, { identifiers })
+export const teacherRemoveClassMember = (id, userId) => http.delete(`/teacher/classes/${id}/members/${userId}`)
+export const teacherAssignClass = (id, data) => http.post(`/teacher/classes/${id}/assignments`, data)
+export const teacherUpdateAssignment = (id, assignmentId, data) => http.put(`/teacher/classes/${id}/assignments/${assignmentId}`, data)
+export const teacherRemoveAssignment = (id, assignmentId) => http.delete(`/teacher/classes/${id}/assignments/${assignmentId}`)
+export const teacherClassAnnounce = (id, data) => http.post(`/teacher/classes/${id}/announcements`, data)
+// 学生端班级
+export const myClasses = () => http.get('/classes/mine')
+export const joinClass = (code) => http.post('/classes/join', { code })
 
 // ---------- 管理端 ----------
 export const adminStats = () => http.get('/admin/stats')
@@ -101,7 +126,9 @@ export const adminSendNotification = (data) => http.post('/admin/notifications',
 export const adminDeleteNotification = (id) => http.delete(`/admin/notifications/${id}`)
 export const adminListDiscussions = (params) => http.get('/admin/discussions', { params })
 export const adminDeleteDiscussion = (id) => http.delete(`/admin/discussions/${id}`)
-export const adminAiReview = (id) => http.post(`/admin/submissions/${id}/ai-review`)
+export const adminAiReview = (id) => http.post(`/admin/submissions/${id}/ai-review`, null, { timeout: 120000 })
+export const adminReturnSubmission = (id, feedback) => http.post(`/admin/submissions/${id}/return`, { feedback })
+export const adminAuditLogs = (params) => http.get('/admin/audit-logs', { params })
 
 // ---------- 技能维度(管理端) ----------
 export const adminListSkillDimensions = () => http.get('/admin/skill-dimensions')

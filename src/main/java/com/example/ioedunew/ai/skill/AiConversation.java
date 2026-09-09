@@ -28,6 +28,10 @@ public class AiConversation {
     @Column(length = 100)
     private String title;
 
+    /** 会话上下文 JSON,如 {"projectId":12};为空表示无特定上下文 */
+    @Column(columnDefinition = "TEXT")
+    private String context;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 

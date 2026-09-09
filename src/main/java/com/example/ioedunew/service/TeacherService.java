@@ -6,6 +6,7 @@ import com.example.ioedunew.entity.Project;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.EnrollmentRepository;
 import com.example.ioedunew.repository.ProjectRepository;
+import com.example.ioedunew.repository.SubmissionRepository;
 import com.example.ioedunew.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,16 +30,28 @@ public class TeacherService {
     private final ProjectRepository projectRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
+    private final SubmissionRepository submissionRepository;
+    private final AdminService adminService;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
+    private final com.example.ioedunew.repository.LearningActivityRepository activityRepository;
 
     public TeacherService(ProjectRepository projectRepository,
                           EnrollmentRepository enrollmentRepository,
                           UserRepository userRepository,
-                          ObjectMapper objectMapper) {
+                          SubmissionRepository submissionRepository,
+                          AdminService adminService,
+                          ObjectMapper objectMapper,
+                          NotificationService notificationService,
+                          com.example.ioedunew.repository.LearningActivityRepository activityRepository) {
         this.projectRepository = projectRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.userRepository = userRepository;
+        this.submissionRepository = submissionRepository;
+        this.adminService = adminService;
         this.objectMapper = objectMapper;
+        this.notificationService = notificationService;
+        this.activityRepository = activityRepository;
     }
 
     /** 我的项目:管理员看全部,教师只看自己名下 */
@@ -49,20 +62,49 @@ public class TeacherService {
                 .collect(Collectors.toList());
     }
 
-    /** 教学工作台统计:项目数 / 报名学生数 / 资源文件数 */
+    /** 教学工作台统计:项目数 / 报名学生数 / 待评成果数 / 已完成学生数 */
     public Map<String, Object> stats(Long userId, boolean admin) {
         List<Project> mine = myProjects(userId, admin);
-        long students = mine.stream().mapToLong(p -> p.getEnrolledCount() == null ? 0 : p.getEnrolledCount()).sum();
-        int resources = mine.stream().mapToInt(this::countResources).sum();
-        double rating = mine.stream().mapToDouble(p -> p.getRating() == null ? 0 : p.getRating())
-                .average().orElse(0);
+        java.util.Set<Long> ids = mine.stream().map(Project::getId).collect(Collectors.toSet());
+        long students = 0;
+        long completed = 0;
+        for (Long id : ids) {
+            for (Enrollment e : enrollmentRepository.findByProjectIdOrderByEnrolledAtDesc(id)) {
+                students++;
+                if ("COMPLETED".equals(e.getStatus())) {
+                    completed++;
+                }
+            }
+        }
+        long pending = submissionRepository.findByStatusOrderBySubmittedAtDesc("SUBMITTED").stream()
+                .filter(s -> ids.contains(s.getProjectId())).count();
 
         Map<String, Object> m = new HashMap<>();
         m.put("projectCount", mine.size());
         m.put("studentTotal", students);
-        m.put("resourceCount", resources);
-        m.put("avgRating", Math.round(rating * 10) / 10.0);
+        m.put("completedTotal", completed);
+        m.put("pendingSubmissions", pending);
+        m.put("atRiskCount", atRisk(userId, admin).size());
+        m.put("resourceCount", mine.stream().mapToInt(this::countResources).sum());
         return m;
+    }
+
+    /**
+     * 教师编辑自己项目的教学内容。统计字段、讲师归属与创建时间沿用原值;
+     * 描述经 HtmlSanitizer 消毒,与管理端保存口径一致。
+     */
+    @Transactional
+    public Project updateProject(Long userId, boolean admin, Long projectId, Project input) {
+        Project existing = ownedProject(userId, admin, projectId);
+        if (input.getTitle() == null || input.getTitle().trim().isEmpty()) {
+            throw new BusinessException("项目标题不能为空");
+        }
+        input.setId(projectId);
+        input.setMentor(existing.getMentor());
+        input.setMentorId(existing.getMentorId());
+        input.setHubItemId(existing.getHubItemId());
+        input.setHubVersionNo(existing.getHubVersionNo());
+        return adminService.saveProject(input);
     }
 
     /**
@@ -116,6 +158,103 @@ public class TeacherService {
             result.add(m);
         }
         return result;
+    }
+
+    /** 给项目的全部报名学生发公告(站内通知) */
+    @Transactional
+    public int announceToProject(Long userId, boolean admin, Long projectId, String title, String content) {
+        Project p = ownedProject(userId, admin, projectId);
+        if (title == null || title.trim().isEmpty() || title.trim().length() > 100) {
+            throw new BusinessException("公告标题需为 1~100 字");
+        }
+        String author = userRepository.findById(userId).map(User::getName).orElse("教师");
+        String body = (content == null || content.trim().isEmpty() ? "" : content.trim() + " ") + "—— 《" + p.getTitle() + "》· " + author;
+        int n = 0;
+        for (Enrollment e : enrollmentRepository.findByProjectIdOrderByEnrolledAtDesc(projectId)) {
+            notificationService.create(e.getUserId(), "project", "项目公告:" + title.trim(), body);
+            n++;
+        }
+        return n;
+    }
+
+    /** 教师新建自己指导的项目(默认草稿,编辑满意后再发布) */
+    @Transactional
+    public Project createProject(Long userId, Project input) {
+        if (input.getTitle() == null || input.getTitle().trim().isEmpty()) {
+            throw new BusinessException("项目标题不能为空");
+        }
+        User me = userRepository.findById(userId).orElseThrow(() -> new BusinessException(401, "用户不存在"));
+        input.setId(null);
+        input.setMentorId(me.getId());
+        input.setMentor(me.getName());
+        if (input.getStatus() == null || input.getStatus().isEmpty()) {
+            input.setStatus("DRAFT");
+        }
+        return adminService.saveProject(input);
+    }
+
+    /** 定向提醒某个学生(站内通知) */
+    @Transactional
+    public void remindStudent(Long userId, boolean admin, Long projectId, Long studentId, String message) {
+        Project p = ownedProject(userId, admin, projectId);
+        enrollmentRepository.findByUserIdAndProjectId(studentId, projectId)
+                .orElseThrow(() -> new BusinessException(404, "该学生未报名此项目"));
+        String author = userRepository.findById(userId).map(User::getName).orElse("老师");
+        String body = (message == null || message.trim().isEmpty()
+                ? "请尽快推进《" + p.getTitle() + "》的学习,有困难可以在项目讨论区或 AI 导师那里寻求帮助。"
+                : message.trim()) + " —— " + author;
+        notificationService.create(studentId, "project", "老师提醒:《" + p.getTitle() + "》", body);
+    }
+
+    /**
+     * 掉队名单:我指导项目里进行中的报名,满足任一条件即列出——
+     * 已过截止、14 天没有任何学习动作、时间过半但进度不到 30%。
+     */
+    public List<Map<String, Object>> atRisk(Long userId, boolean admin) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        for (Project p : myProjects(userId, admin)) {
+            for (Enrollment e : enrollmentRepository.findByProjectIdOrderByEnrolledAtDesc(p.getId())) {
+                if ("COMPLETED".equals(e.getStatus())) {
+                    continue;
+                }
+                List<String> reasons = new ArrayList<>();
+                boolean overdue = e.getDeadline() != null && e.getDeadline().isBefore(today);
+                if (overdue) {
+                    reasons.add("已过截止 " + java.time.temporal.ChronoUnit.DAYS.between(e.getDeadline(), today) + " 天");
+                }
+                LocalDateTime last = activityRepository.findTopByUserIdOrderByCreatedAtDesc(e.getUserId())
+                        .map(a -> a.getCreatedAt()).orElse(e.getEnrolledAt());
+                long idleDays = java.time.temporal.ChronoUnit.DAYS.between(last.toLocalDate(), today);
+                if (idleDays >= 14) {
+                    reasons.add(idleDays + " 天没有学习动作");
+                }
+                if (e.getDeadline() != null && e.getEnrolledAt() != null) {
+                    long total = java.time.temporal.ChronoUnit.DAYS.between(e.getEnrolledAt().toLocalDate(), e.getDeadline());
+                    long passed = java.time.temporal.ChronoUnit.DAYS.between(e.getEnrolledAt().toLocalDate(), today);
+                    if (!overdue && total > 0 && passed * 2 >= total && (e.getProgress() == null ? 0 : e.getProgress()) < 30) {
+                        reasons.add("时间过半进度仅 " + (e.getProgress() == null ? 0 : e.getProgress()) + "%");
+                    }
+                }
+                if (reasons.isEmpty()) {
+                    continue;
+                }
+                User u = userRepository.findById(e.getUserId()).orElse(null);
+                Map<String, Object> m = new HashMap<>();
+                m.put("userId", e.getUserId());
+                m.put("studentName", u == null ? "已注销用户" : u.getName());
+                m.put("studentNo", u == null ? null : u.getStudentNo());
+                m.put("projectId", p.getId());
+                m.put("projectTitle", p.getTitle());
+                m.put("progress", e.getProgress());
+                m.put("currentTask", e.getCurrentTask());
+                m.put("deadline", e.getDeadline());
+                m.put("lastActiveAt", last);
+                m.put("reasons", reasons);
+                out.add(m);
+            }
+        }
+        return out;
     }
 
     private Project ownedProject(Long userId, boolean admin, Long projectId) {

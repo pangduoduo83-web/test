@@ -24,4 +24,9 @@ public class AuthUser {
     public boolean isTeacher() {
         return "TEACHER".equals(role);
     }
+
+    /** 实验室管理员:只负责设备与借阅审批 */
+    public boolean isLabAdmin() {
+        return "LAB_ADMIN".equals(role);
+    }
 }

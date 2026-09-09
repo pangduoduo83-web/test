@@ -27,6 +27,10 @@ public class AuthInterceptor implements HandlerInterceptor {
     private static final Pattern PUBLIC_BROWSE = Pattern.compile(
             "^/api/(projects(/\\d+(/discussions)?)?|equipment(/locations|/\\d+)?)$");
 
+    /** 实验室管理员在管理端可用的范围:看板统计、设备、借阅审批 */
+    private static final Pattern LAB_ADMIN_SCOPE = Pattern.compile(
+            "^/api/admin/(stats|trends|equipment|borrows)(/.*)?$");
+
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
 
@@ -89,7 +93,10 @@ public class AuthInterceptor implements HandlerInterceptor {
         // JWT 仅用于确认身份,角色权限始终以数据库中的当前值为准。
         user = new AuthUser(current.getId(), current.getRole(), user.getTenant());
         if (uri.startsWith("/api/admin/") && !user.isAdmin()) {
-            return reject(response, 403, "需要管理员权限");
+            boolean labScope = user.isLabAdmin() && LAB_ADMIN_SCOPE.matcher(uri).matches();
+            if (!labScope) {
+                return reject(response, 403, user.isLabAdmin() ? "实验室管理员只能管理设备与借阅" : "需要管理员权限");
+            }
         }
         if (uri.startsWith("/api/teacher/") && !user.isTeacher() && !user.isAdmin()) {
             return reject(response, 403, "需要教师权限");

@@ -3,6 +3,7 @@ package com.example.ioedunew.service;
 import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.dto.MiscDtos;
 import com.example.ioedunew.entity.Enrollment;
+import com.example.ioedunew.entity.LearningActivity;
 import com.example.ioedunew.entity.Project;
 import com.example.ioedunew.entity.Submission;
 import com.example.ioedunew.entity.User;
@@ -31,19 +32,25 @@ public class SubmissionService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final SkillService skillService;
+    private final ProjectStatsService statsService;
+    private final LearningActivityService activityService;
 
     public SubmissionService(SubmissionRepository submissionRepository,
                              EnrollmentRepository enrollmentRepository,
                              ProjectRepository projectRepository,
                              UserRepository userRepository,
                              NotificationService notificationService,
-                             SkillService skillService) {
+                             SkillService skillService,
+                             ProjectStatsService statsService,
+                             LearningActivityService activityService) {
         this.submissionRepository = submissionRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.skillService = skillService;
+        this.statsService = statsService;
+        this.activityService = activityService;
     }
 
     @Transactional
@@ -86,7 +93,53 @@ public class SubmissionService {
         s.setContent(req.getContent().trim());
         s.setAttachmentUrl(req.getAttachmentUrl());
         s.setAssessmentName(assessmentName.isEmpty() ? null : assessmentName);
-        return submissionRepository.save(s);
+        Submission saved = submissionRepository.save(s);
+        activityService.record(userId, LearningActivity.SUBMIT, projectId,
+                "提交《" + project.getTitle() + "》" + (assessmentName.isEmpty() ? "成果" : "考核项「" + assessmentName + "」"));
+        return saved;
+    }
+
+    /** 某讲师名下项目的成果(管理员传 null 表示全部) */
+    public List<Submission> listForMentor(Long mentorId, String status, Long projectId) {
+        java.util.Set<Long> mine = mentorId == null ? null : projectRepository.findAll().stream()
+                .filter(p -> mentorId.equals(p.getMentorId())).map(Project::getId).collect(Collectors.toSet());
+        return listAll(status, null, projectId).stream()
+                .filter(s -> mine == null || mine.contains(s.getProjectId()))
+                .collect(Collectors.toList());
+    }
+
+    /** 退回修改:不打分,附上修改意见,学生可修改后重新提交 */
+    @Transactional
+    public Submission returnForRevision(Long submissionId, String feedback, String graderName) {
+        Submission s = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new BusinessException(404, "提交记录不存在"));
+        if (!"SUBMITTED".equals(s.getStatus())) {
+            throw new BusinessException("只有待评审的成果可以退回");
+        }
+        if (feedback == null || feedback.trim().isEmpty()) {
+            throw new BusinessException("退回时请写明需要修改的地方");
+        }
+        s.setStatus("RETURNED");
+        s.setFeedback(feedback.trim());
+        s.setGraderName(graderName);
+        s.setGradedAt(LocalDateTime.now());
+        submissionRepository.save(s);
+        String scope = s.getAssessmentName() == null ? "成果" : "考核项「" + s.getAssessmentName() + "」";
+        notificationService.create(s.getUserId(), "project", "成果被退回修改",
+                "《" + s.getProjectTitle() + "》" + scope + "需要修改后重新提交。老师意见:" + s.getFeedback());
+        activityService.record(s.getUserId(), LearningActivity.GRADED, s.getProjectId(),
+                "《" + s.getProjectTitle() + "》" + scope + "被退回修改");
+        return s;
+    }
+
+    /** 教师只能评自己指导项目的成果 */
+    public void requireMentor(Long submissionId, Long mentorId) {
+        Submission s = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new BusinessException(404, "提交记录不存在"));
+        Project p = projectRepository.findById(s.getProjectId()).orElse(null);
+        if (p == null || !mentorId.equals(p.getMentorId())) {
+            throw new BusinessException(403, "只能评审自己指导项目的成果");
+        }
     }
 
     public Submission mySubmission(Long userId, Long projectId) {
@@ -138,6 +191,9 @@ public class SubmissionService {
             evidenceWeight = gradeAssessment(s, req, project) / 100.0;
         }
         skillService.applyProjectEvidence(s, project, req.getSkillEvidence(), evidenceWeight);
+        activityService.record(s.getUserId(), LearningActivity.GRADED, s.getProjectId(),
+                "《" + s.getProjectTitle() + "》" + (s.getAssessmentName() == null ? "成果" : "「" + s.getAssessmentName() + "」")
+                        + "获评 " + req.getScore() + " 分");
         return s;
     }
 
@@ -212,6 +268,12 @@ public class SubmissionService {
             e.setStatus("COMPLETED");
             e.setCurrentTask("已通过成果评审");
             enrollmentRepository.save(e);
+            // 通过评审才是"完成项目",经验奖励在这里发放
+            userRepository.findById(userId).ifPresent(u -> {
+                u.setExp(u.getExp() + 50);
+                userRepository.save(u);
+            });
+            statsService.refresh(projectId);
         }
     }
 

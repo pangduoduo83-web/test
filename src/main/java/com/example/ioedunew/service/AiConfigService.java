@@ -29,6 +29,8 @@ public class AiConfigService {
     private static final String KEY_TEMPERATURE = "ai.temperature";
     private static final String KEY_CONNECT_TIMEOUT = "ai.connectTimeoutMs";
     private static final String KEY_READ_TIMEOUT = "ai.readTimeoutMs";
+    /** 本站每月 Token 预算(输入+输出),0 表示不限 */
+    private static final String KEY_MONTHLY_BUDGET = "ai.monthlyTokenBudget";
 
     private final SystemSettingRepository repository;
     private final SecretCrypto crypto;
@@ -85,7 +87,18 @@ public class AiConfigService {
         m.put("temperature", cfg.temperature);
         m.put("connectTimeoutMs", cfg.connectTimeoutMs);
         m.put("readTimeoutMs", cfg.readTimeoutMs);
+        m.put("monthlyTokenBudget", monthlyTokenBudget());
         return m;
+    }
+
+    /** 本站每月 Token 预算,0 为不限 */
+    public long monthlyTokenBudget() {
+        try {
+            String v = loadAll().get(KEY_MONTHLY_BUDGET);
+            return v == null || v.trim().isEmpty() ? 0 : Long.parseLong(v.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /**
@@ -151,6 +164,18 @@ public class AiConfigService {
                 throw new BusinessException("读取超时需在 3000~120000 毫秒之间");
             }
             put(KEY_READ_TIMEOUT, String.valueOf(v));
+        }
+        if (body.get("monthlyTokenBudget") != null) {
+            long v;
+            try {
+                v = (long) Double.parseDouble(String.valueOf(body.get("monthlyTokenBudget")));
+            } catch (NumberFormatException e) {
+                throw new BusinessException("月度 Token 预算格式不正确");
+            }
+            if (v < 0) {
+                throw new BusinessException("月度 Token 预算不能为负数");
+            }
+            put(KEY_MONTHLY_BUDGET, String.valueOf(v));
         }
         return view();
     }

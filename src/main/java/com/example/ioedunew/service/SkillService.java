@@ -54,17 +54,20 @@ public class SkillService {
     private final SkillDimensionService dimensionService;
     private final AiPlanService aiPlanService;
     private final ObjectMapper objectMapper;
+    private final LearningActivityService activityService;
 
     public SkillService(SkillScoreRepository skillScoreRepository,
                         SkillScoreEventRepository eventRepository,
                         SkillDimensionService dimensionService,
                         AiPlanService aiPlanService,
-                        ObjectMapper objectMapper) {
+                        ObjectMapper objectMapper,
+                        LearningActivityService activityService) {
         this.skillScoreRepository = skillScoreRepository;
         this.eventRepository = eventRepository;
         this.dimensionService = dimensionService;
         this.aiPlanService = aiPlanService;
         this.objectMapper = objectMapper;
+        this.activityService = activityService;
     }
 
     // ---------- 查询 ----------
@@ -167,6 +170,7 @@ public class SkillService {
         }
         saveEvents(userId, dims, events);
         aiPlanService.evict(userId);
+        activityService.record(userId, com.example.ioedunew.entity.LearningActivity.SELF_ASSESS, null, "完成技能自评");
         return summary(userId);
     }
 

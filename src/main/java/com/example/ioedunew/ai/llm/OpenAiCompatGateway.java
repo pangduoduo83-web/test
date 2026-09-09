@@ -47,9 +47,10 @@ public class OpenAiCompatGateway implements LlmGateway {
         ChatResult result = new ChatResult();
         result.setContent(choice.path("message").path("content").asText(""));
         result.setFinishReason(choice.path("finish_reason").asText(null));
+        Map<String, String> names = wireNames(request);
         for (JsonNode tc : choice.path("message").path("tool_calls")) {
             result.getToolCalls().add(new ToolCall(tc.path("id").asText(),
-                    tc.path("function").path("name").asText(),
+                    internalName(names, tc.path("function").path("name").asText()),
                     tc.path("function").path("arguments").asText("{}")));
         }
         result.setPromptTokens(root.path("usage").path("prompt_tokens").asInt(0));
@@ -71,6 +72,7 @@ public class OpenAiCompatGateway implements LlmGateway {
         StringBuilder content = new StringBuilder();
         Map<Integer, ToolCall> calls = new LinkedHashMap<>();
         Map<Integer, StringBuilder> args = new LinkedHashMap<>();
+        Map<String, String> names = wireNames(request);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -108,7 +110,7 @@ public class OpenAiCompatGateway implements LlmGateway {
                     }
                     JsonNode fn = tc.path("function");
                     if (fn.hasNonNull("name")) {
-                        call.setName(fn.get("name").asText());
+                        call.setName(internalName(names, fn.get("name").asText()));
                     }
                     if (fn.hasNonNull("arguments")) {
                         args.computeIfAbsent(index, k -> new StringBuilder()).append(fn.get("arguments").asText());
@@ -155,7 +157,7 @@ public class OpenAiCompatGateway implements LlmGateway {
             if ("tool".equals(m.getRole())) {
                 n.put("tool_call_id", m.getToolCallId());
                 if (m.getName() != null) {
-                    n.put("name", m.getName());
+                    n.put("name", wireName(m.getName()));
                 }
             }
             if (!m.getToolCalls().isEmpty()) {
@@ -165,7 +167,7 @@ public class OpenAiCompatGateway implements LlmGateway {
                     t.put("id", tc.getId());
                     t.put("type", "function");
                     ObjectNode fn = t.putObject("function");
-                    fn.put("name", tc.getName());
+                    fn.put("name", wireName(tc.getName()));
                     fn.put("arguments", tc.getArguments() == null ? "{}" : tc.getArguments());
                 }
             }
@@ -176,7 +178,7 @@ public class OpenAiCompatGateway implements LlmGateway {
                 ObjectNode t = tools.addObject();
                 t.put("type", "function");
                 ObjectNode fn = t.putObject("function");
-                fn.put("name", spec.getName());
+                fn.put("name", wireName(spec.getName()));
                 fn.put("description", spec.getDescription());
                 fn.set("parameters", spec.getParameters());
             }
@@ -198,6 +200,33 @@ public class OpenAiCompatGateway implements LlmGateway {
             out.write(payload);
         }
         return conn;
+    }
+
+    /**
+     * 平台内部工具名用点分隔(如 project.get),而 OpenAI 兼容接口(DeepSeek 等)只接受 ^[a-zA-Z0-9_-]+$,
+     * 发送前把非法字符换成下划线,收到模型的调用后再按本次请求的工具表映射回内部名。
+     */
+    static String wireName(String name) {
+        return name == null ? null : name.replaceAll("[^A-Za-z0-9_-]", "_");
+    }
+
+    private static Map<String, String> wireNames(ChatRequest request) {
+        Map<String, String> map = new LinkedHashMap<>();
+        for (ToolSpec spec : request.getTools()) {
+            map.put(wireName(spec.getName()), spec.getName());
+        }
+        for (ChatMessage m : request.getMessages()) {
+            for (ToolCall tc : m.getToolCalls()) {
+                if (tc.getName() != null) {
+                    map.putIfAbsent(wireName(tc.getName()), tc.getName());
+                }
+            }
+        }
+        return map;
+    }
+
+    private static String internalName(Map<String, String> names, String wire) {
+        return names.getOrDefault(wire, wire);
     }
 
     private String readAll(InputStream in) {

@@ -4,6 +4,7 @@ import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.entity.Discussion;
 import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.Favorite;
+import com.example.ioedunew.entity.LearningActivity;
 import com.example.ioedunew.entity.Project;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.DiscussionRepository;
@@ -23,8 +24,8 @@ import java.util.stream.Collectors;
 
 /**
  * 项目服务:项目中心的浏览、报名、收藏、进度更新。
- * 报名副作用:enrolledCount 自增、经验值 +10、生成通知;
- * 进度到 100 时置为 COMPLETED 并加 50 经验,由本服务统一控制。
+ * 报名副作用:经验值 +10、生成通知、刷新项目统计;
+ * 进度是学生自报的学习位置,到 100 只提醒提交成果,项目"完成"由成果评审(SubmissionService)判定。
  */
 @Service
 public class ProjectService {
@@ -36,6 +37,8 @@ public class ProjectService {
     private final NotificationService notificationService;
     private final DiscussionRepository discussionRepository;
     private final WeChatService weChatService;
+    private final ProjectStatsService statsService;
+    private final LearningActivityService activityService;
 
     public ProjectService(ProjectRepository projectRepository,
                           EnrollmentRepository enrollmentRepository,
@@ -43,7 +46,9 @@ public class ProjectService {
                           UserRepository userRepository,
                           NotificationService notificationService,
                           DiscussionRepository discussionRepository,
-                          WeChatService weChatService) {
+                          WeChatService weChatService,
+                          ProjectStatsService statsService,
+                          LearningActivityService activityService) {
         this.projectRepository = projectRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.favoriteRepository = favoriteRepository;
@@ -51,6 +56,8 @@ public class ProjectService {
         this.notificationService = notificationService;
         this.discussionRepository = discussionRepository;
         this.weChatService = weChatService;
+        this.statsService = statsService;
+        this.activityService = activityService;
     }
 
     public List<Project> list(String keyword, String difficulty, String sort) {
@@ -70,18 +77,18 @@ public class ProjectService {
         Comparator<Project> cmp;
         String s = sort == null ? "popular" : sort;
         switch (s) {
-            case "rating":
-                cmp = Comparator.comparing(Project::getRating).reversed();
-                break;
             case "newest":
-                cmp = Comparator.comparing(Project::getUpdatedAt).reversed();
+                cmp = Comparator.comparing(Project::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()));
                 break;
-            case "downloads":
-                cmp = Comparator.comparing(Project::getDownloads).reversed();
+            case "favorites":
+                cmp = Comparator.comparing(Project::getFavoriteCount, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Project::getViews, Comparator.nullsLast(Comparator.reverseOrder()));
                 break;
             case "popular":
             default:
-                cmp = Comparator.comparing(Project::getViews).reversed();
+                // 热门 = 参与人数优先,其次浏览量;这两个都是真实累计值
+                cmp = Comparator.comparing(Project::getEnrolledCount, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Project::getViews, Comparator.nullsLast(Comparator.reverseOrder()));
         }
         items.sort(cmp);
         return items;
@@ -124,9 +131,9 @@ public class ProjectService {
         e.setDeadline(LocalDate.now().plusWeeks(parseWeeks(p.getDuration())));
         enrollmentRepository.save(e);
 
-        p.setEnrolledCount(p.getEnrolledCount() + 1);
-        projectRepository.save(p);
+        statsService.refresh(projectId);
         addExp(userId, 10);
+        activityService.record(userId, LearningActivity.ENROLL, projectId, "报名《" + p.getTitle() + "》");
         notificationService.create(userId, "project", "报名成功",
                 "你已报名《" + p.getTitle() + "》,预计周期 " + p.getDuration() + ",加油!");
         return e;
@@ -140,41 +147,79 @@ public class ProjectService {
         Project p = projectRepository.findById(projectId)
                 .orElseThrow(() -> new BusinessException(404, "项目不存在"));
         Favorite existing = favoriteRepository.findByUserIdAndProjectId(userId, projectId).orElse(null);
+        boolean favorited;
         if (existing != null) {
             favoriteRepository.delete(existing);
-            p.setFavoriteCount(Math.max(0, p.getFavoriteCount() - 1));
-            projectRepository.save(p);
-            return false;
+            favorited = false;
+        } else {
+            Favorite f = new Favorite();
+            f.setUserId(userId);
+            f.setProjectId(projectId);
+            favoriteRepository.save(f);
+            favorited = true;
         }
-        Favorite f = new Favorite();
-        f.setUserId(userId);
-        f.setProjectId(projectId);
-        favoriteRepository.save(f);
-        p.setFavoriteCount(p.getFavoriteCount() + 1);
-        projectRepository.save(p);
-        return true;
+        favoriteRepository.flush();
+        statsService.refresh(p.getId());
+        return favorited;
     }
 
+    /**
+     * 学生自报学习进度(0~100)。进度只是学习位置,不会把项目判定为完成:
+     * 到 100 时提醒提交成果,评审通过(SubmissionService)才算完成并发放经验。
+     */
     @Transactional
     public Enrollment updateProgress(Long userId, Long projectId, int progress, String currentTask) {
+        return updateProgress(userId, projectId, progress, currentTask, null);
+    }
+
+    /**
+     * 带大纲阶段的进度更新:completedPhases 为已完成阶段序号(从 1 开始)。
+     * 项目有教学大纲且传了阶段时,进度按"完成阶段数 / 总阶段数"计算,当前任务默认为下一个未完成阶段的标题。
+     */
+    @Transactional
+    public Enrollment updateProgress(Long userId, Long projectId, int progress, String currentTask, List<Integer> completedPhases) {
         Enrollment e = enrollmentRepository.findByUserIdAndProjectId(userId, projectId)
                 .orElseThrow(() -> new BusinessException("尚未报名该项目"));
-        boolean wasCompleted = "COMPLETED".equals(e.getStatus());
-        e.setProgress(progress);
-        if (currentTask != null && !currentTask.isEmpty()) {
-            e.setCurrentTask(currentTask);
+        if ("COMPLETED".equals(e.getStatus())) {
+            throw new BusinessException("该项目已通过评审完成,进度不再变动");
         }
-        if (progress >= 100 && !wasCompleted) {
-            e.setStatus("COMPLETED");
-            addExp(userId, 50);
-            notificationService.create(userId, "project", "项目完成",
-                    "恭喜完成《" + e.getProjectTitle() + "》,经验值 +50!");
+        int before = e.getProgress() == null ? 0 : e.getProgress();
+        int clamped = Math.max(0, Math.min(100, progress));
+        String nextTask = currentTask == null ? "" : currentTask.trim();
+        if (completedPhases != null) {
+            List<String> titles = syllabusTitles(projectId);
+            if (titles.isEmpty()) {
+                throw new BusinessException("该项目没有教学大纲,请直接填写进度百分比");
+            }
+            java.util.TreeSet<Integer> done = new java.util.TreeSet<>();
+            for (Integer n : completedPhases) {
+                if (n != null && n >= 1 && n <= titles.size()) {
+                    done.add(n);
+                }
+            }
+            e.setCompletedPhases(done.toString());
+            clamped = (int) Math.round(done.size() * 100.0 / titles.size());
+            if (nextTask.isEmpty()) {
+                for (int i = 1; i <= titles.size(); i++) {
+                    if (!done.contains(i)) {
+                        nextTask = "第 " + i + " 阶段:" + titles.get(i - 1);
+                        break;
+                    }
+                }
+            }
+        }
+        e.setProgress(clamped);
+        if (!nextTask.isEmpty()) {
+            e.setCurrentTask(cut(nextTask, 100));
+        } else if (clamped >= 100) {
+            e.setCurrentTask("提交项目成果,等待评审");
         }
         enrollmentRepository.save(e);
-        User user = userRepository.findById(userId).orElse(null);
-        if (user != null) {
-            user.setWeeklyHours(user.getWeeklyHours() + 2);
-            userRepository.save(user);
+        activityService.record(userId, LearningActivity.PROGRESS, projectId,
+                "《" + e.getProjectTitle() + "》进度 " + before + "% → " + clamped + "%");
+        if (clamped >= 100 && before < 100) {
+            notificationService.create(userId, "project", "进度已到 100%",
+                    "《" + e.getProjectTitle() + "》的学习进度已推进到 100%,请到项目页「项目成果」提交成果,评审通过后项目才算完成并获得经验值。");
         }
         return e;
     }
@@ -226,7 +271,9 @@ public class ProjectService {
         d.setUserName(user.getName());
         d.setParentId(parentId);
         d.setContent(content.trim());
-        return discussionRepository.save(d);
+        Discussion saved = discussionRepository.save(d);
+        activityService.record(userId, LearningActivity.DISCUSS, projectId, parentId == null ? "发起项目讨论" : "回复项目讨论");
+        return saved;
     }
 
     /** 举报讨论:通知全体管理员处理(小程序 UGC 审核要求提供举报途径) */
@@ -243,6 +290,31 @@ public class ProjectService {
         for (User admin : userRepository.findByRole("ADMIN")) {
             notificationService.create(admin.getId(), "system", "收到讨论内容举报", detail);
         }
+    }
+
+    /** 项目教学大纲各阶段标题(phase + title),没有大纲返回空列表 */
+    public List<String> syllabusTitles(Long projectId) {
+        Project p = projectRepository.findById(projectId).orElse(null);
+        List<String> titles = new java.util.ArrayList<>();
+        if (p == null || p.getSyllabus() == null || p.getSyllabus().trim().isEmpty()) {
+            return titles;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode arr = new com.fasterxml.jackson.databind.ObjectMapper().readTree(p.getSyllabus());
+            if (arr.isArray()) {
+                for (com.fasterxml.jackson.databind.JsonNode n : arr) {
+                    String phase = n.path("phase").asText("").trim();
+                    String title = n.path("title").asText("").trim();
+                    titles.add((phase.isEmpty() ? "" : phase + " ") + (title.isEmpty() ? "未命名阶段" : title));
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return titles;
+    }
+
+    private static String cut(String v, int max) {
+        return v.length() <= max ? v : v.substring(0, max);
     }
 
     private void addExp(Long userId, int delta) {

@@ -71,7 +71,7 @@ public class ProjectController {
                                             @Valid @RequestBody MiscDtos.ProgressUpdateRequest req,
                                             HttpServletRequest request) {
         return ApiResponse.ok(projectService.updateProgress(
-                auth(request).getId(), id, req.getProgress(), req.getCurrentTask()));
+                auth(request).getId(), id, req.getProgress(), req.getCurrentTask(), req.getCompletedPhases()));
     }
 
     @GetMapping("/{id}/discussions")

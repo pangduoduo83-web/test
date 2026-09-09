@@ -23,8 +23,11 @@ import java.util.Map;
 public class SiteConfigService {
 
     private static final String KEY_TITLE = "site.title";
+    private static final String KEY_SLOGAN = "site.slogan";
     private static final String KEY_LOGO = "site.logoUrl";
     private static final String KEY_FOOTER = "site.footerText";
+    private static final String KEY_CONTACT_EMAIL = "site.contactEmail";
+    private static final String KEY_SERVICE_HOURS = "site.serviceHours";
     private static final String KEY_ALLOW_REGISTER = "site.allowRegister";
     private static final String KEY_PROJECT_PAGE_SIZE = "site.projectPageSize";
     private static final String KEY_EQUIPMENT_PAGE_SIZE = "site.equipmentPageSize";
@@ -49,8 +52,11 @@ public class SiteConfigService {
         Map<String, String> db = loadAll();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("title", orDefault(db.get(KEY_TITLE), "AI未来实践中心"));
+        m.put("slogan", orDefault(db.get(KEY_SLOGAN), "项目驱动教学实验平台"));
         m.put("logoUrl", orDefault(db.get(KEY_LOGO), ""));
         m.put("footerText", orDefault(db.get(KEY_FOOTER), ""));
+        m.put("contactEmail", orDefault(db.get(KEY_CONTACT_EMAIL), ""));
+        m.put("serviceHours", orDefault(db.get(KEY_SERVICE_HOURS), ""));
         m.put("allowRegister", !"false".equalsIgnoreCase(db.get(KEY_ALLOW_REGISTER)));
         m.put("projectPageSize", parseInt(db.get(KEY_PROJECT_PAGE_SIZE), 9));
         m.put("equipmentPageSize", parseInt(db.get(KEY_EQUIPMENT_PAGE_SIZE), 9));
@@ -76,8 +82,29 @@ public class SiteConfigService {
             }
             put(KEY_TITLE, v);
         }
+        if (body.get("slogan") != null) {
+            String v = String.valueOf(body.get("slogan")).trim();
+            if (v.length() > 40) {
+                throw new BusinessException("副标题不能超过 40 字");
+            }
+            put(KEY_SLOGAN, v);
+        }
         if (body.get("logoUrl") != null) {
             put(KEY_LOGO, String.valueOf(body.get("logoUrl")).trim());
+        }
+        if (body.get("contactEmail") != null) {
+            String v = String.valueOf(body.get("contactEmail")).trim();
+            if (!v.isEmpty() && !v.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+                throw new BusinessException("联系邮箱格式不正确");
+            }
+            put(KEY_CONTACT_EMAIL, v);
+        }
+        if (body.get("serviceHours") != null) {
+            String v = String.valueOf(body.get("serviceHours")).trim();
+            if (v.length() > 60) {
+                throw new BusinessException("服务时间不能超过 60 字");
+            }
+            put(KEY_SERVICE_HOURS, v);
         }
         if (body.get("footerText") != null) {
             String v = String.valueOf(body.get("footerText")).trim();

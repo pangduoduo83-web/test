@@ -1,5 +1,8 @@
 package com.example.ioedunew.service;
 
+import com.example.ioedunew.ai.skill.AiConversation;
+import com.example.ioedunew.ai.skill.AiConversationRepository;
+import com.example.ioedunew.ai.skill.AiMessageRepository;
 import com.example.ioedunew.common.BusinessException;
 import com.example.ioedunew.dto.AdminDtos;
 import com.example.ioedunew.entity.Discussion;
@@ -13,6 +16,7 @@ import com.example.ioedunew.repository.EquipmentFavoriteRepository;
 import com.example.ioedunew.repository.EquipmentRepository;
 import com.example.ioedunew.repository.EnrollmentRepository;
 import com.example.ioedunew.repository.FavoriteRepository;
+import com.example.ioedunew.repository.LearningActivityRepository;
 import com.example.ioedunew.repository.NotificationRepository;
 import com.example.ioedunew.repository.ProjectRepository;
 import com.example.ioedunew.repository.SkillScoreEventRepository;
@@ -55,6 +59,12 @@ public class AdminService {
     private final ProjectService projectService;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
+    private final ProjectStatsService statsService;
+    private final LearningActivityRepository learningActivityRepository;
+    private final AiConversationRepository aiConversationRepository;
+    private final AiMessageRepository aiMessageRepository;
+    private final com.example.ioedunew.repository.ClassMemberRepository classMemberRepository;
+    private final com.example.ioedunew.tenant.TenantQuotaService quotaService;
 
     public AdminService(EquipmentRepository equipmentRepository,
                         ProjectRepository projectRepository,
@@ -71,7 +81,19 @@ public class AdminService {
                         EquipmentFavoriteRepository equipmentFavoriteRepository,
                         ProjectService projectService,
                         NotificationService notificationService,
-                        ObjectMapper objectMapper) {
+                        ObjectMapper objectMapper,
+                        ProjectStatsService statsService,
+                        LearningActivityRepository learningActivityRepository,
+                        AiConversationRepository aiConversationRepository,
+                        AiMessageRepository aiMessageRepository,
+                        com.example.ioedunew.repository.ClassMemberRepository classMemberRepository,
+                        com.example.ioedunew.tenant.TenantQuotaService quotaService) {
+        this.quotaService = quotaService;
+        this.classMemberRepository = classMemberRepository;
+        this.statsService = statsService;
+        this.learningActivityRepository = learningActivityRepository;
+        this.aiConversationRepository = aiConversationRepository;
+        this.aiMessageRepository = aiMessageRepository;
         this.equipmentRepository = equipmentRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
@@ -141,6 +163,10 @@ public class AdminService {
             // 若不强制保留会把已有统计清零
             input.setCompletionRate(existing.getCompletionRate());
             input.setForks(existing.getForks());
+            input.setRating(existing.getRating());
+            // 商店上游指针不在编辑表单里,必须沿用,否则一次编辑就会断开与商店条目的关联
+            input.setHubItemId(existing.getHubItemId());
+            input.setHubVersionNo(existing.getHubVersionNo());
         }
         input.setUpdatedAt(LocalDateTime.now());
         return projectRepository.save(input);
@@ -173,6 +199,7 @@ public class AdminService {
 
     @Transactional
     public User createUser(AdminDtos.UserCreateRequest req) {
+        quotaService.checkUserQuota(userRepository.count());
         String email = normalizeEmail(req.getEmail());
         if (userRepository.existsByEmail(email)) {
             throw new BusinessException("该邮箱已被使用");
@@ -274,6 +301,13 @@ public class AdminService {
         skillScoreRepository.deleteByUserId(id);
         skillScoreEventRepository.deleteByUserId(id);
         notificationRepository.deleteByUserId(id);
+        learningActivityRepository.deleteByUserId(id);
+        classMemberRepository.deleteByUserId(id);
+        // AI 会话与消息随用户删除;ai_runs 作为审计记录保留(其中已冗余用户名)
+        for (AiConversation c : aiConversationRepository.findByUserId(id)) {
+            aiMessageRepository.deleteByConversationId(c.getId());
+            aiConversationRepository.delete(c);
+        }
         userRepository.delete(user);
     }
 
@@ -323,7 +357,9 @@ public class AdminService {
             enrollment.setCurrentTask(cleanNullable(req.getCurrentTask()));
         }
         enrollment.setDeadline(req.getDeadline());
-        return enrollmentRepository.save(enrollment);
+        Enrollment saved = enrollmentRepository.save(enrollment);
+        statsService.refresh(enrollment.getProjectId());
+        return saved;
     }
 
     @Transactional
@@ -334,13 +370,9 @@ public class AdminService {
                 enrollment.getUserId(), enrollment.getProjectId())) {
             throw new BusinessException(409, "该报名已有成果提交,不能删除");
         }
-        Project project = projectRepository.findById(enrollment.getProjectId()).orElse(null);
-        if (project != null) {
-            int count = project.getEnrolledCount() == null ? 0 : project.getEnrolledCount();
-            project.setEnrolledCount(Math.max(0, count - 1));
-            projectRepository.save(project);
-        }
         enrollmentRepository.delete(enrollment);
+        enrollmentRepository.flush();
+        statsService.refresh(enrollment.getProjectId());
     }
 
     // ---------- 数据看板 ----------
@@ -418,7 +450,7 @@ public class AdminService {
     private String normalizeRole(String role) {
         String value = role == null || role.trim().isEmpty()
                 ? "STUDENT" : role.trim().toUpperCase();
-        if (!"STUDENT".equals(value) && !"TEACHER".equals(value) && !"ADMIN".equals(value)) {
+        if (!"STUDENT".equals(value) && !"TEACHER".equals(value) && !"ADMIN".equals(value) && !"LAB_ADMIN".equals(value)) {
             throw new BusinessException("非法角色:" + role);
         }
         return value;

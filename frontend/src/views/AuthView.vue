@@ -15,7 +15,7 @@
           </div>
           <div>
             <h1 class="brand-title">{{ site.title }}</h1>
-            <div class="brand-sub">项目驱动教学实验平台</div>
+            <div class="brand-sub">{{ site.slogan }}</div>
           </div>
         </div>
         <p class="brand-tagline">融合理论与实践，通过项目驱动学习，培养创新型电子信息人才</p>
@@ -164,8 +164,9 @@ onMounted(async () => {
 })
 
 const onForgot = () => {
+  const contact = site.contactEmail ? `,或发邮件到 ${site.contactEmail}` : ''
   ElMessageBox.alert(
-    '平台暂未开放自助重置。请携带学生证到实验室管理处,或发邮件到 admin@ioedu.cn 联系管理员重置密码。',
+    `平台暂未开放自助重置。请到实验室管理处${contact}联系管理员重置密码。`,
     '忘记密码',
     { confirmButtonText: '知道了' }
   )

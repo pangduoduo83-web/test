@@ -50,6 +50,9 @@ public class AuthService {
     private final NotificationRepository notificationRepository;
     private final ProjectRepository projectRepository;
     private final WeChatService weChatService;
+    private final com.example.ioedunew.repository.LearningActivityRepository learningActivityRepository;
+    private final com.example.ioedunew.repository.ClassMemberRepository classMemberRepository;
+    private final com.example.ioedunew.tenant.TenantQuotaService quotaService;
 
     public AuthService(UserRepository userRepository,
                        SkillScoreRepository skillScoreRepository,
@@ -66,7 +69,13 @@ public class AuthService {
                        DiscussionRepository discussionRepository,
                        NotificationRepository notificationRepository,
                        ProjectRepository projectRepository,
-                       WeChatService weChatService) {
+                       WeChatService weChatService,
+                       com.example.ioedunew.repository.LearningActivityRepository learningActivityRepository,
+                       com.example.ioedunew.repository.ClassMemberRepository classMemberRepository,
+                       com.example.ioedunew.tenant.TenantQuotaService quotaService) {
+        this.quotaService = quotaService;
+        this.learningActivityRepository = learningActivityRepository;
+        this.classMemberRepository = classMemberRepository;
         this.userRepository = userRepository;
         this.skillScoreRepository = skillScoreRepository;
         this.skillScoreEventRepository = skillScoreEventRepository;
@@ -105,6 +114,7 @@ public class AuthService {
         if (!siteConfigService.registerAllowed()) {
             throw new BusinessException("平台已关闭自助注册,请联系管理员开通账号");
         }
+        quotaService.checkUserQuota(userRepository.count());
         if (userRepository.existsByEmail(req.getEmail())) {
             throw new BusinessException("该邮箱已注册");
         }
@@ -129,6 +139,11 @@ public class AuthService {
         return new AuthDtos.AuthResponse(jwtUtil.createToken(user.getId(), user.getRole()), user);
     }
 
+    /** 连续密码错误达到此次数后锁定 */
+    static final int MAX_FAILED_LOGINS = 5;
+    static final int LOCK_MINUTES = 15;
+
+    /** 故意不加 @Transactional:失败计数要在抛出"密码错误"之后仍然落库,不能被回滚 */
     public AuthDtos.AuthResponse login(AuthDtos.LoginRequest req) {
         // 同一输入框兼容邮箱与手机号:含 @ 视为邮箱,否则按手机号查找
         String account = req.getEmail().trim();
@@ -136,11 +151,29 @@ public class AuthService {
                 ? userRepository.findByEmail(account)
                 : userRepository.findByPhone(account))
                 .orElseThrow(() -> new BusinessException("账号或密码错误"));
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(java.time.LocalDateTime.now())) {
+            long minutes = Math.max(1, java.time.Duration.between(java.time.LocalDateTime.now(), user.getLockedUntil()).toMinutes());
+            throw new BusinessException(423, "密码连续错误次数过多,账号已锁定,请 " + minutes + " 分钟后再试");
+        }
         if (!BCrypt.checkpw(req.getPassword(), user.getPasswordHash())) {
-            throw new BusinessException("账号或密码错误");
+            int failed = (user.getFailedLogins() == null ? 0 : user.getFailedLogins()) + 1;
+            if (failed >= MAX_FAILED_LOGINS) {
+                user.setFailedLogins(0);
+                user.setLockedUntil(java.time.LocalDateTime.now().plusMinutes(LOCK_MINUTES));
+                userRepository.save(user);
+                throw new BusinessException(423, "密码连续错误 " + MAX_FAILED_LOGINS + " 次,账号已锁定 " + LOCK_MINUTES + " 分钟");
+            }
+            user.setFailedLogins(failed);
+            userRepository.save(user);
+            throw new BusinessException("账号或密码错误" + (failed >= 3 ? "(还可尝试 " + (MAX_FAILED_LOGINS - failed) + " 次)" : ""));
         }
         if (!Boolean.TRUE.equals(user.getEnabled())) {
             throw new BusinessException(403, "账号已被禁用,请联系管理员");
+        }
+        if (user.getFailedLogins() != null && user.getFailedLogins() > 0 || user.getLockedUntil() != null) {
+            user.setFailedLogins(0);
+            user.setLockedUntil(null);
+            userRepository.save(user);
         }
         return new AuthDtos.AuthResponse(jwtUtil.createToken(user.getId(), user.getRole()), user);
     }
@@ -246,6 +279,8 @@ public class AuthService {
         skillScoreRepository.deleteByUserId(userId);
         skillScoreEventRepository.deleteByUserId(userId);
         notificationRepository.deleteByUserId(userId);
+        learningActivityRepository.deleteByUserId(userId);
+        classMemberRepository.deleteByUserId(userId);
         userRepository.delete(user);
     }
 }

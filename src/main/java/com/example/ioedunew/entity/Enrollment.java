@@ -47,6 +47,13 @@ public class Enrollment {
 
     private LocalDate deadline;
 
+    /** 已完成的教学大纲阶段序号(从 1 开始)JSON 数组,如 [1,2];项目没有大纲时为空 */
+    @Column(columnDefinition = "TEXT")
+    private String completedPhases;
+
+    /** 由哪个班级的作业带入;学生自己报名为空 */
+    private Long classId;
+
     @Column(nullable = false)
     private LocalDateTime enrolledAt = LocalDateTime.now();
 }

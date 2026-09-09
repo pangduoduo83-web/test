@@ -85,7 +85,7 @@ public class NotificationService {
             targets.add(user);
         } else if (req.getRole() != null && !req.getRole().trim().isEmpty()) {
             String role = req.getRole().trim().toUpperCase();
-            if (!"STUDENT".equals(role) && !"TEACHER".equals(role) && !"ADMIN".equals(role)) {
+            if (!"STUDENT".equals(role) && !"TEACHER".equals(role) && !"ADMIN".equals(role) && !"LAB_ADMIN".equals(role)) {
                 throw new BusinessException("非法角色:" + req.getRole());
             }
             targets = userRepository.findByRole(role);

@@ -9,7 +9,9 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (s) => !!s.token,
-    isAdmin: (s) => s.user?.role === 'ADMIN'
+    isAdmin: (s) => s.user?.role === 'ADMIN',
+    /** 能进管理后台的角色:系统管理员 + 实验室管理员(后者只看设备与借阅) */
+    isStaffAdmin: (s) => s.user?.role === 'ADMIN' || s.user?.role === 'LAB_ADMIN'
   },
   actions: {
     setAuth({ token, user }, remember = true) {

@@ -5,9 +5,10 @@
         <div class="filters">
           <el-input v-model="filters.keyword" placeholder="姓名 / 邮箱 / 手机号 / 学号 / 专业" clearable
                     style="width:260px" @keyup.enter="load" @clear="load" />
-          <el-select v-model="filters.role" placeholder="全部角色" clearable style="width:120px" @change="load">
+          <el-select v-model="filters.role" placeholder="全部角色" clearable style="width:140px" @change="load">
             <el-option label="学生" value="STUDENT" />
             <el-option label="教师" value="TEACHER" />
+            <el-option label="实验室管理员" value="LAB_ADMIN" />
             <el-option label="管理员" value="ADMIN" />
           </el-select>
           <el-select v-model="filters.enabled" placeholder="全部状态" clearable style="width:120px" @change="load">
@@ -100,6 +101,7 @@
             <el-select v-model="form.role">
               <el-option label="学生" value="STUDENT" />
               <el-option label="教师" value="TEACHER" />
+              <el-option label="实验室管理员(只管设备与借阅)" value="LAB_ADMIN" />
               <el-option label="管理员" value="ADMIN" />
             </el-select>
           </el-form-item>
@@ -151,7 +153,7 @@ const importUsersCsv = (opt) => {
       if (/姓名|name/i.test(c[0]) || !c[0] || !(c[1] || '').includes('@')) continue
       rows.push({
         name: c[0], email: c[1], password: c[2] || '123456',
-        role: ['STUDENT', 'TEACHER', 'ADMIN'].includes((c[3] || '').toUpperCase()) ? c[3].toUpperCase() : 'STUDENT',
+        role: ['STUDENT', 'TEACHER', 'ADMIN', 'LAB_ADMIN'].includes((c[3] || '').toUpperCase()) ? c[3].toUpperCase() : 'STUDENT',
         studentNo: c[4] || undefined, major: c[5] || undefined, grade: c[6] || undefined
       })
     }
@@ -206,8 +208,8 @@ const load = async () => {
   page.value = 1
 }
 
-const roleText = (r) => r === 'ADMIN' ? '管理员' : r === 'TEACHER' ? '教师' : '学生'
-const roleBadge = (r) => r === 'ADMIN' ? 'badge-purple' : r === 'TEACHER' ? 'badge-green' : 'badge-blue'
+const roleText = (r) => ({ ADMIN: '管理员', TEACHER: '教师', LAB_ADMIN: '实验室管理员' }[r] || '学生')
+const roleBadge = (r) => ({ ADMIN: 'badge-purple', TEACHER: 'badge-green', LAB_ADMIN: 'badge-yellow' }[r] || 'badge-blue')
 
 const openEdit = (row = null) => {
   Object.assign(form, emptyForm)

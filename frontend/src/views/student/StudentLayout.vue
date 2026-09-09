@@ -9,13 +9,13 @@
         </span>
         <div>
           <div class="brand-name">{{ site.title }}</div>
-          <div class="brand-sub">项目驱动教学实验平台</div>
+          <div class="brand-sub">{{ site.slogan }}</div>
         </div>
       </div>
 
       <div class="top-actions">
         <div class="top-search">
-          <el-input v-model="keyword" placeholder="搜索项目、设备或教程..." clearable
+          <el-input v-model="keyword" placeholder="搜索项目名称、标签、作者..." clearable
                     @keyup.enter="doSearch">
             <template #prefix><Search :size="15" /></template>
           </el-input>
@@ -62,7 +62,7 @@
             <el-dropdown-menu>
               <el-dropdown-item command="profile">个人资料</el-dropdown-item>
               <el-dropdown-item v-if="authStore.user?.role === 'TEACHER'" command="teacher">教师工作台</el-dropdown-item>
-              <el-dropdown-item v-if="authStore.isAdmin" command="admin">管理后台</el-dropdown-item>
+              <el-dropdown-item v-if="authStore.isStaffAdmin" command="admin">{{ authStore.isAdmin ? '管理后台' : '设备与借阅管理' }}</el-dropdown-item>
               <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -148,16 +148,16 @@
           </router-link>
         </nav>
 
-        <!-- 本周学习统计 -->
+        <!-- 本周学习统计(来自学习活动日志) -->
         <div class="week-stats">
           <div class="ws-label">本周学习</div>
           <div class="ws-row">
-            <span>学习时长</span>
-            <b class="ws-blue">{{ weekStats.hours }}h</b>
+            <span>活跃天数</span>
+            <b class="ws-blue">{{ weekStats.activeDays }} 天</b>
           </div>
           <div class="ws-row">
-            <span>完成项目</span>
-            <b>{{ weekStats.completed }}个</b>
+            <span>学习动作</span>
+            <b>{{ weekStats.activities }} 次</b>
           </div>
           <div class="ws-row">
             <span>技能掌握</span>
@@ -203,7 +203,9 @@
         </el-collapse-item>
       </el-collapse>
       <div class="help-contact">
-        仍未解决? 联系实验室管理员: <b>admin@ioedu.cn</b> · 值班时间 工作日 9:00-17:30
+        仍未解决? 联系实验室管理员<template v-if="site.contactEmail">: <b>{{ site.contactEmail }}</b></template>
+        <template v-if="site.serviceHours"> · {{ site.serviceHours }}</template>
+        <template v-if="!site.contactEmail && !site.serviceHours">,或到实验室管理处当面咨询</template>
       </div>
       <template #footer>
         <el-button type="primary" @click="helpVisible = false">关闭</el-button>
@@ -218,7 +220,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   BarChart3, Bell, BookOpen, Bookmark, Bot, ClipboardList, GraduationCap,
-  HelpCircle, LogOut, Megaphone, Package, Rocket, Search, Settings, User, Wrench
+  HelpCircle, LogOut, Megaphone, Package, Rocket, School, Search, Settings, User, Wrench
 } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
 import {
@@ -235,7 +237,7 @@ const authStore = useAuthStore()
 const keyword = ref('')
 const notifications = ref([])
 const unread = ref(0)
-const weekStats = reactive({ hours: 0, completed: 0, skillAvg: 0 })
+const weekStats = reactive({ activeDays: 0, activities: 0, skillAvg: 0 })
 let pollTimer = null
 
 const majors = ['电子信息工程', '通信工程', '自动化', '计算机科学', '物联网工程']
@@ -254,25 +256,26 @@ const helpVisible = ref(false)
 const guideSteps = [
   { title: '完成能力测评', desc: '在「技能评估」自评各项技能,获得个性化项目推荐与学习建议。' },
   { title: '挑选并报名项目', desc: '在「项目中心」按分类/标签筛选,查看详情后点击「立即报名」。' },
+  { title: '跟着 AI 导师做', desc: '项目页点「AI 导师」,它会对照教学大纲告诉你下一步做什么,并帮你更新进度、查设备库存。' },
   { title: '借用实验设备', desc: '在「设备图书馆」提交借阅申请,等待管理员审批通过后到实验室领取。' },
-  { title: '推进项目进度', desc: '在「个人中心」更新项目进度,完成后获得经验值与成就徽章。' },
-  { title: '按时归还设备', desc: '在「借阅管理」发起归还申请,通过功能验收后完成归还。' }
+  { title: '提交成果结项', desc: '做完后在项目页「项目成果」提交,指导教师评审通过(≥60 分)即结项,获得经验值与技能实证。' }
 ]
 
-const faqs = [
+const faqs = computed(() => [
   { q: '设备可以借多久?', a: '开发板类最长 2 周,仪器仪表类最长 1 周;到期前 3 天可申请续借一次。' },
   { q: '借阅申请多久审批?', a: '管理员在 1 个工作日内完成审批,结果会通过站内通知提醒你。' },
   { q: '设备损坏了怎么办?', a: '第一时间联系实验室管理员登记;人为损坏需按价赔偿或维修。' },
-  { q: '忘记密码怎么办?', a: '发邮件到 admin@ioedu.cn 或到实验室管理处,由管理员协助重置。' },
-  { q: '项目完成后如何结项?', a: '把进度推进到 100% 即自动结项,系统会发放经验值并更新成就。' }
-]
+  { q: '忘记密码怎么办?', a: site.contactEmail ? `发邮件到 ${site.contactEmail} 或到实验室管理处,由管理员协助重置。` : '到实验室管理处联系管理员协助重置。' },
+  { q: '项目怎样才算完成?', a: '进度条是你自己记录的学习位置;真正结项要在项目页提交成果,指导教师评审 ≥60 分后项目才判定完成并发放经验值。' }
+])
 
 const menus = [
   { path: '/app/projects', icon: Rocket, title: '项目中心', desc: '浏览所有创新项目' },
+  { path: '/app/classes', icon: School, title: '我的班级', desc: '老师布置与公告' },
   { path: '/app/equipment', icon: Wrench, title: '设备图书馆', desc: '借用开发工具仪表' },
   { path: '/app/borrowing', icon: ClipboardList, title: '借阅管理', desc: '申请审批追踪' },
   { path: '/app/skills', icon: BarChart3, title: '技能评估', desc: '能力测评与提升' },
-  { path: '/app/ai', icon: Bot, title: 'AI 助手', desc: '智能问答与技能' },
+  { path: '/app/ai', icon: Bot, title: 'AI 助手', desc: '项目导师与技能' },
   { path: '/app/dashboard', icon: User, title: '个人中心', desc: '我的项目进度' }
 ]
 
@@ -298,8 +301,8 @@ const loadNotifications = async () => {
 const loadWeekStats = async () => {
   try {
     const d = await fetchDashboard()
-    weekStats.hours = d.weeklyHours
-    weekStats.completed = d.completedProjects
+    weekStats.activeDays = d.weeklyActiveDays || 0
+    weekStats.activities = d.weeklyActivities || 0
     weekStats.skillAvg = d.skillAvg
   } catch (e) { /* 侧栏统计失败不影响主内容 */ }
 }

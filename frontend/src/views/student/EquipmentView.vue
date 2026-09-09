@@ -37,12 +37,6 @@
         <el-option label="全部位置" value="ALL" />
         <el-option v-for="l in locations" :key="l" :label="l" :value="l" />
       </el-select>
-      <el-select v-model="filters.minRating" placeholder="设备评分" class="sel" @change="load">
-        <el-option label="全部评分" :value="0" />
-        <el-option label="4.5星以上" :value="4.5" />
-        <el-option label="4.0星以上" :value="4.0" />
-        <el-option label="3.5星以上" :value="3.5" />
-      </el-select>
     </div>
 
     <!-- 分类 tab -->
@@ -89,16 +83,17 @@
           </div>
           <div class="ec-meta">
             <span><MapPin :size="13" /> {{ e.location }}</span>
-            <span><Star :size="13" fill="#facc15" color="#facc15" /> {{ e.rating }}</span>
-            <span>已借 {{ e.borrowCount }} 次</span>
+            <span>库存 {{ e.availableCount }}/{{ e.totalCount }}</span>
+            <span>已借出 {{ e.borrowCount }} 次</span>
             <span v-if="e.price" class="ec-price">¥{{ e.price }}</span>
           </div>
 
           <div class="ec-btns">
             <button v-if="e.status === 'AVAILABLE' && e.availableCount > 0"
                     class="ec-borrow-btn" @click="openBorrow(e)">借阅</button>
-            <button v-else-if="e.status === 'AVAILABLE'" class="ec-borrow-btn disabled" disabled>预约排队</button>
-            <button v-else class="ec-borrow-btn disabled" disabled>暂停借阅</button>
+            <button v-else-if="e.status === 'AVAILABLE'" class="ec-borrow-btn disabled" disabled
+                    title="全部借出中,可先加入心愿单,归还后来借">已借完</button>
+            <button v-else class="ec-borrow-btn disabled" disabled>维护中</button>
             <el-button class="ec-detail-btn" @click="openDetail(e)">详情</el-button>
           </div>
         </div>
@@ -214,9 +209,9 @@
           <div class="notice-title">借阅须知</div>
           <ul>
             <li>请在使用前检查设备完整性</li>
-            <li>开发板类设备借用期限为2周</li>
+            <li>开发板类设备借用期限为 2 周,到期前 3 天可续借一次</li>
             <li>精密仪器需在老师指导下使用</li>
-            <li>逾期归还将影响信用评分</li>
+            <li>逾期未还将暂停借阅资格,直至归还验收</li>
           </ul>
         </div>
       </div>
@@ -250,10 +245,10 @@
       <div class="agreement">
         <p>1. 借用人须为本平台注册学生,凭有效身份领取设备,设备仅限本人在校内学习科研使用,不得转借他人或挪作商用。</p>
         <p>2. 领取设备时应当场检查外观与功能,发现异常立即向管理员登记;未登记的损坏视为借用期内发生。</p>
-        <p>3. 开发板类设备借用期限最长 2 周,仪器仪表类最长 1 周;到期前 3 天可申请续借一次,逾期未还将暂停借阅资格并影响信用评分。</p>
+        <p>3. 开发板类设备借用期限最长 2 周,仪器仪表类最长 1 周;到期前 3 天可申请续借一次,逾期未还将暂停借阅资格直至归还验收。</p>
         <p>4. 借用期间妥善保管设备,防水防摔防静电;精密仪器须在指导老师监督下使用。</p>
         <p>5. 归还时须通过管理员功能验收;人为损坏或遗失的,按设备参考价值赔偿或承担维修费用。</p>
-        <p>6. 本协议自勾选同意并提交申请时生效,最终解释权归电子信息创新实验室所有。</p>
+        <p>6. 本协议自勾选同意并提交申请时生效,最终解释权归实验室管理方所有。</p>
       </div>
       <template #footer>
         <el-button @click="agreementVisible = false">关闭</el-button>
@@ -269,7 +264,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   CheckCircle, CircuitBoard, Eye, FileText, Folder, Gauge, Heart, LayoutGrid,
-  MapPin, Radio, Search, SlidersHorizontal, Star, Thermometer, Wrench
+  MapPin, Radio, Search, SlidersHorizontal, Thermometer, Wrench
 } from 'lucide-vue-next'
 import {
   applyBorrow, fetchEquipment, fetchEquipmentFavorites, fetchLocations, toggleEquipmentFavorite
@@ -282,7 +277,7 @@ const authStore = useAuthStore()
 
 const items = ref([])
 const locations = ref([])
-const filters = reactive({ keyword: route.query.keyword || '', status: 'ALL', location: 'ALL', minRating: 0 })
+const filters = reactive({ keyword: route.query.keyword || '', status: 'ALL', location: 'ALL' })
 const advancedOpen = ref(false)
 const activeCategory = ref('')
 const failedImages = ref(new Set())
@@ -381,8 +376,7 @@ const load = async () => {
   items.value = await fetchEquipment({
     keyword: filters.keyword || undefined,
     status: filters.status,
-    location: filters.location,
-    minRating: filters.minRating || undefined
+    location: filters.location
   })
 }
 
