@@ -102,10 +102,41 @@
           </div>
         </div>
 
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h3><MonitorPlay :size="17" color="#0e7490" /> 数据大屏</h3>
+              <p class="sub">大屏抬头、学期 KPI 目标(目标为 0 表示不显示该项)与演示数据开关。</p>
+            </div>
+            <a href="/admin/screen" target="_blank" class="open-screen">打开大屏 ↗</a>
+          </div>
+          <div class="form-grid">
+            <div class="field">
+              <label>大屏标题</label>
+              <el-input v-model="screen.title" maxlength="40" placeholder="留空则用「站点标题 · 实时数据看板」" />
+            </div>
+            <div class="field">
+              <label>英文副标题</label>
+              <el-input v-model="screen.subtitle" maxlength="60" placeholder="REAL-TIME TEACHING DATA CENTER" />
+            </div>
+            <div class="field"><label>目标 · 参与学生数</label><el-input-number v-model="screen.targetStudents" :min="0" :max="100000" style="width:100%" /></div>
+            <div class="field"><label>目标 · 完成项目数</label><el-input-number v-model="screen.targetCompleted" :min="0" :max="100000" style="width:100%" /></div>
+            <div class="field"><label>目标 · 设备利用率 %</label><el-input-number v-model="screen.targetUtilization" :min="0" :max="100" style="width:100%" /></div>
+            <div class="field"><label>目标 · 周活跃率 %</label><el-input-number v-model="screen.targetActiveRate" :min="0" :max="100" style="width:100%" /></div>
+          </div>
+          <div class="toggle-row" :class="{ on: screen.demo }" style="margin-top:12px">
+            <div>
+              <div class="toggle-title">演示数据</div>
+              <div class="hint">新站点还没有学生时,大屏显示一套逼真的样例数据用于演示;正式启用后请关闭,关闭即刻恢复真实数据</div>
+            </div>
+            <el-switch v-model="screen.demo" />
+          </div>
+        </div>
+
         <div class="actions card">
           <el-button type="primary" size="large" :loading="saving" @click="save"><Save :size="15" style="margin-right:6px" />保存配置</el-button>
           <el-button size="large" @click="load">还原为已保存</el-button>
-          <span class="muted">保存后学生端、登录页立即生效,无需重启</span>
+          <span class="muted">保存后学生端、登录页、大屏立即生效,无需重启</span>
         </div>
       </div>
 
@@ -150,8 +181,8 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { GraduationCap, LayoutList, Palette, Save, ShieldCheck, UserPlus } from 'lucide-vue-next'
-import { adminGetSiteSettings, adminUpdateSiteSettings } from '../../api'
+import { GraduationCap, LayoutList, MonitorPlay, Palette, Save, ShieldCheck, UserPlus } from 'lucide-vue-next'
+import { adminGetSiteSettings, adminScreenSettings, adminUpdateScreenSettings, adminUpdateSiteSettings } from '../../api'
 import { loadSiteConfig } from '../../utils/siteConfig'
 import ImageUploader from '../../components/ImageUploader.vue'
 
@@ -186,6 +217,7 @@ const save = async () => {
   saving.value = true
   try {
     await adminUpdateSiteSettings({ ...form })
+    await adminUpdateScreenSettings({ ...screen })
     await loadSiteConfig(true)
     ElMessage.success('已保存,立即生效')
   } finally {
@@ -193,7 +225,10 @@ const save = async () => {
   }
 }
 
-onMounted(load)
+const screen = reactive({ title: '', subtitle: '', targetStudents: 0, targetCompleted: 0, targetUtilization: 0, targetActiveRate: 0, demo: false })
+const loadScreen = async () => { Object.assign(screen, await adminScreenSettings()) }
+
+onMounted(() => { load(); loadScreen() })
 </script>
 
 <style scoped>
@@ -203,6 +238,8 @@ onMounted(load)
 .muted { font-size: 12px; color: #9ca3af; }
 
 .card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+.open-screen { font-size: 13px; color: #0e7490; text-decoration: none; white-space: nowrap; background: #ecfeff; padding: 6px 12px; border-radius: 8px; }
+.open-screen:hover { background: #cffafe; }
 .card-head h3 { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
 .sub { color: var(--text-secondary); font-size: 13px; margin: 0; line-height: 1.6; }
 

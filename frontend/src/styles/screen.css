@@ -1,0 +1,73 @@
+/* 数据大屏公共样式(非 scoped,供大屏各分页组件共用),全部限定在 .screen-root 下 */
+.screen-root {
+  --bg: #04101f; --cy: #22e1ff; --cy-dim: rgba(34, 225, 255, .35); --cy-soft: rgba(34, 225, 255, .12);
+  --grn: #35e37a; --amb: #f7b731; --red: #ff5b6e; --pur: #b97cff; --txt: #dff6ff; --txt-dim: #8fb6d6;
+  --panel: linear-gradient(180deg, rgba(10, 36, 78, .85), rgba(6, 20, 46, .92));
+  --frame-bg: rgba(8, 26, 58, .55); --card-bg: linear-gradient(180deg, rgba(14, 44, 92, .8), rgba(8, 26, 58, .92));
+  --chip: rgba(34, 225, 255, .08); --ink: #fff; --grid-line: rgba(34, 225, 255, .12);
+  position: fixed; inset: 0; overflow: hidden; color: var(--txt);
+  background: radial-gradient(ellipse at 20% 0%, #0d2a5c 0%, transparent 55%), radial-gradient(ellipse at 80% 100%, #0b2b52 0%, transparent 50%), var(--bg);
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+}
+/* 校园蓝浅色主题:投影仪 / 白天会议室 */
+.screen-root.light {
+  --bg: #eef4fb; --cy: #0b74d1; --cy-dim: rgba(11, 116, 209, .35); --cy-soft: rgba(11, 116, 209, .1);
+  --grn: #16a34a; --amb: #d97706; --red: #dc2626; --pur: #7c3aed; --txt: #1e293b; --txt-dim: #64748b;
+  --panel: linear-gradient(180deg, #ffffff, #f4f8fe); --frame-bg: rgba(255, 255, 255, .85);
+  --card-bg: linear-gradient(180deg, #ffffff, #f3f7fd); --chip: rgba(11, 116, 209, .08); --ink: #0f172a; --grid-line: rgba(11, 116, 209, .12);
+  background: radial-gradient(ellipse at 20% 0%, #dbeafe 0%, transparent 55%), radial-gradient(ellipse at 80% 100%, #e0f2fe 0%, transparent 50%), var(--bg);
+}
+.screen-root::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 44px), repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 44px); opacity: .5; mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%); pointer-events: none; }
+.screen-root .bg-particles { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .9; }
+.screen-root.light .bg-particles { opacity: .35; }
+.screen-root .scan { position: absolute; left: 0; right: 0; height: 160px; pointer-events: none; background: linear-gradient(180deg, transparent, var(--cy-soft) 60%, rgba(34, 225, 255, .28) 99%, transparent); animation: sc-scan 9s linear infinite; }
+.screen-root.light .scan { display: none; }
+@keyframes sc-scan { 0% { top: -160px; } 100% { top: 100%; } }
+.screen-root .canvas { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center; display: flex; flex-direction: column; padding: 14px 28px 10px; box-sizing: border-box; gap: 12px; }
+.screen-root b, .screen-root .num b, .screen-root .kv b, .screen-root .alert-count, .screen-root .time, .screen-root .pct, .screen-root .big { font-family: 'Bahnschrift', 'DIN Alternate', 'Segoe UI', 'Arial Narrow', sans-serif; font-variant-numeric: tabular-nums; }
+.screen-root .muted, .screen-root .dim { color: var(--txt-dim); }
+.screen-root .grow { flex: 1; min-width: 0; }
+
+/* 通用框 */
+.screen-root .frame { position: relative; border: 1px solid var(--cy-dim); background: var(--frame-bg); border-radius: 6px; box-shadow: inset 0 0 40px var(--cy-soft); backdrop-filter: blur(2px); min-height: 0; }
+.screen-root .frame::before, .screen-root .frame::after { content: ''; position: absolute; width: 16px; height: 16px; border: 2px solid var(--cy); filter: drop-shadow(0 0 4px var(--cy)); pointer-events: none; }
+.screen-root .frame::before { left: -1px; top: -1px; border-right: 0; border-bottom: 0; }
+.screen-root .frame::after { right: -1px; bottom: -1px; border-left: 0; border-top: 0; }
+.screen-root .box-title { font-size: 15px; font-weight: 700; color: var(--ink); padding: 10px 16px 0; display: flex; align-items: center; gap: 8px; }
+.screen-root .box-title::before { content: ''; width: 4px; height: 14px; background: var(--cy); box-shadow: 0 0 8px var(--cy); }
+.screen-root .box-title em { font-style: normal; font-size: 10px; letter-spacing: 2px; color: var(--txt-dim); opacity: .7; font-weight: 400; margin-left: auto; padding-right: 30px; background: repeating-linear-gradient(-45deg, var(--cy-dim) 0 2px, transparent 2px 6px) right center / 24px 10px no-repeat; }
+.screen-root .box-title small { font-size: 11px; color: var(--txt-dim); font-weight: 400; margin-left: 4px; }
+.screen-root .chart { flex: 1; min-height: 0; margin: 4px 8px 6px; }
+
+/* 小数字格 */
+.screen-root .kv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 2px; padding: 8px 10px 6px; align-content: center; }
+.screen-root .kv { text-align: center; }
+.screen-root .kv b { display: block; font-size: 22px; line-height: 1; color: var(--cy); }
+.screen-root .kv > span { display: block; margin-top: 3px; font-size: 10.5px; color: var(--txt-dim); white-space: nowrap; }
+.screen-root .kv.warn b { color: var(--amb); } .screen-root .kv.bad b { color: var(--red); animation: sc-pulse 1.6s infinite; } .screen-root .kv.ok b { color: var(--grn); }
+@keyframes sc-pulse { 50% { opacity: .55; } }
+
+/* 榜单行 */
+.screen-root .rank-list { list-style: none; margin: 0; padding: 4px 14px 10px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+.screen-root .rank-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.screen-root .rank-no { width: 22px; height: 22px; border-radius: 6px; background: var(--chip); color: var(--cy); font-size: 12px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
+.screen-root .rank-no.r1 { background: linear-gradient(135deg, #ffe27a, #d19a00); color: #3b2a00; box-shadow: 0 0 10px rgba(255, 213, 74, .7); }
+.screen-root .rank-no.r2 { background: linear-gradient(135deg, #f1f5f9, #94a3b8); color: #1e293b; }
+.screen-root .rank-no.r3 { background: linear-gradient(135deg, #f0b27a, #b45309); color: #3b1a00; }
+.screen-root .rank-name { flex: 1; min-width: 0; color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.screen-root .rank-bar { flex: 2; height: 8px; border-radius: 4px; background: rgba(0, 0, 0, .35); overflow: hidden; }
+.screen-root.light .rank-bar { background: #dbe4f0; }
+.screen-root .rank-bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--cy), var(--pur)); box-shadow: 0 0 8px var(--cy-dim); transition: width .8s ease; }
+.screen-root .rank-val { width: 64px; text-align: right; color: var(--ink); font-weight: 700; }
+.screen-root .rank-sub { font-size: 11px; color: var(--txt-dim); white-space: nowrap; }
+
+/* 标签 */
+.screen-root .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--cy); }
+.screen-root .tag.grn { color: var(--grn); background: rgba(53, 227, 122, .12); }
+.screen-root .tag.amb { color: var(--amb); background: rgba(247, 183, 49, .12); }
+.screen-root .tag.red { color: var(--red); background: rgba(255, 91, 110, .12); }
+
+/* 分页入场 */
+.screen-root .page-enter { animation: sc-enter .5s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes sc-enter { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.screen-root .empty-hint { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; color: var(--txt-dim); text-align: center; line-height: 1.8; }

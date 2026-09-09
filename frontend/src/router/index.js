@@ -68,6 +68,8 @@ const router = createRouter({
     },
     // 项目商店平台管理端:独立登录(商店服务的平台管理员),与客户站点账号无关
     { path: '/platform/login', name: 'platform-login', component: () => import('../views/platform/PlatformLogin.vue') },
+    // 平台总览大屏:全部客户站点汇总,独立全屏页面
+    { path: '/platform/screen', name: 'platform-screen', component: () => import('../views/platform/PlatformScreen.vue'), meta: { requiresHubAdmin: true } },
     {
       path: '/platform',
       component: () => import('../views/platform/PlatformLayout.vue'),

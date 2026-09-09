@@ -144,6 +144,17 @@ public class AdminController {
         return ApiResponse.ok(bigScreenService.snapshot());
     }
 
+    @GetMapping("/screen-settings")
+    public ApiResponse<Map<String, Object>> screenSettings() {
+        return ApiResponse.ok(siteConfigService.screenConfig());
+    }
+
+    /** body: { title?, subtitle?, targetStudents?, targetCompleted?, targetUtilization?, targetActiveRate?, demo? } */
+    @PutMapping("/screen-settings")
+    public ApiResponse<Map<String, Object>> updateScreenSettings(@RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(siteConfigService.updateScreen(body));
+    }
+
     // ---------- 操作审计 ----------
 
     @GetMapping("/audit-logs")

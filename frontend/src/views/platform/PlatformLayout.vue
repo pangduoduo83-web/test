@@ -23,6 +23,10 @@
         <router-link to="/platform/sites" class="pf-nav-item" :class="{ active: $route.path.startsWith('/platform/sites') }">
           <Building2 :size="17" />客户站点
         </router-link>
+        <div class="pf-nav-group">展示</div>
+        <a href="/platform/screen" target="_blank" class="pf-nav-item">
+          <MonitorPlay :size="17" />平台总览大屏 ↗
+        </a>
       </nav>
 
       <div class="pf-side-foot">
@@ -62,7 +66,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Building2, KeyRound, LayoutDashboard, LogOut, PackageCheck, Store } from 'lucide-vue-next'
+import { Building2, KeyRound, LayoutDashboard, LogOut, MonitorPlay, PackageCheck, Store } from 'lucide-vue-next'
 import { clearHubAuth, getHubAdminName, hubChangePassword, hubStats } from '../../api/hub'
 import '../../styles/platform.css'
 

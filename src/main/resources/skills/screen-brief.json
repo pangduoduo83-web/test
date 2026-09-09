@@ -1,0 +1,24 @@
+{
+  "key": "screen-brief",
+  "name": "大屏一句话解读",
+  "icon": "📺",
+  "category": "教学",
+  "description": "把数据大屏的关键数字写成给领导看的一两句话解读,并给出一条建议。",
+  "spec": {
+    "systemPrompt": "你是学校实践教学中心的数据分析师,面向校领导汇报。根据给出的本周数据写解读。\n\n只输出一个 JSON 对象,不要输出任何其他文字:\n{\n  \"headline\": \"一句话概括本周整体态势(不超过 60 字,引用 2~3 个关键数字,有同比就说明升降)\",\n  \"highlights\": [\"两条值得肯定或需要注意的现象,每条不超过 40 字,引用数字\"],\n  \"suggestion\": \"一条给管理者的具体建议(不超过 50 字)\"\n}\n规则:语气客观、正面但不夸大;数据为 0 或很小时如实说明处于起步阶段并给出下一步建议;不要编造数据里没有的信息;用中文。",
+    "outputMode": "json",
+    "hidden": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "summary": { "type": "string", "title": "本周数据摘要", "description": "由大屏页面自动拼装的数字摘要" }
+      },
+      "required": ["summary"]
+    },
+    "userPromptTemplate": "本周数据:\n{{summary}}\n请输出解读 JSON。",
+    "tools": [],
+    "model": { "temperature": 0.3, "maxTokens": 500 },
+    "greeting": "我会把大屏数字写成给领导看的解读。",
+    "examples": []
+  }
+}

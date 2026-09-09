@@ -33,6 +33,14 @@ public class SiteConfigService {
     private static final String KEY_EQUIPMENT_PAGE_SIZE = "site.equipmentPageSize";
     private static final String KEY_PROJECT_CATEGORIES = "site.projectCategories";
     private static final String KEY_EQUIPMENT_CATEGORIES = "site.equipmentCategories";
+    // 数据大屏:抬头、学期 KPI 目标、演示数据开关
+    private static final String KEY_SCREEN_TITLE = "site.screenTitle";
+    private static final String KEY_SCREEN_SUBTITLE = "site.screenSubtitle";
+    private static final String KEY_SCREEN_TARGET_STUDENTS = "site.screenTargetStudents";
+    private static final String KEY_SCREEN_TARGET_COMPLETED = "site.screenTargetCompleted";
+    private static final String KEY_SCREEN_TARGET_UTILIZATION = "site.screenTargetUtilization";
+    private static final String KEY_SCREEN_TARGET_ACTIVE_RATE = "site.screenTargetActiveRate";
+    private static final String KEY_SCREEN_DEMO = "site.screenDemo";
 
     private static final List<String> DEFAULT_PROJECT_CATEGORIES = java.util.Arrays.asList(
             "开发板/评估板", "物联网应用", "电源管理", "消费电子", "测试测量", "通信网络", "AI应用");
@@ -67,6 +75,65 @@ public class SiteConfigService {
 
     public boolean registerAllowed() {
         return !"false".equalsIgnoreCase(loadAll().get(KEY_ALLOW_REGISTER));
+    }
+
+    /** 数据大屏配置(仅管理员接口返回):抬头、KPI 目标、演示开关 */
+    public Map<String, Object> screenConfig() {
+        Map<String, String> db = loadAll();
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("title", orDefault(db.get(KEY_SCREEN_TITLE), ""));
+        m.put("subtitle", orDefault(db.get(KEY_SCREEN_SUBTITLE), "REAL-TIME TEACHING DATA CENTER"));
+        m.put("targetStudents", parseInt(db.get(KEY_SCREEN_TARGET_STUDENTS), 0));
+        m.put("targetCompleted", parseInt(db.get(KEY_SCREEN_TARGET_COMPLETED), 0));
+        m.put("targetUtilization", parseInt(db.get(KEY_SCREEN_TARGET_UTILIZATION), 0));
+        m.put("targetActiveRate", parseInt(db.get(KEY_SCREEN_TARGET_ACTIVE_RATE), 0));
+        m.put("demo", "true".equalsIgnoreCase(db.get(KEY_SCREEN_DEMO)));
+        return m;
+    }
+
+    @Transactional
+    public Map<String, Object> updateScreen(Map<String, Object> body) {
+        if (body == null || body.isEmpty()) {
+            throw new BusinessException("没有需要保存的配置");
+        }
+        if (body.containsKey("title")) {
+            String v = body.get("title") == null ? "" : String.valueOf(body.get("title")).trim();
+            if (v.length() > 40) {
+                throw new BusinessException("大屏标题不能超过 40 字");
+            }
+            put(KEY_SCREEN_TITLE, v);
+        }
+        if (body.containsKey("subtitle")) {
+            String v = body.get("subtitle") == null ? "" : String.valueOf(body.get("subtitle")).trim();
+            if (v.length() > 60) {
+                throw new BusinessException("大屏副标题不能超过 60 字");
+            }
+            put(KEY_SCREEN_SUBTITLE, v);
+        }
+        putTarget(body, "targetStudents", KEY_SCREEN_TARGET_STUDENTS, 100000);
+        putTarget(body, "targetCompleted", KEY_SCREEN_TARGET_COMPLETED, 100000);
+        putTarget(body, "targetUtilization", KEY_SCREEN_TARGET_UTILIZATION, 100);
+        putTarget(body, "targetActiveRate", KEY_SCREEN_TARGET_ACTIVE_RATE, 100);
+        if (body.containsKey("demo")) {
+            put(KEY_SCREEN_DEMO, String.valueOf(Boolean.TRUE.equals(body.get("demo"))));
+        }
+        return screenConfig();
+    }
+
+    private void putTarget(Map<String, Object> body, String field, String key, int max) {
+        if (!body.containsKey(field)) {
+            return;
+        }
+        int v;
+        try {
+            v = body.get(field) == null ? 0 : (int) Double.parseDouble(String.valueOf(body.get(field)));
+        } catch (NumberFormatException e) {
+            throw new BusinessException("KPI 目标必须是数字");
+        }
+        if (v < 0 || v > max) {
+            throw new BusinessException("KPI 目标超出范围(0~" + max + ")");
+        }
+        put(key, String.valueOf(v));
     }
 
     /** 管理端保存:仅更新传入字段 */

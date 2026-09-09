@@ -46,12 +46,21 @@ public class BigScreenService {
     private final AiUsageDailyRepository aiUsageRepository;
     private final SiteConfigService siteConfigService;
     private final KicadAiClient kicadAiClient;
+    private final com.example.ioedunew.repository.CourseClassRepository classRepository;
+    private final com.example.ioedunew.repository.ClassMemberRepository memberRepository;
+    private final com.example.ioedunew.repository.SkillScoreRepository skillScoreRepository;
 
     public BigScreenService(UserRepository userRepository, ProjectRepository projectRepository,
                             EnrollmentRepository enrollmentRepository, SubmissionRepository submissionRepository,
                             BorrowRequestRepository borrowRepository, EquipmentRepository equipmentRepository,
                             LearningActivityRepository activityRepository, AiUsageDailyRepository aiUsageRepository,
-                            SiteConfigService siteConfigService, KicadAiClient kicadAiClient) {
+                            SiteConfigService siteConfigService, KicadAiClient kicadAiClient,
+                            com.example.ioedunew.repository.CourseClassRepository classRepository,
+                            com.example.ioedunew.repository.ClassMemberRepository memberRepository,
+                            com.example.ioedunew.repository.SkillScoreRepository skillScoreRepository) {
+        this.classRepository = classRepository;
+        this.memberRepository = memberRepository;
+        this.skillScoreRepository = skillScoreRepository;
         this.kicadAiClient = kicadAiClient;
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
@@ -65,6 +74,43 @@ public class BigScreenService {
     }
 
     public Map<String, Object> snapshot() {
+        Map<String, Object> screenCfg = siteConfigService.screenConfig();
+        Map<String, Object> out = Boolean.TRUE.equals(screenCfg.get("demo")) ? demoSnapshot() : realSnapshot();
+        Map<String, Object> pub = siteConfigService.publicConfig();
+        Map<String, Object> site = new LinkedHashMap<>();
+        site.put("title", pub.get("title"));
+        site.put("logoUrl", pub.get("logoUrl"));
+        site.put("screenTitle", screenCfg.get("title"));
+        site.put("screenSubtitle", screenCfg.get("subtitle"));
+        out.put("site", site);
+        out.put("demo", Boolean.TRUE.equals(screenCfg.get("demo")));
+        out.put("kpi", kpi(screenCfg, out));
+        return out;
+    }
+
+    /** 学期 KPI:目标 vs 实际,目标为 0 表示未设置 */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> kpi(Map<String, Object> cfg, Map<String, Object> snap) {
+        Map<String, Object> users = (Map<String, Object>) snap.get("users");
+        Map<String, Object> projects = (Map<String, Object>) snap.get("projects");
+        Map<String, Object> equipment = (Map<String, Object>) snap.get("equipment");
+        long students = ((Number) users.get("students")).longValue();
+        long active7 = ((Number) users.get("active7d")).longValue();
+        int activeRate = students == 0 ? 0 : (int) Math.round(active7 * 100.0 / students);
+        List<Map<String, Object>> list = new ArrayList<>();
+        list.add(kpiItem("参与学生", students, ((Number) cfg.get("targetStudents")).intValue(), "人"));
+        list.add(kpiItem("完成项目", ((Number) projects.get("completed")).longValue(), ((Number) cfg.get("targetCompleted")).intValue(), "个"));
+        list.add(kpiItem("设备利用率", ((Number) equipment.get("utilization")).longValue(), ((Number) cfg.get("targetUtilization")).intValue(), "%"));
+        list.add(kpiItem("周活跃率", activeRate, ((Number) cfg.get("targetActiveRate")).intValue(), "%"));
+        return list;
+    }
+
+    private static Map<String, Object> kpiItem(String name, long actual, int target, String unit) {
+        int pct = target <= 0 ? 0 : (int) Math.min(100, Math.round(actual * 100.0 / target));
+        return map("name", name, "actual", actual, "target", target, "unit", unit, "percent", pct);
+    }
+
+    private Map<String, Object> realSnapshot() {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
         List<User> users = userRepository.findAll();
@@ -285,7 +331,276 @@ public class BigScreenService {
             feed.add(map("time", a.getCreatedAt(), "user", u == null ? "已注销用户" : u.getName(), "type", a.getType(), "title", a.getTitle()));
         }
         out.put("feed", feed);
+
+        // ---------- 累计与同比 ----------
+        LocalDateTime weekAgo = now.minusDays(7);
+        LocalDateTime twoWeeksAgo = now.minusDays(14);
+        long actsThis = recent14.stream().filter(a -> !a.getCreatedAt().isBefore(weekAgo)).count();
+        long actsLast = recent14.size() - actsThis;
+        long activeLast = recent14.stream().filter(a -> a.getCreatedAt().isBefore(weekAgo)).map(LearningActivity::getUserId).distinct().count();
+        long completedThis = recent14.stream().filter(a -> LearningActivity.GRADED.equals(a.getType()) && !a.getCreatedAt().isBefore(weekAgo)).count();
+        long completedLast = recent14.stream().filter(a -> LearningActivity.GRADED.equals(a.getType()) && a.getCreatedAt().isBefore(weekAgo)).count();
+        long newUsersLast = users.stream().filter(u -> u.getCreatedAt() != null && u.getCreatedAt().isBefore(weekAgo) && !u.getCreatedAt().isBefore(twoWeeksAgo)).count();
+        LocalDateTime since = users.stream().map(User::getCreatedAt).filter(d -> d != null).min(LocalDateTime::compareTo).orElse(now);
+        out.put("cumulative", map(
+                "students", students,
+                "completed", completed,
+                "actions", activityRepository.count(),
+                "submissions", submissions.size(),
+                "runningDays", Math.max(1, java.time.temporal.ChronoUnit.DAYS.between(since.toLocalDate(), today) + 1),
+                "aiRunsMonth", aiRunsMonth));
+        out.put("wow", map(
+                "actions", wow(actsThis, actsLast),
+                "activeUsers", wow(active7.size(), activeLast),
+                "completed", wow(completedThis, completedLast),
+                "newUsers", wow(newWeek, newUsersLast)));
+
+        // ---------- 成果墙:评分最高的成果 ----------
+        List<Map<String, Object>> works = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        graded.stream().sorted((a, b) -> Integer.compare(b.getScore(), a.getScore())).forEach(s -> {
+            String key = s.getUserId() + ":" + s.getProjectId();
+            if (works.size() >= 18 || !seen.add(key)) {
+                return;
+            }
+            Project p = projectById.get(s.getProjectId());
+            User u = userById.get(s.getUserId());
+            works.add(map("studentName", u == null ? s.getUserName() : u.getName(), "major", u == null ? null : u.getMajor(),
+                    "projectTitle", p == null ? s.getProjectTitle() : p.getTitle(), "coverUrl", p == null ? null : p.getCoverUrl(),
+                    "icon", p == null ? null : p.getIcon(), "score", s.getScore(), "feedback", s.getFeedback(),
+                    "assessmentName", s.getAssessmentName(), "gradedAt", s.getGradedAt(), "mentor", p == null ? null : p.getMentor()));
+        });
+        out.put("works", works);
+
+        // ---------- 班级榜 ----------
+        List<Map<String, Object>> classRanks = new ArrayList<>();
+        for (com.example.ioedunew.entity.CourseClass c : classRepository.findAll()) {
+            List<Long> memberIds = memberRepository.findByClassIdOrderByJoinedAtAsc(c.getId()).stream()
+                    .map(com.example.ioedunew.entity.ClassMember::getUserId).collect(Collectors.toList());
+            if (memberIds.isEmpty()) {
+                continue;
+            }
+            List<Enrollment> es = enrollments.stream().filter(e -> memberIds.contains(e.getUserId())).collect(Collectors.toList());
+            long done = es.stream().filter(e -> "COMPLETED".equals(e.getStatus())).count();
+            int avgP = es.isEmpty() ? 0 : (int) Math.round(es.stream().mapToInt(e -> "COMPLETED".equals(e.getStatus()) ? 100 : (e.getProgress() == null ? 0 : e.getProgress())).average().orElse(0));
+            long activeMembers = memberIds.stream().filter(active7::contains).count();
+            classRanks.add(map("name", c.getName(), "teacher", c.getTeacherName(), "members", memberIds.size(),
+                    "avgProgress", avgP, "completionRate", es.isEmpty() ? 0 : Math.round(done * 100.0 / es.size()),
+                    "activeRate", Math.round(activeMembers * 100.0 / memberIds.size())));
+        }
+        classRanks.sort((a, b) -> Long.compare(((Number) b.get("avgProgress")).longValue(), ((Number) a.get("avgProgress")).longValue()));
+        out.put("classes", classRanks);
+
+        // ---------- 专业分布 ----------
+        Map<String, Long> majorCount = users.stream().filter(u -> "STUDENT".equals(u.getRole()))
+                .collect(Collectors.groupingBy(u -> u.getMajor() == null || u.getMajor().trim().isEmpty() ? "未填写" : u.getMajor().trim(), Collectors.counting()));
+        List<Map<String, Object>> majors = majorCount.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                .map(e -> map("name", e.getKey(), "value", e.getValue())).collect(Collectors.toList());
+        out.put("majors", majors);
+
+        // ---------- 全校技能雷达 ----------
+        Map<String, List<Integer>> bySkill = new java.util.LinkedHashMap<>();
+        for (com.example.ioedunew.entity.SkillScore s : skillScoreRepository.findAll()) {
+            if (s.getScore() != null) {
+                bySkill.computeIfAbsent(s.getSkillName(), k -> new ArrayList<>()).add(s.getScore());
+            }
+        }
+        List<Map<String, Object>> skills = new ArrayList<>();
+        bySkill.forEach((name, scores) -> skills.add(map("name", name,
+                "avg", (int) Math.round(scores.stream().mapToInt(Integer::intValue).average().orElse(0)),
+                "max", scores.stream().mapToInt(Integer::intValue).max().orElse(0), "count", scores.size())));
+        out.put("skills", skills);
+
+        // ---------- 24 小时活跃分布(近 7 天) ----------
+        int[] hours = new int[24];
+        for (LearningActivity a : recent14) {
+            if (!a.getCreatedAt().isBefore(weekAgo)) {
+                hours[a.getCreatedAt().getHour()]++;
+            }
+        }
+        List<Integer> hourList = new ArrayList<>();
+        for (int h : hours) {
+            hourList.add(h);
+        }
+        out.put("hours", hourList);
+
+        // ---------- 设备排行与资产 ----------
+        List<Map<String, Object>> equipmentTop = equipment.stream()
+                .sorted((a, b) -> Integer.compare(b.getBorrowCount() == null ? 0 : b.getBorrowCount(), a.getBorrowCount() == null ? 0 : a.getBorrowCount()))
+                .limit(10)
+                .map(q -> map("name", q.getName(), "borrowCount", q.getBorrowCount() == null ? 0 : q.getBorrowCount(),
+                        "total", q.getTotalCount() == null ? 0 : q.getTotalCount(), "available", q.getAvailableCount() == null ? 0 : q.getAvailableCount(),
+                        "category", q.getCategory()))
+                .collect(Collectors.toList());
+        double assetValue = equipment.stream().mapToDouble(q -> (q.getPrice() == null ? 0 : q.getPrice()) * (q.getTotalCount() == null ? 0 : q.getTotalCount())).sum();
+        out.put("equipmentTop", equipmentTop);
+        out.put("equipmentAssets", map("value", Math.round(assetValue), "kinds", equipment.size(), "units", totalUnits,
+                "borrowsTotal", borrows.size(), "borrowsMonth", borrows.stream().filter(b -> b.getAppliedAt() != null && !b.getAppliedAt().isBefore(now.minusDays(30))).count()));
+
+        // ---------- 教师带教榜 ----------
+        Map<Long, List<Project>> byMentor = projects.stream().filter(p -> p.getMentorId() != null).collect(Collectors.groupingBy(Project::getMentorId));
+        List<Map<String, Object>> teachersRank = new ArrayList<>();
+        byMentor.forEach((mentorId, ps) -> {
+            User t = userById.get(mentorId);
+            Set<Long> pids = ps.stream().map(Project::getId).collect(Collectors.toSet());
+            List<Enrollment> es = enrollments.stream().filter(e -> pids.contains(e.getProjectId())).collect(Collectors.toList());
+            List<Submission> gs = graded.stream().filter(s -> pids.contains(s.getProjectId())).collect(Collectors.toList());
+            teachersRank.add(map("name", t == null ? ps.get(0).getMentor() : t.getName(), "projects", ps.size(),
+                    "students", es.stream().map(Enrollment::getUserId).distinct().count(),
+                    "completed", es.stream().filter(e -> "COMPLETED".equals(e.getStatus())).count(),
+                    "graded", gs.size(),
+                    "avgScore", gs.isEmpty() ? null : (int) Math.round(gs.stream().mapToInt(Submission::getScore).average().orElse(0)),
+                    "pending", submissions.stream().filter(s -> pids.contains(s.getProjectId()) && "SUBMITTED".equals(s.getStatus())).count()));
+        });
+        teachersRank.sort((a, b) -> Long.compare(((Number) b.get("students")).longValue(), ((Number) a.get("students")).longValue()));
+        out.put("teachers", teachersRank);
         return out;
+    }
+
+    // ====================================================================
+    // 演示数据:新站点还没有学生时给领导看的一整屏。固定随机种子,每次刷新数字稍有波动但整体稳定。
+    // ====================================================================
+    private static final String[] DEMO_SURNAMES = {"陈", "李", "王", "张", "刘", "杨", "黄", "周", "吴", "赵", "林", "郑", "何", "许", "孙", "罗", "高", "梁", "宋", "唐"};
+    private static final String[] DEMO_GIVEN = {"梓涵", "子墨", "浩然", "欣怡", "宇轩", "诗涵", "俊杰", "雨桐", "博文", "可欣", "嘉豪", "思远", "语嫣", "皓轩", "若曦", "明哲", "佳琪", "泽宇", "婉婷", "逸飞", "安琪", "睦晨", "书瑶", "启航"};
+    private static final String[] DEMO_MAJORS = {"电子信息工程", "自动化", "物联网工程", "通信工程", "计算机科学与技术", "机械电子工程"};
+    private static final String[][] DEMO_PROJECTS = {
+            {"基于 STM32 的智能温湿度监测节点", "🌡️"}, {"四足机器狗 LinkDog 二代", "🐕"}, {"桌面机械台灯(会听会看)", "💡"},
+            {"FPGA 数字信号处理实验板", "📡"}, {"低功耗 LoRa 农业传感网", "🌾"}, {"智能小车循迹与避障", "🚗"},
+            {"USB PD 快充电源模块", "🔋"}, {"语音识别智能音箱", "🔊"}, {"六轴姿态传感手环", "⌚"}, {"太阳能 MPPT 充电控制器", "☀️"}
+    };
+    private static final String[] DEMO_EQUIPMENT = {"数字示波器 DS1054Z", "恒温焊台 T12", "逻辑分析仪", "可编程直流电源", "STM32 开发板", "万用表 UT61E", "热风枪返修台", "频谱分析仪", "3D 打印机", "信号发生器"};
+    private static final String[] DEMO_FEEDBACK = {"电路设计规范,焊接工艺优秀,文档完整", "功能全部实现,PCB 布局合理,建议优化电源滤波", "创新点突出,演示流畅,报告结构清晰", "调试记录详实,问题定位准确", "团队协作好,成果超出预期"};
+
+    private Map<String, Object> demoSnapshot() {
+        java.util.Random rnd = new java.util.Random(LocalDate.now().toEpochDay());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = LocalDate.now();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("siteTitle", siteConfigService.publicConfig().get("title"));
+        out.put("generatedAt", now);
+        int students = 486 + rnd.nextInt(20);
+        int teachers = 18;
+        int activeToday = 120 + rnd.nextInt(40);
+        int active7 = 310 + rnd.nextInt(40);
+        out.put("users", map("total", students + teachers + 3, "students", students, "teachers", teachers, "activeToday", activeToday, "active7d", active7, "newThisWeek", 12 + rnd.nextInt(8)));
+        int enrollments = 1260 + rnd.nextInt(60);
+        int completed = 342 + rnd.nextInt(10);
+        out.put("projects", map("total", 46, "published", 41, "enrollments", enrollments, "ongoing", enrollments - completed, "completed", completed,
+                "completionRate", Math.round(completed * 100.0 / enrollments), "overdue", 23,
+                "buckets", map("notStarted", 96, "p0_25", 214, "p25_50", 268, "p50_75", 201, "p75_100", 139)));
+        out.put("grades", map("submitted", 398, "pending", 17, "returned", 6, "graded", 375, "avgScore", 82, "failing", 9, "excellent", 168, "passRate", 98));
+        out.put("equipment", map("kinds", 36, "totalUnits", 412, "availableUnits", 245, "utilization", 41, "borrowing", 158, "pending", 7, "overdue", 3, "outOfStock", 2));
+        out.put("ai", map("runsToday", 86 + rnd.nextInt(30), "runsMonth", 2140, "tokensMonth", 3_860_000L));
+        out.put("kicad", map("users", 64, "activeUsers24h", 21, "projects", 133, "conversations", 412, "conversationsActive24h", 38, "messages", 3120, "toolCalls", 5680,
+                "tokens", 41_000_000L, "online", 6, "activeRuns", 2, "agentReady", true, "toolCount", 130, "model", "custom:deepseek-chat"));
+        List<Map<String, Object>> alerts = new ArrayList<>();
+        alerts.add(map("level", "danger", "text", "23 个报名已过截止仍未完成", "count", 23));
+        alerts.add(map("level", "warning", "text", "17 份成果等待评审", "count", 17));
+        alerts.add(map("level", "warning", "text", "7 条借阅申请待审批", "count", 7));
+        alerts.add(map("level", "danger", "text", "3 笔借用已逾期未归还", "count", 3));
+        out.put("alerts", alerts);
+
+        List<Map<String, Object>> studentCards = new ArrayList<>();
+        for (int i = 0; i < 48; i++) {
+            int progress = Math.max(8, Math.min(100, 95 - i * 2 + rnd.nextInt(6)));
+            int score = progress > 60 ? 70 + rnd.nextInt(28) : 55 + rnd.nextInt(30);
+            String trend = rnd.nextInt(10) < 6 ? "up" : rnd.nextInt(2) == 0 ? "down" : "flat";
+            studentCards.add(map("userId", 1000 + i, "rank", i + 1, "name", demoName(rnd, i), "studentNo", "2023" + (1000 + i),
+                    "major", DEMO_MAJORS[i % DEMO_MAJORS.length], "projects", 1 + rnd.nextInt(3), "completed", progress >= 100 ? 1 : 0,
+                    "progress", progress, "score", score, "actions7d", 4 + rnd.nextInt(30), "activeDays7d", 1 + rnd.nextInt(6), "trend", trend,
+                    "lastActiveAt", now.minusHours(rnd.nextInt(72)), "overdue", i % 11 == 7));
+        }
+        out.put("students", studentCards);
+        List<Map<String, Object>> projectCards = new ArrayList<>();
+        for (int i = 0; i < DEMO_PROJECTS.length; i++) {
+            int enrolled = 180 - i * 14 + rnd.nextInt(10);
+            int done = (int) (enrolled * (0.18 + rnd.nextDouble() * 0.3));
+            projectCards.add(map("projectId", 100 + i, "rank", i + 1, "title", DEMO_PROJECTS[i][0], "mentor", demoName(rnd, 200 + i) + "老师",
+                    "difficulty", i % 3 == 0 ? "挑战" : i % 3 == 1 ? "进阶" : "入门", "enrolled", enrolled, "completed", done,
+                    "avgProgress", 35 + rnd.nextInt(45), "completionRate", Math.round(done * 100.0 / enrolled), "pendingSubmissions", rnd.nextInt(5), "overdue", rnd.nextInt(4)));
+        }
+        out.put("projectCards", projectCards);
+
+        List<Map<String, Object>> trend = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate d = today.minusDays(i);
+            boolean weekend = d.getDayOfWeek().getValue() >= 6;
+            int acts = weekend ? 60 + rnd.nextInt(60) : 260 + rnd.nextInt(160);
+            trend.add(map("date", d.toString(), "label", d.getMonthValue() + "/" + d.getDayOfMonth(), "actions", acts, "tasks", acts / 3 + rnd.nextInt(20), "activeUsers", weekend ? 30 + rnd.nextInt(30) : 110 + rnd.nextInt(50)));
+        }
+        out.put("trend", trend);
+        String[] feedTitles = {"《%s》进度 25%% → 50%%", "提交《%s》成果", "与 AI「项目导师」对话", "借用 %s", "《%s》第 3 阶段完成", "《%s》成果评分 88 分"};
+        List<Map<String, Object>> feed = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            String tpl = feedTitles[rnd.nextInt(feedTitles.length)];
+            String title = tpl.contains("借用") ? String.format(tpl, DEMO_EQUIPMENT[rnd.nextInt(DEMO_EQUIPMENT.length)]) : String.format(tpl, DEMO_PROJECTS[rnd.nextInt(DEMO_PROJECTS.length)][0]);
+            feed.add(map("time", now.minusMinutes(i * 7 + rnd.nextInt(6)), "user", demoName(rnd, 300 + i), "type", "PROGRESS", "title", title));
+        }
+        out.put("feed", feed);
+
+        out.put("cumulative", map("students", 1286, "completed", completed, "actions", 583_000 + rnd.nextInt(1000), "submissions", 398, "runningDays", 216, "aiRunsMonth", 2140));
+        out.put("wow", map("actions", wow(1860, 1655), "activeUsers", wow(active7, 288), "completed", wow(21, 16), "newUsers", wow(14, 19)));
+
+        List<Map<String, Object>> works = new ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            String[] p = DEMO_PROJECTS[i % DEMO_PROJECTS.length];
+            works.add(map("studentName", demoName(rnd, 400 + i), "major", DEMO_MAJORS[i % DEMO_MAJORS.length], "projectTitle", p[0], "coverUrl", null,
+                    "icon", p[1], "score", 98 - i * 2, "feedback", DEMO_FEEDBACK[i % DEMO_FEEDBACK.length], "assessmentName", i % 2 == 0 ? "项目答辩" : "功能实现",
+                    "gradedAt", now.minusDays(i * 2), "mentor", demoName(rnd, 500 + i) + "老师"));
+        }
+        out.put("works", works);
+
+        List<Map<String, Object>> classes = new ArrayList<>();
+        String[] classNames = {"电信 2301", "自动化 2302", "物联网 2301", "通信 2303", "计科 2304", "机电 2301", "电信 2302", "物联网 2302"};
+        for (int i = 0; i < classNames.length; i++) {
+            classes.add(map("name", classNames[i], "teacher", demoName(rnd, 600 + i) + "老师", "members", 38 + rnd.nextInt(10),
+                    "avgProgress", 82 - i * 5 + rnd.nextInt(4), "completionRate", 46 - i * 4 + rnd.nextInt(5), "activeRate", 88 - i * 6 + rnd.nextInt(6)));
+        }
+        out.put("classes", classes);
+        List<Map<String, Object>> majors = new ArrayList<>();
+        int[] majorCounts = {142, 96, 88, 71, 55, 34};
+        for (int i = 0; i < DEMO_MAJORS.length; i++) {
+            majors.add(map("name", DEMO_MAJORS[i], "value", majorCounts[i]));
+        }
+        out.put("majors", majors);
+        String[] skillNames = {"嵌入式开发", "编程能力", "通信技术", "PCB设计", "信号处理", "硬件调试"};
+        int[] skillAvg = {68, 74, 57, 63, 52, 66};
+        List<Map<String, Object>> skills = new ArrayList<>();
+        for (int i = 0; i < skillNames.length; i++) {
+            skills.add(map("name", skillNames[i], "avg", skillAvg[i] + rnd.nextInt(3), "max", 92 + rnd.nextInt(6), "count", students));
+        }
+        out.put("skills", skills);
+        List<Integer> hours = new ArrayList<>();
+        int[] shape = {2, 1, 0, 0, 0, 1, 4, 18, 62, 110, 128, 96, 40, 72, 118, 134, 121, 88, 74, 102, 118, 86, 41, 12};
+        for (int h : shape) {
+            hours.add(h + rnd.nextInt(8));
+        }
+        out.put("hours", hours);
+        List<Map<String, Object>> equipmentTop = new ArrayList<>();
+        for (int i = 0; i < DEMO_EQUIPMENT.length; i++) {
+            int total = 6 + rnd.nextInt(20);
+            equipmentTop.add(map("name", DEMO_EQUIPMENT[i], "borrowCount", 260 - i * 22 + rnd.nextInt(10), "total", total, "available", rnd.nextInt(total + 1), "category", i < 4 ? "测试仪表" : "工具"));
+        }
+        out.put("equipmentTop", equipmentTop);
+        out.put("equipmentAssets", map("value", 1_268_000L, "kinds", 36, "units", 412, "borrowsTotal", 3480, "borrowsMonth", 286));
+        List<Map<String, Object>> teachersRank = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            teachersRank.add(map("name", demoName(rnd, 700 + i) + "老师", "projects", 6 - i / 2, "students", 96 - i * 9 + rnd.nextInt(5), "completed", 31 - i * 3,
+                    "graded", 58 - i * 5, "avgScore", 80 + rnd.nextInt(8), "pending", rnd.nextInt(4)));
+        }
+        out.put("teachers", teachersRank);
+        return out;
+    }
+
+    private static String demoName(java.util.Random rnd, int seed) {
+        java.util.Random r = new java.util.Random(seed * 31L + 7);
+        return DEMO_SURNAMES[r.nextInt(DEMO_SURNAMES.length)] + DEMO_GIVEN[r.nextInt(DEMO_GIVEN.length)];
+    }
+
+    /** 同比:本周 vs 上周,返回 {now, prev, pct};上周为 0 时 pct 为 null */
+    private static Map<String, Object> wow(long cur, long prev) {
+        return map("now", cur, "prev", prev, "pct", prev == 0 ? null : Math.round((cur - prev) * 100.0 / prev));
     }
 
     private static void alert(List<Map<String, Object>> alerts, long count, String level, String text) {
