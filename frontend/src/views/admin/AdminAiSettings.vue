@@ -81,9 +81,9 @@
               <div class="hint">毫秒;等待模型回复的最长时间,推理类模型可调大</div>
             </div>
             <div class="field span-2">
-              <label>本站每月 Token 预算 <span class="val">{{ form.monthlyTokenBudget ? form.monthlyTokenBudget.toLocaleString() : '不限' }}</span></label>
-              <el-input-number v-model="form.monthlyTokenBudget" :min="0" :step="100000" style="width:100%" />
-              <div class="hint">输入 + 输出合计;用完后全站 AI 功能暂停到下月 1 日,防止账单失控。0 表示不限。参考:DeepSeek 约 100 万 Token ≈ 1~2 元</div>
+              <label>每人每日使用次数上限 <span class="val">{{ form.dailyRunsPerUser ? form.dailyRunsPerUser + ' 次' : '不限' }}</span></label>
+              <el-input-number v-model="form.dailyRunsPerUser" :min="0" :max="10000" :step="10" style="width:100%" />
+              <div class="hint">防止个别账号刷接口;Key 是本站自己的,平台不做额度限制。0 表示不限。本站的硬件设计助手也使用这里配置的模型与 Key</div>
             </div>
           </div>
         </div>
@@ -158,7 +158,7 @@ const testResult = ref(null)
 
 const form = reactive({
   enabled: true, baseUrl: '', model: '', apiKey: '', maxTokens: 2000, temperature: 0.4, connectTimeoutMs: 3000, readTimeoutMs: 20000,
-  monthlyTokenBudget: 0
+  dailyRunsPerUser: 50
 })
 
 const providers = [
@@ -197,7 +197,7 @@ const load = async () => {
   settings.value = d
   Object.assign(form, {
     enabled: d.enabled, baseUrl: d.baseUrl, model: d.model, maxTokens: d.maxTokens, temperature: d.temperature,
-    connectTimeoutMs: d.connectTimeoutMs, readTimeoutMs: d.readTimeoutMs, apiKey: '', monthlyTokenBudget: d.monthlyTokenBudget || 0
+    connectTimeoutMs: d.connectTimeoutMs, readTimeoutMs: d.readTimeoutMs, apiKey: '', dailyRunsPerUser: d.dailyRunsPerUser ?? 50
   })
 }
 
@@ -208,7 +208,7 @@ const save = async () => {
     settings.value = await adminUpdateAiSettings({
       enabled: form.enabled, baseUrl: form.baseUrl.trim(), model: form.model.trim(), apiKey: form.apiKey || undefined,
       maxTokens: form.maxTokens, temperature: form.temperature, connectTimeoutMs: form.connectTimeoutMs, readTimeoutMs: form.readTimeoutMs,
-      monthlyTokenBudget: form.monthlyTokenBudget || 0
+      dailyRunsPerUser: form.dailyRunsPerUser ?? 0
     })
     form.apiKey = ''
     testResult.value = null

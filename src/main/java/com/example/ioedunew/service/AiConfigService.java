@@ -29,8 +29,8 @@ public class AiConfigService {
     private static final String KEY_TEMPERATURE = "ai.temperature";
     private static final String KEY_CONNECT_TIMEOUT = "ai.connectTimeoutMs";
     private static final String KEY_READ_TIMEOUT = "ai.readTimeoutMs";
-    /** 本站每月 Token 预算(输入+输出),0 表示不限 */
-    private static final String KEY_MONTHLY_BUDGET = "ai.monthlyTokenBudget";
+    /** 每人每日 AI 运行次数上限(防刷),0 表示不限;由各站点自己决定 */
+    private static final String KEY_DAILY_RUNS = "ai.dailyRunsPerUser";
 
     private final SystemSettingRepository repository;
     private final SecretCrypto crypto;
@@ -49,6 +49,9 @@ public class AiConfigService {
 
     @Value("${ioedu.ai.read-timeout-ms}")
     private int envReadTimeoutMs;
+
+    @Value("${ioedu.ai.daily-runs-per-user:50}")
+    private int defaultDailyRuns;
 
     public AiConfigService(SystemSettingRepository repository, SecretCrypto crypto) {
         this.repository = repository;
@@ -87,17 +90,17 @@ public class AiConfigService {
         m.put("temperature", cfg.temperature);
         m.put("connectTimeoutMs", cfg.connectTimeoutMs);
         m.put("readTimeoutMs", cfg.readTimeoutMs);
-        m.put("monthlyTokenBudget", monthlyTokenBudget());
+        m.put("dailyRunsPerUser", dailyRunsPerUser(defaultDailyRuns));
         return m;
     }
 
-    /** 本站每月 Token 预算,0 为不限 */
-    public long monthlyTokenBudget() {
+    /** 每人每日运行次数上限;站点未设置时用环境变量默认值,0 为不限 */
+    public int dailyRunsPerUser(int fallback) {
         try {
-            String v = loadAll().get(KEY_MONTHLY_BUDGET);
-            return v == null || v.trim().isEmpty() ? 0 : Long.parseLong(v.trim());
+            String v = loadAll().get(KEY_DAILY_RUNS);
+            return v == null || v.trim().isEmpty() ? fallback : Integer.parseInt(v.trim());
         } catch (NumberFormatException e) {
-            return 0;
+            return fallback;
         }
     }
 
@@ -165,17 +168,17 @@ public class AiConfigService {
             }
             put(KEY_READ_TIMEOUT, String.valueOf(v));
         }
-        if (body.get("monthlyTokenBudget") != null) {
-            long v;
+        if (body.get("dailyRunsPerUser") != null) {
+            int v;
             try {
-                v = (long) Double.parseDouble(String.valueOf(body.get("monthlyTokenBudget")));
+                v = (int) Double.parseDouble(String.valueOf(body.get("dailyRunsPerUser")));
             } catch (NumberFormatException e) {
-                throw new BusinessException("月度 Token 预算格式不正确");
+                throw new BusinessException("每日次数上限格式不正确");
             }
-            if (v < 0) {
-                throw new BusinessException("月度 Token 预算不能为负数");
+            if (v < 0 || v > 10000) {
+                throw new BusinessException("每日次数上限需在 0~10000 之间(0 为不限)");
             }
-            put(KEY_MONTHLY_BUDGET, String.valueOf(v));
+            put(KEY_DAILY_RUNS, String.valueOf(v));
         }
         return view();
     }

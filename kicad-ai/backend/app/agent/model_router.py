@@ -72,6 +72,26 @@ class ModelRouter:
             log.info("built model variant %s (thinking=%s)", *key)
         return variant
 
+    def resolve_tenant(self, llm: dict[str, Any], thinking: str | None) -> BaseChatModel:
+        """Model for one IOEDU site: its own endpoint, key and model name (cached per config)."""
+        mode = normalize_thinking_mode(thinking, fallback=self.default_thinking)
+        key = ("site", llm.get("base_url", ""), llm.get("model", ""), str(llm.get("api_key", ""))[-8:], mode)
+        variant = self._variants.get(key)
+        if variant is None:
+            if len(self._variants) > 200:
+                self._variants.clear()
+            settings = self.settings.model_copy(update={
+                "llm_provider": llm.get("provider") or "custom",
+                "llm_base_url": llm.get("base_url") or "",
+                "llm_api_key": llm.get("api_key") or "",
+                "llm_model": llm.get("model") or self.default_model,
+                "llm_temperature": float(llm.get("temperature") or self.settings.llm_temperature),
+                "llm_thinking": mode,
+            })
+            variant = self._variants[key] = build_chat_model(settings)
+            log.info("built site model %s @ %s (thinking=%s)", key[2], key[1], mode)
+        return variant
+
 
 def _route(router: ModelRouter, request: Any) -> Any:
     ctx = getattr(getattr(request, "runtime", None), "context", None)
@@ -85,8 +105,16 @@ def _route(router: ModelRouter, request: Any) -> Any:
         config = {}
     configurable = config.get("configurable") if isinstance(config, dict) else {}
     configurable = configurable if isinstance(configurable, dict) else {}
-    model = extra.get("model") or configurable.get("model")
     thinking = extra.get("thinking") or configurable.get("thinking")
+    # 多商户:该运行所属站点自己的模型配置(只在 config 里放站点编码,密钥留在进程内缓存,不进 checkpoint)
+    tenant = extra.get("llm_tenant") or configurable.get("llm_tenant")
+    if tenant:
+        from app.services.tenant_llm import tenant_llm
+
+        llm = tenant_llm.cached(str(tenant))
+        if llm:
+            return request.override(model=router.resolve_tenant(llm, thinking))
+    model = extra.get("model") or configurable.get("model")
     if not model and not thinking:
         return request
     resolved = router.resolve(model, thinking)

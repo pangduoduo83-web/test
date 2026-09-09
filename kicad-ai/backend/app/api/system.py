@@ -16,6 +16,7 @@ from app.db import User, get_session_factory
 from app.kicad import cli as kicad_cli
 from app.services.presence import presence_hub
 from app.services.runs import run_manager
+from app.services.tenant_llm import tenant_llm
 
 router = APIRouter(tags=["system"])
 
@@ -48,11 +49,19 @@ async def public_info(request: Request):
 async def system_info(request: Request, user: User = Depends(get_current_user)):
     settings = get_settings()
     runtime = request.app.state.agent_runtime
+    # 多商户:展示该用户所属站点自己配置的模型
+    site_llm = await tenant_llm.get(user.tenant or "default")
+    model_label = f"custom:{site_llm['model']}" if site_llm else runtime.model_label
+    provider = "custom" if site_llm else settings.llm_provider
+    presets = routable_presets("custom", site_llm["base_url"], site_llm["model"]) if site_llm else routable_presets(
+        settings.llm_provider, settings.llm_base_url, settings.llm_model)
     return {
         "app_name": settings.app_name,
         "version": __version__,
-        "model": runtime.model_label,
-        "provider": settings.llm_provider,
+        "model": model_label,
+        "provider": provider,
+        "site_model_configured": site_llm is not None,
+        "site_model_required": tenant_llm.enforced(),
         "context_tokens": settings.llm_context_tokens,
         "thinking": settings.llm_thinking,
         "thinking_modes": list(THINKING_MODES),
@@ -66,11 +75,8 @@ async def system_info(request: Request, user: User = Depends(get_current_user)):
         "subagents": settings.enable_subagents,
         "active_runs": run_manager.active_count,
         "online": presence_hub.snapshot(user.tenant or "default")["count"],
-        # A model choice must be served by the configured endpoint; all entries
-        # therefore work with the single API key configured on this server.
-        "model_presets": routable_presets(
-            settings.llm_provider, settings.llm_base_url, settings.llm_model
-        ),
+        # 可选模型必须由同一端点提供(同一把 Key);多商户时按站点自己的端点给
+        "model_presets": presets,
     }
 
 

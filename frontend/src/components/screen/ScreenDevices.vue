@@ -22,17 +22,17 @@
       </div>
     </div>
     <div class="frame ai">
-      <div class="box-title">AI 助教 · KiCad 设计助手<em>AI</em></div>
+      <div class="box-title">AI 助教 · 硬件设计助手<em>AI</em></div>
       <div class="kv-grid">
         <div class="kv"><b>{{ data.ai.runsToday }}</b><span>今日 AI 辅导</span></div>
         <div class="kv"><b>{{ data.ai.runsMonth }}</b><span>本月 AI 辅导</span></div>
         <div class="kv"><b>{{ fmtK(data.ai.tokensMonth) }}</b><span>本月 Token</span></div>
-        <div class="kv" :class="{ ok: data.kicad }"><b>{{ data.kicad ? data.kicad.conversations : '–' }}</b><span>KiCad 设计对话</span></div>
-        <div class="kv" :class="{ ok: data.kicad }"><b>{{ data.kicad ? fmtK(data.kicad.toolCalls) : '–' }}</b><span>KiCad 工具调用</span></div>
-        <div class="kv" :class="{ ok: data.kicad }"><b>{{ data.kicad ? data.kicad.online : '–' }}</b><span>KiCad 在线</span></div>
+        <div class="kv" :class="{ ok: data.kicad }"><b>{{ data.kicad ? data.kicad.conversations : '–' }}</b><span>硬件设计对话</span></div>
+        <div class="kv" :class="{ ok: data.kicad }"><b>{{ data.kicad ? fmtK(data.kicad.toolCalls) : '–' }}</b><span>设计工具调用</span></div>
+        <div class="kv" :class="{ ok: data.kicad }"><b>{{ data.kicad ? data.kicad.online : '–' }}</b><span>硬件助手在线</span></div>
       </div>
       <div class="ai-foot">
-        <span class="tag grn">{{ data.kicad?.agentReady ? 'KiCad Agent 在线 · ' + data.kicad.toolCount + ' 个工具' : 'KiCad 助手未接入' }}</span>
+        <span class="tag grn">{{ data.kicad?.agentReady ? '硬件设计助手在线 · ' + data.kicad.toolCount + ' 个设计工具' : '硬件设计助手未接入' }}</span>
         <span class="tag">AI 项目导师 · 今日建议 · 教学周报 · 项目起草</span>
       </div>
     </div>

@@ -43,7 +43,7 @@ export function ToolsModal({ open, onClose, tools, onInsert }: { open: boolean; 
   }, [q, active, tools]);
 
   return (
-    <Modal open={open} onClose={onClose} title={`可用工具 (${total})`} subtitle={`内置 ${total - upstream} 个 · 开源插件 KiCad-AI-Assistant ${upstream} 个（进程内直接调用）。点击工具名可插入到输入框。`} width="max-w-4xl" scroll="inner">
+    <Modal open={open} onClose={onClose} title={`可用工具 (${total})`} subtitle={`内置 ${total - upstream} 个 · 扩展工具 ${upstream} 个。点击工具名可插入到输入框。`} width="max-w-4xl" scroll="inner">
       <div className="grid h-[70vh] min-h-0 grid-cols-[180px_1fr] gap-4">
         <nav className="min-h-0 space-y-0.5 overflow-y-auto pr-1">
           <CatBtn active={active === "all"} onClick={() => setActive("all")} icon={Wrench} label="全部" count={total} />

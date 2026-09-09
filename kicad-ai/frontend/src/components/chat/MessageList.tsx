@@ -630,9 +630,9 @@ function EmptyState({ onSuggestion }: { onSuggestion: (t: string) => void }) {
         <span className="absolute inset-0 -m-3 rounded-full bg-brand-200/40 blur-xl" />
         <BotAvatar size={56} />
       </span>
-      <h3 className="mt-5 text-base font-semibold text-ink">你好，我是 KiCad AI 助手</h3>
+      <h3 className="mt-5 text-base font-semibold text-ink">你好，我是硬件设计助手</h3>
       <p className="mt-1 max-w-md text-[13px] leading-relaxed text-slate-500">
-        我可以读取和编辑你的 KiCad 原理图与 PCB：优化布局、运行 DRC、分析网表。所有修改都会先整理成计划，经你批准后才会执行。先在右侧选择或导入一个工程，然后告诉我要做什么。
+        我可以读取和编辑你的原理图与 PCB 工程：优化布局、运行 DRC、分析网表、审查 BOM。所有修改都会先整理成计划，经你批准后才会执行。先在右侧选择或导入一个工程，然后告诉我要做什么。
       </p>
       <div className="mt-6 grid w-full max-w-xl grid-cols-1 gap-2.5 sm:grid-cols-2">
         {SUGGESTIONS.map((s, i) => (

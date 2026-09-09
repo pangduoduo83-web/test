@@ -23,8 +23,8 @@
         <a v-if="authStore.isAdmin" class="admin-menu-item screen-link" href="/admin/screen" target="_blank">
           <span class="ami-icon"><MonitorPlay :size="17" /></span>数据大屏 ↗
         </a>
-        <a v-if="authStore.isAdmin" class="admin-menu-item kicad-link" href="/kicad/admin" target="_blank" title="KiCad AI 设计助手的用量与用户管理(本站)">
-          <span class="ami-icon"><CircuitBoard :size="17" /></span>KiCad 助手管理 ↗
+        <a v-if="authStore.isAdmin" class="admin-menu-item kicad-link" href="/hw/admin" target="_blank" title="硬件设计助手的用量与用户管理(本站)">
+          <span class="ami-icon"><CircuitBoard :size="17" /></span>硬件助手管理 ↗
         </a>
         <a class="admin-menu-item" @click="$router.push('/app/dashboard')">
           <span class="ami-icon"><GraduationCap :size="17" /></span>学生端视图

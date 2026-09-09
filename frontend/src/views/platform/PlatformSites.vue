@@ -85,7 +85,7 @@
             <div v-if="usageOf(row.code)" class="usage">
               <div class="u-row"><span>用户</span><b>{{ usageOf(row.code).users }}</b><small v-if="row.maxUsers">/ {{ row.maxUsers }}</small><small class="dim">· 7 天活跃 {{ usageOf(row.code).activeUsers7d }}</small></div>
               <div class="u-row"><span>存储</span><b>{{ usageOf(row.code).storageMb }} MB</b><small v-if="row.storageLimitMb">/ {{ row.storageLimitMb }} MB</small></div>
-              <div class="u-row"><span>AI 本月</span><b>{{ fmtK(usageOf(row.code).aiTokensMonth) }}</b><small v-if="row.aiMonthlyTokens">/ {{ fmtK(row.aiMonthlyTokens) }}</small><small class="dim">· {{ usageOf(row.code).aiRunsMonth }} 次</small></div>
+              <div class="u-row"><span>AI 本月</span><b>{{ fmtK(usageOf(row.code).aiTokensMonth) }}</b><small class="dim">· {{ usageOf(row.code).aiRunsMonth }} 次 · 用站点自己的 Key</small></div>
             </div>
             <span v-else class="s2">加载中…</span>
           </template>
@@ -124,7 +124,6 @@
         <div class="two">
           <el-form-item label="用户数上限"><el-input-number v-model="quotaForm.maxUsers" :min="0" :step="50" style="width:100%" /><div class="fh">0 表示不限。达到后不能再注册或新建账号</div></el-form-item>
           <el-form-item label="存储上限(MB)"><el-input-number v-model="quotaForm.storageLimitMb" :min="0" :step="1024" style="width:100%" /><div class="fh">0 表示不限。包含图片、教学资料</div></el-form-item>
-          <el-form-item label="AI 月度 Token"><el-input-number v-model="quotaForm.aiMonthlyTokens" :min="0" :step="500000" style="width:100%" /><div class="fh">0 表示不限。站点自己设了预算时以站点为准</div></el-form-item>
           <el-form-item label="到期日"><el-date-picker v-model="quotaForm.expiresAt" type="date" value-format="YYYY-MM-DD" style="width:100%" placeholder="留空为永久" /><div class="fh">到期后站点所有请求返回 403,续期即恢复</div></el-form-item>
         </div>
       </el-form>
@@ -250,7 +249,7 @@ const usageOf = (code) => usage.value.find((u) => u.code === code)
 const fmtK = (n) => (n == null ? '–' : n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? (n / 1000).toFixed(0) + 'k' : String(n))
 const quotaVisible = ref(false)
 const quotaRow = ref(null)
-const quotaForm = reactive({ plan: '', maxUsers: 0, storageLimitMb: 0, aiMonthlyTokens: 0, expiresAt: '' })
+const quotaForm = reactive({ plan: '', maxUsers: 0, storageLimitMb: 0, expiresAt: '' })
 
 const load = async () => {
   config.value = await hubSitesConfig()
@@ -263,7 +262,7 @@ const load = async () => {
 
 const openQuota = (row) => {
   quotaRow.value = row
-  Object.assign(quotaForm, { plan: row.plan || '', maxUsers: row.maxUsers || 0, storageLimitMb: row.storageLimitMb || 0, aiMonthlyTokens: row.aiMonthlyTokens || 0, expiresAt: row.expiresAt || '' })
+  Object.assign(quotaForm, { plan: row.plan || '', maxUsers: row.maxUsers || 0, storageLimitMb: row.storageLimitMb || 0, expiresAt: row.expiresAt || '' })
   quotaVisible.value = true
 }
 const saveQuota = async () => {
@@ -271,7 +270,7 @@ const saveQuota = async () => {
   try {
     await hubSiteQuota(quotaRow.value.code, {
       plan: quotaForm.plan || null, maxUsers: quotaForm.maxUsers || null, storageLimitMb: quotaForm.storageLimitMb || null,
-      aiMonthlyTokens: quotaForm.aiMonthlyTokens || null, expiresAt: quotaForm.expiresAt || null
+      aiMonthlyTokens: null, expiresAt: quotaForm.expiresAt || null
     })
     ElMessage.success('配额已更新,立即生效')
     quotaVisible.value = false

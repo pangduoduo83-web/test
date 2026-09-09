@@ -47,7 +47,7 @@ export function ChatHeader({ online, onSkills, onSnapshots, onMore }: Props) {
         </span>
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[15px] font-semibold text-ink">KiCad AI 助手</span>
+            <span className="text-[15px] font-semibold text-ink">硬件设计助手</span>
             <span className={`flex items-center gap-1 text-[11px] font-medium tabular-nums transition-colors ${status.text}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />
               {status.label}

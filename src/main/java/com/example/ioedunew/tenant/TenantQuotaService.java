@@ -84,12 +84,6 @@ public class TenantQuotaService {
         dirSizeCache.remove(t.getCode());
     }
 
-    /** 当前租户的 AI 月度 Token 上限(站点自己没设时用套餐值;都没设返回 0=不限) */
-    public long tenantAiMonthlyTokens() {
-        Tenant t = current();
-        return t == null || t.getAiMonthlyTokens() == null ? 0 : t.getAiMonthlyTokens();
-    }
-
     private Tenant current() {
         String code = TenantContext.get();
         return code == null ? null : registry.findByCode(code).orElse(null);

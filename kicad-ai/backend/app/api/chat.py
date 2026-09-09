@@ -27,6 +27,7 @@ from app.services.conversations import (
     validate_design_selection,
 )
 from app.services.presence import presence_hub
+from app.services.tenant_llm import NOT_CONFIGURED_MESSAGE, tenant_llm
 from app.services.runs import RunSession, run_manager
 
 log = logging.getLogger(__name__)
@@ -127,6 +128,11 @@ async def _start_run(
     if run_manager.is_running(conv.id):
         raise HTTPException(status.HTTP_409_CONFLICT, "该对话正在处理上一条消息，请稍候")
 
+    # 多商户:用该用户所属站点自己配置的大模型;站点没配就明确提示,不用平台的 Key
+    site_llm = await tenant_llm.get(getattr(user, "tenant", None) or "default")
+    if site_llm is None and tenant_llm.enforced():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, NOT_CONFIGURED_MESSAGE)
+
     context = build_context(user, conv, project)
     context.selection = validate_design_selection(user, project, selection)
     context.extra["require_change_plan"] = True
@@ -137,6 +143,9 @@ async def _start_run(
     if thinking:
         context.extra["thinking"] = thinking
     config = runtime.thread_config(conv.id, user.id)
+    if site_llm is not None:
+        context.extra["llm_tenant"] = (user.tenant or "default").lower()
+        config["configurable"]["llm_tenant"] = (user.tenant or "default").lower()
     if model:
         config["configurable"]["model"] = model
     if thinking:

@@ -38,7 +38,7 @@ export function SystemSettings() {
       setSettings(s);
       const v = s.values;
       setForm({
-        app_name: String(v.app_name ?? "KiCad AI Assistant"),
+        app_name: String(v.app_name ?? "硬件设计助手"),
         app_tagline: String(v.app_tagline ?? ""),
         app_footer: String(v.app_footer ?? "🔒 用户工作区隔离，越界路径拒绝  📷 修改前自动快照  🌐 支持主流大模型  ⚡ 智能 EDA 闭环"),
         app_copyright: String(v.app_copyright ?? ""),
@@ -150,7 +150,7 @@ export function SystemSettings() {
               <input value={form.app_name} onChange={(e) => setForm({ ...form, app_name: e.target.value })} className={inputCls} />
             </Field>
             <Field label="副标题" hint="显示在对话窗口助手名称下方">
-              <input value={form.app_tagline} onChange={(e) => setForm({ ...form, app_tagline: e.target.value })} className={inputCls} placeholder="基于 LangGraph · Deep Agents 的 KiCad 智能助手" />
+              <input value={form.app_tagline} onChange={(e) => setForm({ ...form, app_tagline: e.target.value })} className={inputCls} placeholder="AI 帮你画原理图、布 PCB、跑 DRC、审 BOM" />
             </Field>
             <Field label="首页底栏特性标语 (Footer 特性条)" hint="显示在首页最底部的特性提示条（支持多个短语以空格或 · 分隔，留空则隐藏）">
               <input
@@ -160,7 +160,7 @@ export function SystemSettings() {
                 placeholder="🔒 用户工作区隔离，越界路径拒绝  📷 修改前自动快照  🌐 支持主流大模型  ⚡ 智能 EDA 闭环"
               />
             </Field>
-            <Field label="页脚版权说明 (Copyright)" hint="自定义底部版权文字（例如 © 2026 KiCad AI 助手，留空则默认显示站点名称与版本）">
+            <Field label="页脚版权说明 (Copyright)" hint="自定义底部版权文字（例如 © 2026 硬件设计助手，留空则默认显示站点名称与版本）">
               <input
                 value={form.app_copyright}
                 onChange={(e) => setForm({ ...form, app_copyright: e.target.value })}

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     # ---- server -----------------------------------------------------------
-    app_name: str = "KiCad AI Assistant"
+    app_name: str = "硬件设计助手"
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
@@ -121,7 +121,7 @@ class Settings(BaseSettings):
     ioedu_login_url: str = "/auth"
 
     # ---- branding ---------------------------------------------------------
-    app_tagline: str = "基于 LangGraph · Deep Agents 的 KiCad 智能助手"
+    app_tagline: str = "AI 帮你画原理图、布 PCB、跑 DRC、审 BOM"
     app_logo: str = ""  # relative file name under <data_dir>/branding (set via admin upload)
     app_footer: str = "🔒 用户工作区隔离，越界路径拒绝  📷 修改前自动快照  🌐 支持主流大模型  ⚡ 智能 EDA 闭环"
     app_copyright: str = ""

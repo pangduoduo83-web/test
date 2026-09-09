@@ -4,8 +4,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  // 作为教学平台的子应用部署在 /kicad/ 下(nginx 剥掉前缀转给 FastAPI);本地开发可设 VITE_BASE=/
-  base: process.env.VITE_BASE || "/kicad/",
+  // 作为教学平台的子应用部署在 /hw/ 下(nginx 剥掉前缀转给 FastAPI);本地开发可设 VITE_BASE=/
+  base: process.env.VITE_BASE || "/hw/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },

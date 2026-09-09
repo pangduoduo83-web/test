@@ -146,12 +146,12 @@
               <span class="menu-desc">{{ m.desc }}</span>
             </span>
           </router-link>
-          <!-- KiCad AI 设计助手是独立子系统,同域 /kicad/ 下,复用本站登录态,新标签打开 -->
-          <a href="/kicad/app" target="_blank" class="menu-item menu-external">
+          <!-- 硬件设计助手是独立子系统,同域 /hw/ 下,复用本站登录态,新标签打开 -->
+          <a href="/hw/app" target="_blank" class="menu-item menu-external">
             <span class="menu-icon"><CircuitBoard :size="19" /></span>
             <span class="menu-text">
-              <span class="menu-title">KiCad 设计助手 ↗</span>
-              <span class="menu-desc">AI 画原理图与 PCB</span>
+              <span class="menu-title">硬件设计助手 ↗</span>
+              <span class="menu-desc">AI 画原理图、布 PCB、审 BOM</span>
             </span>
           </a>
         </nav>

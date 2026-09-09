@@ -16,32 +16,23 @@ public class AiUsageService {
 
     private final AiUsageDailyRepository repo;
     private final com.example.ioedunew.service.AiConfigService configService;
-    private final com.example.ioedunew.tenant.TenantQuotaService quotaService;
 
     @Value("${ioedu.ai.daily-runs-per-user:50}")
     private int dailyRunsPerUser;
 
-    public AiUsageService(AiUsageDailyRepository repo, com.example.ioedunew.service.AiConfigService configService,
-                          com.example.ioedunew.tenant.TenantQuotaService quotaService) {
+    public AiUsageService(AiUsageDailyRepository repo, com.example.ioedunew.service.AiConfigService configService) {
         this.repo = repo;
         this.configService = configService;
-        this.quotaService = quotaService;
     }
 
+    /** 唯一的限制是每人每日次数(防刷),由各站点在 AI 设置里自定;大模型 Key 是各站点自己的,不做额度控制 */
     public void checkQuota(Long userId) {
-        if (dailyRunsPerUser > 0) {
+        int limit = configService.dailyRunsPerUser(dailyRunsPerUser);
+        if (limit > 0) {
             int used = repo.findByUserIdAndDay(userId, LocalDate.now()).map(AiUsageDaily::getRuns).orElse(0);
-            if (used >= dailyRunsPerUser) {
-                throw new BusinessException("今日 AI 使用次数已达上限(" + dailyRunsPerUser + " 次),请明天再来");
+            if (used >= limit) {
+                throw new BusinessException("今日 AI 使用次数已达上限(" + limit + " 次),请明天再来");
             }
-        }
-        // 站点自己设的预算优先;没设则用平台给该站点的套餐额度
-        long budget = configService.monthlyTokenBudget();
-        if (budget <= 0) {
-            budget = quotaService.tenantAiMonthlyTokens();
-        }
-        if (budget > 0 && monthTokens() >= budget) {
-            throw new BusinessException("本站本月 AI 额度已用完,请联系管理员调整预算或下月再用");
         }
     }
 
@@ -109,11 +100,8 @@ public class AiUsageService {
         out.put("promptTokens", pt);
         out.put("completionTokens", ct);
         out.put("activeUsers", users.size());
-        out.put("dailyRunsPerUser", dailyRunsPerUser);
+        out.put("dailyRunsPerUser", configService.dailyRunsPerUser(dailyRunsPerUser));
         out.put("monthTokens", monthTokens());
-        long budget = configService.monthlyTokenBudget();
-        out.put("monthlyTokenBudget", budget > 0 ? budget : quotaService.tenantAiMonthlyTokens());
-        out.put("budgetSource", budget > 0 ? "SITE" : quotaService.tenantAiMonthlyTokens() > 0 ? "PLAN" : "NONE");
         out.put("series", series);
         return out;
     }

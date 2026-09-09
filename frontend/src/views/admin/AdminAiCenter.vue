@@ -27,10 +27,7 @@
         <div class="ref-stat-icon" style="background:linear-gradient(135deg,#facc15,#f59e0b)"><Users :size="22" color="#fff" /></div>
         <div>
           <div class="ref-stat-value">{{ usage ? fmtK(usage.monthTokens) : '–' }}</div>
-          <div class="ref-stat-label">
-            本月 Token{{ usage?.monthlyTokenBudget ? ` · 预算 ${fmtK(usage.monthlyTokenBudget)},已用 ${Math.min(100, Math.round(usage.monthTokens * 100 / usage.monthlyTokenBudget))}%` : ' · 未设预算' }}
-            · {{ usage?.activeUsers ?? '–' }} 活跃用户
-          </div>
+          <div class="ref-stat-label">本月 Token · {{ usage?.activeUsers ?? '–' }} 活跃用户 · 每人每日上限 {{ usage?.dailyRunsPerUser ? usage.dailyRunsPerUser + ' 次' : '不限' }}</div>
         </div>
       </div>
     </div>

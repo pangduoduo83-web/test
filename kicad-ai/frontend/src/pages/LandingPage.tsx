@@ -1,4 +1,4 @@
-import {
+﻿import {
   ArrowRight,
   Bot,
   Layers,
@@ -105,7 +105,7 @@ export function LandingPage() {
       <section className="mx-auto max-w-6xl px-6 pb-10 pt-10 text-center md:pt-16">
         <div className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border border-brand-100 bg-white/80 px-3 py-1 text-[12px] text-brand-700 shadow-sm">
           <Bot size={14} />
-          基于 LangGraph · Deep Agents 的 KiCad 智能助手
+          AI 帮你画原理图、布 PCB、跑 DRC、审 BOM
           {info && (
             <span className="ml-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
               {info.agent_ready ? `在线 · ${info.tool_count} 个工具${info.upstream_tool_count ? `（含开源插件 ${info.upstream_tool_count} 个）` : ""}` : "启动中"}
@@ -143,7 +143,7 @@ export function LandingPage() {
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
               <span className="ml-3 rounded-md bg-white px-3 py-0.5 text-[11px] text-slate-400">{appName} — 优化电源模块布局</span>
             </div>
-            <img src="/screenshot.png" alt="KiCad AI Assistant 界面" className="block w-full" loading="eager" />
+            <img src="/screenshot.png" alt="硬件设计助手界面" className="block w-full" loading="eager" />
           </div>
         </div>
       </section>
@@ -181,7 +181,7 @@ export function LandingPage() {
           <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-line bg-slate-900 p-5 text-left font-mono text-[12.5px] leading-relaxed text-slate-200 shadow-lg">
             <div className="text-slate-400">用户</div>
             <div className="mb-3">帮我优化一下电源模块的布局，电容尽量靠近芯片的电源引脚，并检查是否有 DRC 问题。</div>
-            <div className="text-slate-400">KiCad AI 助手</div>
+            <div className="text-slate-400">硬件设计助手</div>
             <div>1. get_board_info → 2. list_footprints → 3. set_footprint_position(C3, C4) → 4. run_drc_check</div>
             <div className="mt-1 text-emerald-400">✔ DRC 检查通过 · C3/C4 已移至 U1 电源引脚 1.7 mm 处 · 已自动保存 2 个快照</div>
           </div>
