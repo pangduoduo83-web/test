@@ -13,5 +13,9 @@ public interface LearningActivityRepository extends JpaRepository<LearningActivi
 
     java.util.Optional<LearningActivity> findTopByUserIdOrderByCreatedAtDesc(Long userId);
 
+    List<LearningActivity> findByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime after);
+
+    List<LearningActivity> findTop30ByOrderByCreatedAtDesc();
+
     void deleteByUserId(Long userId);
 }

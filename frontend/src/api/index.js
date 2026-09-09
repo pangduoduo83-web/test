@@ -129,6 +129,7 @@ export const adminDeleteDiscussion = (id) => http.delete(`/admin/discussions/${i
 export const adminAiReview = (id) => http.post(`/admin/submissions/${id}/ai-review`, null, { timeout: 120000 })
 export const adminReturnSubmission = (id, feedback) => http.post(`/admin/submissions/${id}/return`, { feedback })
 export const adminAuditLogs = (params) => http.get('/admin/audit-logs', { params })
+export const adminScreen = () => http.get('/admin/screen', { timeout: 60000 })
 
 // ---------- 技能维度(管理端) ----------
 export const adminListSkillDimensions = () => http.get('/admin/skill-dimensions')

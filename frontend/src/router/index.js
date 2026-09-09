@@ -25,6 +25,13 @@ const router = createRouter({
       ]
     },
     {
+      // 数据大屏:独立全屏页面,不套后台布局;数据按当前站点(Host)隔离
+      path: '/admin/screen',
+      name: 'admin-screen',
+      component: () => import('../views/admin/AdminBigScreen.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
       path: '/teacher',
       component: () => import('../views/teacher/TeacherLayout.vue'),
       meta: { requiresAuth: true, requiresTeacher: true },

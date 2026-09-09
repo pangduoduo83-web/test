@@ -20,6 +20,9 @@
         </router-link>
       </nav>
       <div class="admin-foot">
+        <a v-if="authStore.isAdmin" class="admin-menu-item screen-link" href="/admin/screen" target="_blank">
+          <span class="ami-icon"><MonitorPlay :size="17" /></span>数据大屏 ↗
+        </a>
         <a class="admin-menu-item" @click="$router.push('/app/dashboard')">
           <span class="ami-icon"><GraduationCap :size="17" /></span>学生端视图
         </a>
@@ -52,7 +55,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Bell, Bot, ClipboardCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut,
-  MessageSquareText, Radar, Rocket, School, ScrollText, Settings, ShieldCheck, Sparkles, Store, UserRoundCheck, Users, Wrench
+  MessageSquareText, MonitorPlay, Radar, Rocket, School, ScrollText, Settings, ShieldCheck, Sparkles, Store, UserRoundCheck, Users, Wrench
 } from 'lucide-vue-next'
 import { adminStats } from '../../api'
 import { useAuthStore } from '../../stores/auth'
@@ -145,6 +148,8 @@ onMounted(() => {
 .menu-badge { margin-left: auto; }
 
 .admin-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.admin-foot .screen-link { color: #0e7490; background: linear-gradient(90deg, #ecfeff, #f0f9ff); text-decoration: none; }
+.admin-foot .screen-link:hover { background: #cffafe; }
 .admin-foot .logout { color: #dc2626; }
 .admin-foot .logout:hover { background: #fef2f2; }
 

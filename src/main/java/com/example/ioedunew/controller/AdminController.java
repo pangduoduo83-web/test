@@ -64,6 +64,7 @@ public class AdminController {
     private final SiteConfigService siteConfigService;
     private final SkillDimensionService skillDimensionService;
     private final com.example.ioedunew.repository.AuditLogRepository auditLogRepository;
+    private final com.example.ioedunew.service.BigScreenService bigScreenService;
 
     public AdminController(AdminService adminService,
                            BorrowService borrowService,
@@ -77,7 +78,9 @@ public class AdminController {
                            AiClient aiClient,
                            SiteConfigService siteConfigService,
                            SkillDimensionService skillDimensionService,
-                           com.example.ioedunew.repository.AuditLogRepository auditLogRepository) {
+                           com.example.ioedunew.repository.AuditLogRepository auditLogRepository,
+                           com.example.ioedunew.service.BigScreenService bigScreenService) {
+        this.bigScreenService = bigScreenService;
         this.auditLogRepository = auditLogRepository;
         this.adminService = adminService;
         this.borrowService = borrowService;
@@ -132,6 +135,13 @@ public class AdminController {
     public ApiResponse<Submission> returnSubmission(@PathVariable Long id, @RequestBody Map<String, String> body,
                                                     HttpServletRequest request) {
         return ApiResponse.ok(submissionService.returnForRevision(id, body.get("feedback"), adminName(request)));
+    }
+
+    // ---------- 数据大屏 ----------
+
+    @GetMapping("/screen")
+    public ApiResponse<Map<String, Object>> screen() {
+        return ApiResponse.ok(bigScreenService.snapshot());
     }
 
     // ---------- 操作审计 ----------
