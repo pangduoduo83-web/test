@@ -3,10 +3,10 @@
     <div class="head-row">
       <div>
         <h2 class="page-title">技能评估与提升</h2>
-        <p class="page-subtitle">画像由项目评审实证自动校准,自评只作为起点与对照</p>
+        <p class="page-subtitle">画像来自两类实证:老师对项目成果的评审,和 AI 出题的客观测评</p>
       </div>
-      <button class="btn-gradient assess-btn" @click="openAssess">
-        <Zap :size="15" /> {{ data.selfComplete ? '更新自评' : '开始能力自评' }}
+      <button class="btn-gradient assess-btn" @click="openQuiz(null)">
+        <Zap :size="15" /> AI 能力测评
       </button>
     </div>
 
@@ -17,16 +17,14 @@
           <h3>综合能力雷达</h3>
           <div class="overall">
             综合评分 <b class="gradient-text">{{ data.overall }}</b>
-            <span v-if="data.selfOverall !== null" class="overall-self">自评 {{ data.selfOverall }}</span>
           </div>
         </div>
         <div v-if="data.skills.length" ref="radarRef" class="chart"></div>
         <div v-else class="chart-empty">管理员尚未配置技能维度</div>
         <div class="chart-foot">
-          <span class="legend-dot solid"></span>综合分(实证校准)
-          <template v-if="data.selfComplete"><span class="legend-dot dashed"></span>自评</template>
+          <span class="legend-dot solid"></span>综合掌握度
           <span class="chart-foot-right">
-            {{ data.evidenceTotal > 0 ? `已计入 ${data.evidenceTotal} 次项目实证` : '尚无项目实证,完成项目评审后自动校准' }}
+            {{ data.evidenceTotal > 0 ? `已计入 ${data.evidenceTotal} 次实证(项目评审 + AI 测评)` : '尚无实证:做一次 AI 测评或完成项目评审后自动校准' }}
           </span>
         </div>
       </div>
@@ -37,7 +35,7 @@
         <div v-if="data.history.length >= 2" ref="lineRef" class="chart"></div>
         <div v-else class="chart-empty">
           暂无成长记录<br />
-          <small>完成自评或项目评审后,综合评分的每次变化都会记录在这里</small>
+          <small>完成 AI 测评或项目评审后,综合评分的每次变化都会记录在这里</small>
         </div>
       </div>
     </div>
@@ -55,7 +53,7 @@
               <span class="skill-name">{{ s.skillName }}</span>
               <span class="skill-level badge" :class="levelBadge(s.score)">{{ levelText(s.score) }}</span>
               <span v-if="s.evidenceCount > 0" class="badge badge-green">实证 {{ s.evidenceCount }} 次</span>
-              <span v-else class="badge badge-gray">{{ s.selfScore !== null ? '仅自评' : '未自评' }}</span>
+              <span v-else class="badge badge-gray">尚无实证</span>
             </div>
             <div class="skill-desc">{{ s.description || '专业技能维度' }}</div>
           </div>
@@ -66,17 +64,11 @@
         </div>
         <div class="skill-bar">
           <div class="skill-bar-inner" :style="{ width: s.score + '%' }"></div>
-          <span v-if="s.selfScore !== null" class="skill-bar-self" :style="{ left: s.selfScore + '%' }"
-                :title="`自评 ${s.selfScore}`"></span>
         </div>
         <div class="skill-facts">
-          <span>自评 <b>{{ s.selfScore !== null ? s.selfScore : '—' }}</b></span>
-          <span v-if="s.selfScore !== null && s.evidenceCount > 0" :class="gapClass(s)">
-            {{ gapText(s) }}
-          </span>
-          <span v-if="lastEvent(s.skillName)" class="skill-last">
-            最近:{{ lastEvent(s.skillName).note }}
-          </span>
+          <span v-if="lastEvent(s.skillName)" class="skill-last">最近:{{ lastEvent(s.skillName).note }}</span>
+          <span v-else class="skill-last">还没有实证记录</span>
+          <el-button size="small" text type="primary" class="quiz-btn" @click="openQuiz(s.skillName)">测一测这个维度 →</el-button>
         </div>
       </div>
     </div>
@@ -180,19 +172,70 @@
       </template>
     </div>
 
-    <!-- 自评弹窗 -->
-    <el-dialog v-model="assessVisible" title="能力自评" width="520px">
-      <p class="assess-tip">
-        请按实际情况拖动滑块自评各项掌握程度(0-100)。自评只是起点:已有项目实证的维度,综合分不会被自评改写,
-        但自评与实证的差距会显示在画像中,帮助你校准自我认知。
-      </p>
-      <div v-for="(v, name) in assessForm" :key="name" class="assess-row">
-        <span class="assess-name">{{ name }}</span>
-        <el-slider v-model="assessForm[name]" :max="100" show-input :show-input-controls="false" size="small" />
+    <!-- AI 能力测评 -->
+    <el-dialog v-model="quizVisible" :title="quiz.step === 'result' ? '测评结果' : 'AI 能力测评'" width="640px" :close-on-click-modal="false" @closed="resetQuiz">
+      <!-- 选维度 -->
+      <template v-if="quiz.step === 'pick'">
+        <p class="assess-tip">选一个维度,AI 会按你当前的水平出 6 道单选题(约 1 分钟)。答题得分会作为一次实证计入综合掌握度,做得越好涨得越快;做得差也只会小幅回调,放心测。</p>
+        <div class="dim-grid">
+          <button v-for="(s, i) in data.skills" :key="s.skillName" class="dim" :class="{ on: quiz.skillName === s.skillName }" @click="quiz.skillName = s.skillName">
+            <span class="dim-icon" :style="{ background: meta(s.skillName, i).bg }"><component :is="meta(s.skillName, i).icon" :size="16" color="#fff" /></span>
+            <span class="dim-text"><b>{{ s.skillName }}</b><small>当前 {{ s.score }} · {{ s.evidenceCount }} 次实证</small></span>
+          </button>
+        </div>
+      </template>
+      <!-- 出题中 -->
+      <div v-else-if="quiz.step === 'loading'" class="quiz-loading">
+        <div class="spinner"></div>
+        <div><b>AI 正在为「{{ quiz.skillName }}」出题…</b><div class="muted">按你当前 {{ quiz.currentScore }} 分的水平配置难度,约 10 秒</div></div>
       </div>
+      <!-- 答题 -->
+      <template v-else-if="quiz.step === 'answer'">
+        <div class="quiz-progress">
+          <span>{{ quiz.skillName }} · 第 {{ quiz.index + 1 }} / {{ quiz.questions.length }} 题</span>
+          <span class="badge badge-blue">{{ quiz.questions[quiz.index].difficulty || '基础' }}</span>
+        </div>
+        <div class="q-text">{{ quiz.questions[quiz.index].q }}</div>
+        <div class="q-options">
+          <button v-for="(opt, oi) in quiz.questions[quiz.index].options" :key="oi" class="q-opt" :class="{ on: quiz.answers[quiz.index] === oi }" @click="quiz.answers[quiz.index] = oi">
+            <span class="q-letter">{{ 'ABCD'[oi] }}</span>{{ opt }}
+          </button>
+        </div>
+        <div class="q-dots"><i v-for="(q, qi) in quiz.questions" :key="qi" :class="{ done: quiz.answers[qi] != null, cur: qi === quiz.index }" @click="quiz.index = qi"></i></div>
+      </template>
+      <!-- 结果 -->
+      <template v-else-if="quiz.step === 'result'">
+        <div class="quiz-result">
+          <div class="qr-score" :class="quiz.result.score >= 80 ? 'good' : quiz.result.score >= 50 ? 'mid' : 'bad'"><b>{{ quiz.result.score }}</b><span>答对 {{ quiz.result.correct }} / {{ quiz.result.total }}</span></div>
+          <div class="qr-text">
+            <div class="qr-title">「{{ quiz.result.skillName }}」综合掌握度 {{ quiz.result.before }} → <b>{{ quiz.result.after }}</b>
+              <span class="badge" :class="quiz.result.after > quiz.result.before ? 'badge-green' : quiz.result.after < quiz.result.before ? 'badge-red' : 'badge-gray'">{{ quiz.result.after > quiz.result.before ? '+' : '' }}{{ quiz.result.after - quiz.result.before }}</span>
+            </div>
+            <div class="muted">已作为一次 AI 测评实证计入画像;想再涨就去做相关项目,评审通过后权重更高。</div>
+          </div>
+        </div>
+        <div class="qr-detail">
+          <div v-for="d in quiz.result.detail" :key="d.index" class="qr-item" :class="{ ok: d.correct }">
+            <div class="qr-q"><span class="qr-mark">{{ d.correct ? '✓' : '✕' }}</span>{{ quiz.questions[d.index].q }}</div>
+            <div class="qr-ans">正确答案:{{ 'ABCD'[d.answer] }}. {{ quiz.questions[d.index].options[d.answer] }}<span v-if="!d.correct && d.given != null" class="qr-given"> · 你选了 {{ 'ABCD'[d.given] }}</span></div>
+            <div v-if="d.explain" class="qr-explain">{{ d.explain }}</div>
+          </div>
+        </div>
+      </template>
       <template #footer>
-        <el-button @click="assessVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitAssess">提交自评</el-button>
+        <template v-if="quiz.step === 'pick'">
+          <el-button @click="quizVisible = false">取消</el-button>
+          <el-button type="primary" :disabled="!quiz.skillName" @click="startQuiz">开始出题</el-button>
+        </template>
+        <template v-else-if="quiz.step === 'answer'">
+          <el-button :disabled="quiz.index === 0" @click="quiz.index--">上一题</el-button>
+          <el-button v-if="quiz.index < quiz.questions.length - 1" type="primary" :disabled="quiz.answers[quiz.index] == null" @click="quiz.index++">下一题</el-button>
+          <el-button v-else type="primary" :loading="submitting" :disabled="quiz.answers.some((a) => a == null)" @click="submitQuiz">交卷</el-button>
+        </template>
+        <template v-else-if="quiz.step === 'result'">
+          <el-button @click="openQuiz(null)">再测一个维度</el-button>
+          <el-button type="primary" @click="quizVisible = false">完成</el-button>
+        </template>
       </template>
     </el-dialog>
   </div>
@@ -206,7 +249,7 @@ import { ElMessage } from 'element-plus'
 import {
   Activity, BookOpen, Braces, CircuitBoard, Code, Cpu, History, Layers, Radio, Sparkles, Target, Wrench, Zap
 } from 'lucide-vue-next'
-import { fetchAiPlan, fetchSkills, generateAiPlan, submitAssessment } from '../../api'
+import { fetchAiPlan, fetchSkills, generateAiPlan, skillQuizStart, skillQuizSubmit } from '../../api'
 
 const router = useRouter()
 const data = reactive({
@@ -215,9 +258,43 @@ const data = reactive({
 })
 const radarRef = ref(null)
 const lineRef = ref(null)
-const assessVisible = ref(false)
 const submitting = ref(false)
-const assessForm = reactive({})
+
+// ---------- AI 能力测评 ----------
+const quizVisible = ref(false)
+const quiz = reactive({ step: 'pick', skillName: '', quizId: '', questions: [], answers: [], index: 0, currentScore: 0, result: null })
+const resetQuiz = () => { Object.assign(quiz, { step: 'pick', quizId: '', questions: [], answers: [], index: 0, result: null }) }
+const openQuiz = (skillName) => {
+  resetQuiz()
+  quiz.skillName = skillName || data.skills[0]?.skillName || ''
+  quizVisible.value = true
+}
+const startQuiz = async () => {
+  quiz.step = 'loading'
+  quiz.currentScore = data.skills.find((s) => s.skillName === quiz.skillName)?.score || 0
+  try {
+    const r = await skillQuizStart(quiz.skillName)
+    quiz.quizId = r.quizId
+    quiz.questions = r.questions
+    quiz.answers = r.questions.map(() => null)
+    quiz.index = 0
+    quiz.step = 'answer'
+  } catch (e) {
+    quiz.step = 'pick'
+  }
+}
+const submitQuiz = async () => {
+  submitting.value = true
+  try {
+    const r = await skillQuizSubmit(quiz.quizId, quiz.answers)
+    quiz.result = r
+    quiz.step = 'result'
+    plan.value = null
+    await apply(r.summary)
+  } catch (e) { /* 已提示 */ } finally {
+    submitting.value = false
+  }
+}
 let radarChart = null
 let lineChart = null
 
@@ -280,17 +357,8 @@ const meta = (name, i) => knownMeta[name] || palette[i % palette.length]
 const levelText = (v) => v >= 80 ? '精通' : v >= 60 ? '熟练' : v >= 40 ? '进阶' : '入门'
 const levelBadge = (v) => v >= 80 ? 'badge-purple' : v >= 60 ? 'badge-green' : v >= 40 ? 'badge-blue' : 'badge-gray'
 
-const gapText = (s) => {
-  const gap = s.selfScore - s.score
-  if (Math.abs(gap) < 8) return '自评与实证基本一致'
-  return gap > 0 ? `自评高出实证 ${gap} 分` : `实证高于自评 ${-gap} 分`
-}
-const gapClass = (s) => {
-  const gap = s.selfScore - s.score
-  return Math.abs(gap) < 8 ? 'gap-ok' : gap > 0 ? 'gap-over' : 'gap-under'
-}
 const lastEvent = (name) => data.events.find((e) => e.skillName === name)
-const sourceText = (src) => (src === 'PROJECT' ? '项目实证' : src === 'SELF' ? '自评' : '初始')
+const sourceText = (src) => ({ PROJECT: '项目实证', QUIZ: 'AI 测评', SELF: '自评(旧)', INIT: '初始' }[src] || src)
 const deltaClass = (e) => (e.afterScore > e.beforeScore ? 'up' : e.afterScore < e.beforeScore ? 'down' : '')
 const formatTime = (v) => (v || '').replace('T', ' ').slice(0, 16)
 
@@ -299,20 +367,11 @@ const renderCharts = () => {
     if (!radarChart) radarChart = echarts.init(radarRef.value)
     const series = [{
       value: data.skills.map((s) => s.score),
-      name: '综合分',
+      name: '综合掌握度',
       areaStyle: { color: 'rgba(59,130,246,.3)' },
       lineStyle: { color: '#3b82f6', width: 2 },
       itemStyle: { color: '#3b82f6' }
     }]
-    if (data.selfComplete) {
-      series.push({
-        value: data.skills.map((s) => s.selfScore),
-        name: '自评',
-        lineStyle: { color: '#9333ea', width: 1.5, type: 'dashed' },
-        itemStyle: { color: '#9333ea' },
-        areaStyle: { color: 'rgba(147,51,234,.06)' }
-      })
-    }
     radarChart.setOption({
       tooltip: { trigger: 'item' },
       radar: {
@@ -364,26 +423,6 @@ const apply = async (res) => {
 
 const load = async () => {
   await apply(await fetchSkills())
-}
-
-const openAssess = () => {
-  Object.keys(assessForm).forEach((k) => delete assessForm[k])
-  data.skills.forEach((s) => { assessForm[s.skillName] = s.selfScore !== null ? s.selfScore : s.score })
-  assessVisible.value = true
-}
-
-const submitAssess = async () => {
-  submitting.value = true
-  try {
-    await apply(await submitAssessment({ ...assessForm }))
-    assessVisible.value = false
-    plan.value = null
-    ElMessage.success(data.evidenceTotal > 0
-      ? '自评已更新,可对照实证分校准自我认知'
-      : '自评完成,技能画像已建立!完成项目评审后会自动校准')
-  } catch (e) { /* 已提示 */ } finally {
-    submitting.value = false
-  }
 }
 
 onMounted(() => {
@@ -539,7 +578,41 @@ window.addEventListener('resize', () => { radarChart?.resize(); lineChart?.resiz
 .ai-meta { margin-top: 8px; font-size: 12px; color: #9ca3af; text-align: right; }
 
 .assess-tip { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; line-height: 1.7; }
-.assess-row { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
-.assess-name { width: 80px; flex-shrink: 0; font-size: 13px; }
-.assess-row :deep(.el-slider) { flex: 1; }
+.quiz-btn { margin-left: auto; }
+.muted { font-size: 12px; color: var(--text-secondary); }
+.dim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dim { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: #fff; cursor: pointer; }
+.dim.on { border-color: #6366f1; box-shadow: 0 0 0 3px #e0e7ff; background: #f5f3ff; }
+.dim-icon { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; }
+.dim-text { display: flex; flex-direction: column; }
+.dim-text b { font-size: 14px; }
+.dim-text small { font-size: 11.5px; color: var(--text-secondary); }
+.quiz-loading { display: flex; align-items: center; gap: 16px; padding: 30px 10px; }
+.spinner { width: 38px; height: 38px; border-radius: 50%; border: 3px solid #e0e7ff; border-top-color: #4f46e5; animation: spin 1s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.quiz-progress { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.q-text { font-size: 16px; font-weight: 700; line-height: 1.6; margin-bottom: 14px; }
+.q-options { display: flex; flex-direction: column; gap: 8px; }
+.q-opt { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 14px; line-height: 1.5; transition: all .15s; }
+.q-opt:hover { border-color: #a5b4fc; background: #fafaff; }
+.q-opt.on { border-color: #6366f1; background: #eef2ff; box-shadow: 0 0 0 3px #e0e7ff; }
+.q-letter { width: 26px; height: 26px; border-radius: 50%; background: #f3f4f6; display: grid; place-items: center; font-weight: 700; font-size: 12px; flex-shrink: 0; }
+.q-opt.on .q-letter { background: #6366f1; color: #fff; }
+.q-dots { display: flex; gap: 6px; justify-content: center; margin-top: 16px; }
+.q-dots i { width: 24px; height: 6px; border-radius: 3px; background: #e5e7eb; cursor: pointer; }
+.q-dots i.done { background: #a5b4fc; } .q-dots i.cur { background: #4f46e5; }
+.quiz-result { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; }
+.qr-score { width: 96px; height: 96px; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
+.qr-score b { font-size: 34px; line-height: 1; } .qr-score span { font-size: 11px; opacity: .9; margin-top: 4px; }
+.qr-score.good { background: linear-gradient(135deg, #22c55e, #15803d); } .qr-score.mid { background: linear-gradient(135deg, #f59e0b, #b45309); } .qr-score.bad { background: linear-gradient(135deg, #ef4444, #991b1b); }
+.qr-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.qr-title b { color: #4f46e5; font-size: 18px; }
+.qr-detail { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow: auto; }
+.qr-item { padding: 10px 12px; border-radius: 10px; background: #fef2f2; border: 1px solid #fecaca; }
+.qr-item.ok { background: #f0fdf4; border-color: #bbf7d0; }
+.qr-q { font-size: 13.5px; font-weight: 600; display: flex; gap: 8px; }
+.qr-mark { font-weight: 800; color: #dc2626; } .qr-item.ok .qr-mark { color: #16a34a; }
+.qr-ans { font-size: 12.5px; color: #374151; margin-top: 4px; }
+.qr-given { color: #dc2626; }
+.qr-explain { font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.6; }
 </style>

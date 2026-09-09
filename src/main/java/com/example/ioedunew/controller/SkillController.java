@@ -22,9 +22,11 @@ import java.util.Map;
 public class SkillController {
 
     private final SkillService skillService;
+    private final com.example.ioedunew.service.SkillQuizService quizService;
 
-    public SkillController(SkillService skillService) {
+    public SkillController(SkillService skillService, com.example.ioedunew.service.SkillQuizService quizService) {
         this.skillService = skillService;
+        this.quizService = quizService;
     }
 
     @GetMapping
@@ -36,6 +38,25 @@ public class SkillController {
     public ApiResponse<Map<String, Object>> assess(@Valid @RequestBody MiscDtos.SkillAssessRequest req,
                                                    HttpServletRequest request) {
         return ApiResponse.ok(skillService.assess(auth(request).getId(), req.getScores()));
+    }
+
+    /** AI 出题,body: { skillName } */
+    @PostMapping("/quiz/start")
+    public ApiResponse<Map<String, Object>> quizStart(@RequestBody Map<String, String> body, HttpServletRequest request) {
+        return ApiResponse.ok(quizService.start(auth(request), body.get("skillName")));
+    }
+
+    /** 提交答案,body: { quizId, answers: [选项下标...] } */
+    @PostMapping("/quiz/submit")
+    public ApiResponse<Map<String, Object>> quizSubmit(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        java.util.List<Integer> answers = new java.util.ArrayList<>();
+        Object raw = body.get("answers");
+        if (raw instanceof java.util.List) {
+            for (Object o : (java.util.List<?>) raw) {
+                answers.add(o == null ? null : ((Number) o).intValue());
+            }
+        }
+        return ApiResponse.ok(quizService.submit(auth(request), String.valueOf(body.get("quizId")), answers));
     }
 
     private AuthUser auth(HttpServletRequest request) {

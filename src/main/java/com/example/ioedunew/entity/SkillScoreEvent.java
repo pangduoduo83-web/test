@@ -23,6 +23,8 @@ public class SkillScoreEvent {
     public static final String SOURCE_INIT = "INIT";
     public static final String SOURCE_SELF = "SELF";
     public static final String SOURCE_PROJECT = "PROJECT";
+    /** AI 出题的客观测评 */
+    public static final String SOURCE_QUIZ = "QUIZ";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -130,6 +130,8 @@ export const adminAiReview = (id) => http.post(`/admin/submissions/${id}/ai-revi
 export const adminReturnSubmission = (id, feedback) => http.post(`/admin/submissions/${id}/return`, { feedback })
 export const adminAuditLogs = (params) => http.get('/admin/audit-logs', { params })
 export const adminScreen = () => http.get('/admin/screen', { timeout: 60000 })
+export const skillQuizStart = (skillName) => http.post('/skills/quiz/start', { skillName }, { timeout: 120000 })
+export const skillQuizSubmit = (quizId, answers) => http.post('/skills/quiz/submit', { quizId, answers })
 export const adminScreenSettings = () => http.get('/admin/screen-settings')
 export const adminUpdateScreenSettings = (data) => http.put('/admin/screen-settings', data)
 

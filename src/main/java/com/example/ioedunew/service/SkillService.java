@@ -252,6 +252,38 @@ public class SkillService {
         aiPlanService.evict(userId);
     }
 
+    /**
+     * AI 客观测评实证:答题得分(0-100)按 0.5 的权重并入综合分,并计一次实证。
+     * 测评比项目评审"轻",所以权重低于整体成果(1.0),但高于分阶段考核项的下限。
+     */
+    @Transactional
+    public Map<String, Object> applyQuizEvidence(Long userId, String skillName, int quizScore, int correct, int total) {
+        List<SkillDimension> dims = dimensionService.listEnabled();
+        boolean enabled = dims.stream().anyMatch(d -> d.getName().equals(skillName));
+        if (!enabled) {
+            throw new BusinessException("未知的技能维度:" + skillName);
+        }
+        SkillScore s = findOrCreate(userId, skillName);
+        int before = s.getScore();
+        int after = nextScore(before, clamp(quizScore), 0.5);
+        s.setScore(after);
+        s.setEvidenceCount(s.getEvidenceCount() + 1);
+        s.setUpdatedAt(LocalDateTime.now());
+        skillScoreRepository.save(s);
+        List<SkillScoreEvent> events = new ArrayList<>();
+        events.add(event(userId, skillName, SkillScoreEvent.SOURCE_QUIZ, before, after, null,
+                "AI 测评 " + correct + "/" + total + " 题正确,得分 " + quizScore));
+        saveEvents(userId, dims, events);
+        aiPlanService.evict(userId);
+        activityService.record(userId, com.example.ioedunew.entity.LearningActivity.SELF_ASSESS, null,
+                "完成「" + skillName + "」AI 测评,得分 " + quizScore);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("skillName", skillName);
+        m.put("before", before);
+        m.put("after", after);
+        return m;
+    }
+
     // ---------- 评分算法(纯函数,便于单测) ----------
 
     /** 项目要求 required 的成果拿到 submissionScore 分,体现出的维度水平:恰好及格即视为达到项目要求 */
@@ -412,9 +444,7 @@ public class SkillService {
             return suggestions;
         }
         if (evidenceTotal == 0) {
-            suggestions.add(selfComplete
-                    ? "当前画像仅基于自评,完成项目并通过教师评审后会自动校准为实证分"
-                    : "先完成一次能力自评建立基线,再通过项目实践让画像变得可信");
+            suggestions.add("画像还没有实证:先做一次 AI 能力测评建立基线,再通过项目实践让画像变得可信");
         }
         List<Map<String, Object>> sorted = new ArrayList<>(skills);
         sorted.sort(Comparator.comparingInt(s -> (Integer) s.get("score")));
@@ -431,11 +461,8 @@ public class SkillService {
             suggestions.add("「" + strongest.get("skillName") + "」能力良好,可挑战高难度项目");
         }
         for (Map<String, Object> s : skills) {
-            Integer self = (Integer) s.get("selfScore");
-            int score = (Integer) s.get("score");
-            if (self != null && (Integer) s.get("evidenceCount") > 0 && self - score >= 15) {
-                suggestions.add("「" + s.get("skillName") + "」自评 " + self + " 高于实证 " + score
-                        + ",建议通过更高要求的项目验证自己的判断");
+            if ((Integer) s.get("evidenceCount") == 0 && (Integer) s.get("score") <= BASELINE) {
+                suggestions.add("「" + s.get("skillName") + "」还没有任何实证,做一次 AI 测评就能拿到起点分");
                 break;
             }
         }

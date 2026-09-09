@@ -1,7 +1,7 @@
 <template>
   <!-- 任务面板:左侧条件表单,右侧结构化结果;不是聊天框 -->
-  <div class="task">
-    <div class="task-form card">
+  <div class="task" :style="{ '--accent': accent }">
+    <div class="task-form">
       <div class="tf-head">
         <span class="tf-icon">{{ icon }}</span>
         <div>
@@ -9,11 +9,17 @@
           <div class="tf-intro">{{ intro }}</div>
         </div>
       </div>
-      <slot name="form" :run="run" :running="running" />
-      <div v-if="lastInputSummary" class="tf-last">上次条件:{{ lastInputSummary }}</div>
+      <div class="tf-body">
+        <slot name="form" :run="run" :running="running" />
+        <div v-if="lastInputSummary" class="tf-last">上次条件:{{ lastInputSummary }}</div>
+      </div>
     </div>
 
-    <div class="task-result card">
+    <div class="task-result">
+      <div class="tr-head">
+        <span class="tr-title">{{ running ? '正在生成' : (result || raw) ? '结果' : '结果会出现在这里' }}</span>
+        <span v-if="!running && conversationId" class="tr-sub">可继续追问 · 已存入最近任务</span>
+      </div>
       <template v-if="running">
         <div class="steps-live">
           <div class="spinner"></div>
@@ -65,6 +71,8 @@ const props = defineProps({
   icon: { type: String, default: '✦' },
   title: { type: String, required: true },
   intro: { type: String, default: '' },
+  /** 主题色,用于表单头部与结果标题 */
+  accent: { type: String, default: '#6366f1' },
   emptyTitle: { type: String, default: '填好左侧条件,点开始' },
   emptySub: { type: String, default: '结果会以卡片形式出现在这里' },
   /** 结果里用于"继续深入"的字段名 */
@@ -163,15 +171,20 @@ defineExpose({ run, ask })
 </script>
 
 <style scoped>
-.task { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 16px; align-items: start; }
+.task { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 18px; align-items: start; }
 @media (max-width: 1000px) { .task { grid-template-columns: 1fr; } }
-.task-form { position: sticky; top: 16px; }
-.tf-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
-.tf-icon { width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #eef2ff, #e0e7ff); display: grid; place-items: center; font-size: 22px; flex-shrink: 0; }
-.tf-title { font-weight: 800; font-size: 16px; }
-.tf-intro { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; line-height: 1.6; }
+.task-form { position: sticky; top: 16px; background: #fff; border-radius: 18px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-card); }
+.tf-head { display: flex; gap: 12px; align-items: flex-start; padding: 18px 20px 16px; color: #fff; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #1e1b4b)); }
+.tf-icon { width: 46px; height: 46px; border-radius: 13px; background: rgba(255, 255, 255, .2); display: grid; place-items: center; font-size: 24px; flex-shrink: 0; }
+.tf-title { font-weight: 800; font-size: 17px; }
+.tf-intro { font-size: 12.5px; color: rgba(255, 255, 255, .88); margin-top: 4px; line-height: 1.6; }
+.tf-body { padding: 18px 20px 16px; }
 .tf-last { margin-top: 12px; font-size: 12px; color: #9ca3af; border-top: 1px dashed var(--border); padding-top: 10px; }
-.task-result { min-height: 420px; }
+.task-result { min-height: 460px; background: #fff; border-radius: 18px; border: 1px solid var(--border); padding: 18px 22px 22px; box-shadow: var(--shadow-card); }
+.tr-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.tr-title { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.tr-title::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--accent); }
+.tr-sub { font-size: 12px; color: #9ca3af; margin-left: auto; }
 .steps-live { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
 .spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #e0e7ff; border-top-color: #4f46e5; animation: spin 1s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -181,8 +194,8 @@ defineExpose({ run, ask })
 .sk { height: 14px; border-radius: 7px; background: linear-gradient(90deg, #f3f4f6, #e5e7eb, #f3f4f6); background-size: 200% 100%; animation: sk 1.2s infinite; }
 .sk.w60 { width: 60%; } .sk.w80 { width: 80%; } .sk.w40 { width: 40%; }
 @keyframes sk { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.empty { min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; }
-.empty-icon { font-size: 44px; }
+.empty { min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 10%, #fff), #fff 70%); border-radius: 14px; }
+.empty-icon { font-size: 54px; filter: drop-shadow(0 8px 16px rgba(15, 23, 42, .12)); }
 .empty-title { font-weight: 700; font-size: 15px; }
 .empty-sub { font-size: 13px; color: var(--text-secondary); max-width: 360px; line-height: 1.6; }
 .trace { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; font-size: 12px; }
