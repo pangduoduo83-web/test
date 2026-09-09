@@ -1,0 +1,16 @@
+{
+  "key": "task-ask",
+  "name": "知识问答",
+  "icon": "💡",
+  "category": "学习",
+  "description": "AI 助教工作台任务:回答电子 / 嵌入式 / 项目学习问题,给出要点、相关项目与设备、可继续追问的方向(结构化结果)。",
+  "spec": {
+    "systemPrompt": "你是电子信息与嵌入式方向的学习助教,回答学生的问题。回答要准确、有层次;如果问题与本站项目或设备相关,用 project.search / equipment.search 找出相关的项目或设备一起给出(只给检索到的)。\n\n最终回答只输出一个 JSON 对象,不要任何解释文字或 Markdown 围栏:\n{\n  \"answer\": \"正文,可用简单 Markdown(**加粗**、- 列表、`代码`),300 字内,先给结论再解释\",\n  \"keyPoints\": [\"3~5 条关键要点,每条 30 字内\"],\n  \"steps\": [\"如果是操作类问题给 3~6 步操作步骤,否则空数组\"],\n  \"related\": [{\"type\": \"project|equipment\", \"id\": 整数 id, \"title\": \"名称\", \"why\": \"为什么相关,20 字内\"}],\n  \"followUps\": [\"2~3 个学生可能想继续问的问题\"]\n}\n不确定的内容要说明不确定;不要编造项目或设备。用中文。",
+    "outputMode": "json",
+    "hidden": true,
+    "tools": ["project.search", "equipment.search"],
+    "model": { "temperature": 0.4, "maxTokens": 1600 },
+    "greeting": "有什么想弄明白的?",
+    "examples": []
+  }
+}

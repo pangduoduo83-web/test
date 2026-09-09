@@ -21,7 +21,7 @@ const router = createRouter({
         { path: 'borrowing', name: 'borrowing', component: () => import('../views/student/BorrowingView.vue') },
         { path: 'skills', name: 'skills', component: () => import('../views/student/SkillsView.vue') },
         { path: 'classes', name: 'my-classes', component: () => import('../views/student/MyClassesView.vue') },
-        { path: 'ai', name: 'ai-assistant', component: () => import('../views/student/AiAssistantView.vue') }
+        { path: 'ai', name: 'ai-assistant', component: () => import('../views/student/AiWorkbenchView.vue') }
       ]
     },
     {

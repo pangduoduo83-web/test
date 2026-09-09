@@ -466,8 +466,8 @@ const pcbText = computed(() => {
 const designFiles = computed(() =>
   arr(project.value?.resources).filter((r) => r.url && ['原理图', 'LAYOUT', '3D图'].includes(r.type)))
 
-// AI 导师是项目页内的面板,不跳走
-const tutorVisible = ref(false)
+// AI 导师是项目页内的面板,不跳走;带 ?tutor=1 进来时自动展开
+const tutorVisible = ref(route.query.tutor === '1' || route.query.tutor === 1)
 const openTutor = () => { tutorVisible.value = true }
 const reloadDetail = async () => { detail.value = await fetchProjectDetail(route.params.id) }
 const goSubmit = () => { tutorVisible.value = false; tab.value = 'submission' }

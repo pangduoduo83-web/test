@@ -51,7 +51,7 @@
           <el-input v-model="skillKeyword" placeholder="搜索名称 / key / 简介" clearable style="width:220px">
             <template #prefix><Search :size="14" /></template>
           </el-input>
-          <el-button type="primary" plain @click="$router.push('/app/ai')"><Bot :size="14" style="margin-right:6px" />去 AI 助手创建 / 编辑</el-button>
+          <el-button type="primary" plain @click="$router.push({ path: '/app/ai', query: { task: 'custom' } })"><Bot :size="14" style="margin-right:6px" />去 AI 助教创建 / 编辑本站技能</el-button>
         </template>
         <template v-else-if="tab === 'tools'">
           <span class="muted">{{ tools.filter((t) => !t.readOnly).length }} 个写操作工具默认必须经用户确认</span>
@@ -74,7 +74,7 @@
       <div v-if="filteredSkills.length === 0" class="card empty">
         <div class="empty-icon">✨</div>
         <div class="empty-title">{{ skills.length === 0 ? '没有可用的 SKILL' : '没有匹配的 SKILL' }}</div>
-        <div class="muted">内置 SKILL 随版本发布;学生、教师在「AI 助手」里自定义的 SKILL 会出现在这里,你可以把好用的设为本站共享。</div>
+        <div class="muted">内置 SKILL 随版本发布,分别嵌在项目页导师面板、个人中心今日建议、教师工作台和 AI 助教的四个任务里;教师在「AI 助教 → 本站技能」里自定义的 SKILL 会出现在这里。</div>
       </div>
       <div v-else class="skill-grid">
         <div v-for="s in filteredSkills" :key="s.key" class="skill-card" :class="{ off: s.status !== 'ACTIVE' }">
@@ -104,7 +104,7 @@
                        :loading="acting === s.id" @change="toggleStatus(s)" />
             <span class="spacer"></span>
             <el-button v-if="s.scope === 'PERSONAL'" size="small" type="primary" plain @click="promote(s)">设为本站共享</el-button>
-            <el-button size="small" text @click="$router.push({ path: '/app/ai', query: { skill: s.key } })">试用</el-button>
+            <el-button size="small" text @click="tryOut(s)">试用</el-button>
             <el-button v-if="s.scope !== 'BUILTIN'" size="small" text type="danger" @click="remove(s)">删除</el-button>
           </div>
         </div>
@@ -225,6 +225,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 import {
   Activity, BarChart3, Bot, ClipboardList, Eye, GitFork, Layers, PencilLine, ScrollText, Search, Sparkles, User, Users, Wrench
 } from 'lucide-vue-next'
@@ -277,9 +280,18 @@ const roleText = (r) => ({ STUDENT: '所有用户', TEACHER: '教师及以上', 
 const statusText = (s) => ({ SUCCESS: '成功', FAILED: '失败', CONFIRM_REQUIRED: '待确认', RUNNING: '运行中' }[s] || s)
 const statusBadge = (s) => ({ SUCCESS: 'badge-green', FAILED: 'badge-red', CONFIRM_REQUIRED: 'badge-yellow' }[s] || 'badge-gray')
 const fmt = (t) => (t ? String(t).replace('T', ' ').slice(0, 16) : '–')
+// 内置 SKILL 在 AI 助教里各有入口:导师在项目页,推荐/设备/BOM/问答是四个任务,其余在「本站技能」
+const TASK_OF = { 'project-recommender': 'recommend', 'task-recommend': 'recommend', 'equipment-advisor': 'equipment', 'task-equipment': 'equipment', 'bom-reviewer': 'bom', 'task-bom': 'bom', 'study-assistant': 'ask', 'task-ask': 'ask' }
+const tryOut = (s) => {
+  if (s.key === 'project-tutor') { ElMessage.info('项目导师在学生端任意项目页右侧的「AI 导师」面板里使用'); return }
+  const task = TASK_OF[s.key]
+  router.push({ path: '/app/ai', query: task ? { task } : { task: 'custom', skill: s.key } })
+}
 const fmtK = (n) => (n >= 1000000 ? (n / 1000000).toFixed(2) + 'M' : n >= 1000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + 'k' : String(n))
 
-const loadSkills = async () => { skills.value = await adminAiSkills() }
+// 四个老的"聊天式"内置 SKILL 已被 AI 助教的任务版(task-*)取代,不再展示
+const LEGACY = new Set(['study-assistant', 'project-recommender', 'equipment-advisor', 'bom-reviewer'])
+const loadSkills = async () => { skills.value = (await adminAiSkills()).filter((s) => !LEGACY.has(s.key)) }
 const loadTools = async () => { tools.value = await adminAiTools() }
 const loadRuns = async () => {
   const r = await adminAiRuns({ page: runPage.value, size: 20, userId: runUserId.value || undefined })

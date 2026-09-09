@@ -90,6 +90,8 @@ public class SkillRunner {
         public JsonNode input;
         public boolean confirm;
         public JsonNode context;
+        /** 任务式界面给会话起的标题(可选) */
+        public String title;
     }
 
     /** 运行过程事件(流式时逐个推送,非流式时只关心 done/error/confirmRequired) */
@@ -152,7 +154,7 @@ public class SkillRunner {
                     throw new BusinessException("请输入内容");
                 }
                 conversation = req.conversationId == null
-                        ? newConversation(user, skill, userText, req.context)
+                        ? newConversation(user, skill, userText, req.context, req.title)
                         : ownConversation(req.conversationId, user);
                 run.setConversationId(conversation.getId());
                 run.setInput(cut(userText, 2000));
@@ -378,10 +380,15 @@ public class SkillRunner {
     }
 
     private AiConversation newConversation(AuthUser user, AiSkill skill, String firstText, JsonNode context) {
+        return newConversation(user, skill, firstText, context, null);
+    }
+
+    /** title 由前端指定时(任务式界面)优先使用,否则截取首条消息 */
+    private AiConversation newConversation(AuthUser user, AiSkill skill, String firstText, JsonNode context, String title) {
         AiConversation c = new AiConversation();
         c.setUserId(user.getId());
         c.setSkillKey(skill.getSkillKey());
-        String t = firstText.replaceAll("\\s+", " ").trim();
+        String t = (title == null || title.trim().isEmpty() ? firstText : title).replaceAll("\\s+", " ").trim();
         c.setTitle(t.length() > 40 ? t.substring(0, 40) : t);
         c.setContext(contextBuilder.normalize(context));
         return conversationRepo.save(c);

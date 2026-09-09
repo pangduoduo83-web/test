@@ -127,7 +127,7 @@
             <el-button v-if="!busy" type="primary" :disabled="!draft.trim()" @click="ask()">发送</el-button>
             <el-button v-else type="danger" plain @click="stop">停止</el-button>
           </div>
-          <div class="foot-link"><a @click="$router.push({ path: '/app/ai', query: { skill: 'project-tutor', projectId } })">在 AI 工作台打开完整对话 →</a></div>
+          <div class="foot-link"><a @click="$router.push({ path: '/app/ai', query: { task: 'ask' } })">更多问题去 AI 助教 →</a></div>
         </div>
       </div>
     </div>

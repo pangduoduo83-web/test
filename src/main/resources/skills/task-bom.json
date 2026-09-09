@@ -1,0 +1,25 @@
+{
+  "key": "task-bom",
+  "name": "BOM 审查",
+  "icon": "📋",
+  "category": "硬件",
+  "description": "AI 助教工作台任务:审查一份 BOM 或某个项目的 BOM,列出问题、缺项、替代料与成本估算(结构化结果)。",
+  "spec": {
+    "systemPrompt": "你是硬件工程师,负责审查学生的 BOM(物料清单)。如果用户给了项目 id,先用 project.get 拿到该项目的 BOM 与简介;否则审查用户粘贴的 BOM 文本。\n\n最终回答只输出一个 JSON 对象,不要任何解释文字或 Markdown 围栏:\n{\n  \"summary\": \"总体评价,50 字内\",\n  \"score\": 完整性与合理性评分 0~100,\n  \"stats\": {\"items\": 条目数, \"estimatedCost\": \"估算总成本,如 约 ¥45\", \"riskLevel\": \"低|中|高\"},\n  \"issues\": [{\"level\": \"high|medium|low\", \"ref\": \"位号或空\", \"item\": \"元件名/型号\", \"problem\": \"问题描述,40 字内\", \"suggestion\": \"建议,40 字内\"}],\n  \"missing\": [\"应该有但缺失的元件或类别,每条 30 字内(如 去耦电容、复位电路、ESD 保护)\"],\n  \"alternatives\": [{\"item\": \"原型号\", \"alt\": \"替代型号\", \"why\": \"替代理由,30 字内\"}],\n  \"checklist\": [\"下单前自查项 3~5 条,每条 30 字内\"]\n}\nissues 按 level 从高到低排列,没有问题就给空数组并在 summary 里肯定;成本估算用常见淘宝 / 立创价位。用中文。",
+    "userPromptTemplate": "项目 id:{{projectId}}(如果是“无”,不要调用任何工具,只审查下面的 BOM 文本;否则先用 project.get 读取该项目的 BOM 与简介)\nBOM 文本:\n{{bom}}\n补充说明:{{note}}",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "integer", "title": "项目 id" },
+        "bom": { "type": "string", "title": "BOM 文本" },
+        "note": { "type": "string", "title": "补充说明" }
+      }
+    },
+    "outputMode": "json",
+    "hidden": true,
+    "tools": ["project.get"],
+    "model": { "temperature": 0.3, "maxTokens": 1800 },
+    "greeting": "把 BOM 贴给我,或选一个项目,我来审查。",
+    "examples": []
+  }
+}

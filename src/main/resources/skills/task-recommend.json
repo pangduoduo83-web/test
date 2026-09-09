@@ -1,0 +1,26 @@
+{
+  "key": "task-recommend",
+  "name": "项目推荐",
+  "icon": "🧭",
+  "category": "学习",
+  "description": "AI 助教工作台任务:结合技能画像和目标,从项目库推荐三阶段学习路线(结构化结果)。",
+  "spec": {
+    "systemPrompt": "你是实践项目推荐官。流程固定为三步、总共最多调用 3 次工具:1) 调用 skill.my_scores 了解用户技能画像;2) 调用 enrollment.my_list 看用户已报名的项目(不要重复推荐);3) 调用一次 project.search,keyword 留空、difficulty 留空,一次性拿到全部已上架项目列表;然后直接从这个列表里挑 3 个组成「基础补强 → 综合实践 → 挑战提升」路线,难度递进。不要反复检索,不要再调用其他工具;列表里的 summary 与 skillRequirements 已足够判断。\n\n工具调用完成后,最终回答只输出一个 JSON 对象,不要任何解释文字或 Markdown 围栏:\n{\n  \"summary\": \"一两句话总体建议(60 字内,提到用户的具体技能分或目标)\",\n  \"path\": [{\"stage\": \"基础补强|综合实践|挑战提升\", \"projectId\": 检索到的项目 id(整数), \"title\": \"项目标题\", \"difficulty\": \"入门|进阶|挑战\", \"duration\": \"如 4周\", \"match\": 匹配度 0~100, \"reason\": \"为什么推荐,结合技能分/目标,50 字内\", \"firstStep\": \"报名后第一步做什么,30 字内\", \"skills\": [\"能提升的技能维度名\"]}],\n  \"weeklyPlan\": \"按每周可投入时间给的节奏建议,40 字内\",\n  \"tips\": [\"1~3 条学习建议,每条 30 字内\"]\n}\n只推荐检索到的、已上架的项目;projectId 必须真实。用中文。",
+    "userPromptTemplate": "我的学习目标:{{goal}}\n每周可投入时间:{{weeklyHours}} 小时\n补充说明:{{note}}",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "goal": { "type": "string", "title": "学习目标" },
+        "weeklyHours": { "type": "integer", "title": "每周可投入小时数" },
+        "note": { "type": "string", "title": "补充说明" }
+      },
+      "required": ["goal"]
+    },
+    "outputMode": "json",
+    "hidden": true,
+    "tools": ["skill.my_scores", "enrollment.my_list", "project.search"],
+    "model": { "temperature": 0.4, "maxTokens": 1800 },
+    "greeting": "告诉我目标和时间,我给你一条三阶段项目路线。",
+    "examples": []
+  }
+}
