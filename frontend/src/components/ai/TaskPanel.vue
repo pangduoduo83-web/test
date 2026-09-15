@@ -1,47 +1,68 @@
 <template>
-  <!-- 任务面板:左侧条件表单,右侧结构化结果;不是聊天框 -->
+  <!-- 任务面板:左侧条件表单,右侧结构化结果 -->
   <div class="task" :style="{ '--accent': accent }">
     <div class="task-form">
       <div class="tf-head">
-        <span class="tf-icon">{{ icon }}</span>
-        <div>
+        <span class="tf-icon" :style="{ background: accentBg || 'rgba(37, 99, 235, 0.08)', color: accent }">
+          <slot name="header-icon">{{ icon }}</slot>
+        </span>
+        <div class="tf-head-info">
           <div class="tf-title">{{ title }}</div>
-          <div class="tf-intro">{{ intro }}</div>
+          <div v-if="intro" class="tf-intro">{{ intro }}</div>
         </div>
       </div>
       <div class="tf-body">
         <slot name="form" :run="run" :running="running" />
-        <div v-if="lastInputSummary" class="tf-last">上次条件:{{ lastInputSummary }}</div>
+        <div v-if="lastInputSummary" class="tf-last">上次条件: {{ lastInputSummary }}</div>
       </div>
     </div>
 
     <div class="task-result">
       <div class="tr-head">
-        <span class="tr-title">{{ running ? '正在生成' : (result || raw) ? '结果' : '结果会出现在这里' }}</span>
-        <span v-if="!running && conversationId" class="tr-sub">可继续追问 · 已存入最近任务</span>
+        <div class="tr-title-group">
+          <span class="tr-star">✨</span>
+          <span class="tr-title">{{ running ? '正在生成结果…' : (resultTitle || (title ? `AI 为你推荐的${title.replace('推荐', '')}` : 'AI 推荐结果')) }}</span>
+        </div>
+        <div class="tr-actions">
+          <button v-if="showRefresh" class="btn-refresh" :disabled="running" @click="$emit('refresh')">
+            <RotateCcw :size="13" /> 换一批
+          </button>
+          <span v-if="!running && conversationId" class="tr-sub">可继续追问 · 已存入最近任务</span>
+        </div>
       </div>
+
       <template v-if="running">
         <div class="steps-live">
           <div class="spinner"></div>
           <div>
             <div class="sl-title">{{ hints[hintIdx % hints.length] }}</div>
-            <div class="sl-sub">AI 正在调用平台数据,通常 10~30 秒</div>
+            <div class="sl-sub">AI 正在调用平台数据与模型分析，通常需 10~30 秒</div>
           </div>
         </div>
-        <div class="skeleton"><div class="sk w60"></div><div class="sk"></div><div class="sk w80"></div><div class="sk w40"></div><div class="sk"></div></div>
-      </template>
-      <template v-else-if="error">
-        <div class="empty">
-          <div class="empty-icon">⚠️</div>
-          <div class="empty-title">这次没有成功</div>
-          <div class="empty-sub">{{ error }}</div>
-          <el-button size="small" @click="retry">再试一次</el-button>
+        <div class="skeleton">
+          <div class="sk w60"></div>
+          <div class="sk"></div>
+          <div class="sk w80"></div>
+          <div class="sk w40"></div>
+          <div class="sk"></div>
         </div>
       </template>
+
+      <template v-else-if="error">
+        <div class="empty">
+          <div class="empty-icon-wrap">⚠️</div>
+          <div class="empty-title">这次生成未成功</div>
+          <div class="empty-sub">{{ error }}</div>
+          <el-button size="small" type="primary" plain style="margin-top: 8px;" @click="retry">再试一次</el-button>
+        </div>
+      </template>
+
       <template v-else-if="result || raw">
         <div class="trace" v-if="trace.length">
-          <span class="trace-label">AI 做了</span>
-          <span v-for="(t, i) in trace" :key="i" class="trace-chip" :class="{ fail: t.ok === false }">{{ t.label }}<b v-if="t.count > 1"> ×{{ t.count }}</b></span>
+          <span class="trace-label">AI 调用了:</span>
+          <span v-for="(t, i) in trace" :key="i" class="trace-chip" :class="{ fail: t.ok === false }">
+            {{ t.label }}<b v-if="t.count > 1"> ×{{ t.count }}</b>
+          </span>
           <span class="trace-time">{{ elapsed }}s</span>
         </div>
         <slot name="result" :result="result" :raw="raw" :ask="ask" />
@@ -50,9 +71,10 @@
           <button v-for="q in followUps" :key="q" class="follow-chip" @click="ask(q)">{{ q }}</button>
         </div>
       </template>
+
       <template v-else>
         <div class="empty">
-          <div class="empty-icon">{{ icon }}</div>
+          <img :src="emptyIllustration" class="empty-illustration" alt="暂无推荐结果" />
           <div class="empty-title">{{ emptyTitle }}</div>
           <div class="empty-sub">{{ emptySub }}</div>
         </div>
@@ -63,18 +85,23 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RotateCcw } from 'lucide-vue-next'
 import { aiChat } from '../../api'
 import { parseJson } from '../../api/aiJson'
+import emptyIllustration from '../../assets/empty-illustration.png'
 
 const props = defineProps({
   skillKey: { type: String, required: true },
   icon: { type: String, default: '✦' },
   title: { type: String, required: true },
+  resultTitle: { type: String, default: '' },
   intro: { type: String, default: '' },
-  /** 主题色,用于表单头部与结果标题 */
-  accent: { type: String, default: '#6366f1' },
-  emptyTitle: { type: String, default: '填好左侧条件,点开始' },
-  emptySub: { type: String, default: '结果会以卡片形式出现在这里' },
+  /** 主题色 */
+  accent: { type: String, default: '#2563eb' },
+  accentBg: { type: String, default: '' },
+  emptyTitle: { type: String, default: '还没有推荐结果' },
+  emptySub: { type: String, default: '请填写左侧的需求信息，AI 将为你推荐最合适的学习项目' },
+  showRefresh: { type: Boolean, default: true },
   /** 结果里用于"继续深入"的字段名 */
   followUpField: { type: String, default: 'followUps' },
   /** 是否把结果当 JSON 解析(自定义技能是纯文本) */
@@ -82,7 +109,7 @@ const props = defineProps({
   /** 从历史记录重新打开 */
   initial: { type: Object, default: null }
 })
-const emit = defineEmits(['done'])
+const emit = defineEmits(['done', 'refresh'])
 
 const running = ref(false)
 const error = ref('')
@@ -171,41 +198,283 @@ defineExpose({ run, ask })
 </script>
 
 <style scoped>
-.task { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 18px; align-items: start; }
-@media (max-width: 1000px) { .task { grid-template-columns: 1fr; } }
-.task-form { position: sticky; top: 16px; background: #fff; border-radius: 18px; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow-card); }
-.tf-head { display: flex; gap: 12px; align-items: flex-start; padding: 18px 20px 16px; color: #fff; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #1e1b4b)); }
-.tf-icon { width: 46px; height: 46px; border-radius: 13px; background: rgba(255, 255, 255, .2); display: grid; place-items: center; font-size: 24px; flex-shrink: 0; }
-.tf-title { font-weight: 800; font-size: 17px; }
-.tf-intro { font-size: 12.5px; color: rgba(255, 255, 255, .88); margin-top: 4px; line-height: 1.6; }
-.tf-body { padding: 18px 20px 16px; }
-.tf-last { margin-top: 12px; font-size: 12px; color: #9ca3af; border-top: 1px dashed var(--border); padding-top: 10px; }
-.task-result { min-height: 460px; background: #fff; border-radius: 18px; border: 1px solid var(--border); padding: 18px 22px 22px; box-shadow: var(--shadow-card); }
-.tr-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-.tr-title { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
-.tr-title::before { content: ''; width: 4px; height: 16px; border-radius: 2px; background: var(--accent); }
-.tr-sub { font-size: 12px; color: #9ca3af; margin-left: auto; }
-.steps-live { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-.spinner { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #e0e7ff; border-top-color: #4f46e5; animation: spin 1s linear infinite; flex-shrink: 0; }
+.task {
+  display: grid;
+  grid-template-columns: 370px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1060px) {
+  .task { grid-template-columns: 1fr; }
+}
+
+/* 左侧表单容器:干净白底 + 浅边框 */
+.task-form {
+  position: sticky;
+  top: 16px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.tf-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.tf-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.tf-head-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tf-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1e293b;
+}
+
+.tf-intro {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.tf-body {
+  padding: 18px 20px 20px;
+}
+
+.tf-last {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #94a3b8;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+}
+
+/* 右侧结果区:高品质白底容器 */
+.task-result {
+  min-height: 480px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 18px 22px 22px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.tr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tr-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tr-star {
+  color: #2563eb;
+  font-size: 16px;
+}
+
+.tr-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.tr-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.btn-refresh:hover:not(:disabled) {
+  background: #eff6ff;
+}
+.btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tr-sub {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* 生成中动画与骨架屏 */
+.steps-live {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid #dbeafe;
+  border-top-color: #2563eb;
+  animation: spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
-.sl-title { font-weight: 700; font-size: 14px; }
-.sl-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.skeleton { display: flex; flex-direction: column; gap: 12px; }
-.sk { height: 14px; border-radius: 7px; background: linear-gradient(90deg, #f3f4f6, #e5e7eb, #f3f4f6); background-size: 200% 100%; animation: sk 1.2s infinite; }
-.sk.w60 { width: 60%; } .sk.w80 { width: 80%; } .sk.w40 { width: 40%; }
-@keyframes sk { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.empty { min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 10%, #fff), #fff 70%); border-radius: 14px; }
-.empty-icon { font-size: 54px; filter: drop-shadow(0 8px 16px rgba(15, 23, 42, .12)); }
-.empty-title { font-weight: 700; font-size: 15px; }
-.empty-sub { font-size: 13px; color: var(--text-secondary); max-width: 360px; line-height: 1.6; }
-.trace { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; font-size: 12px; }
-.trace-label { color: #9ca3af; }
-.trace-chip { background: #f3f4f6; color: #374151; padding: 3px 10px; border-radius: 999px; }
-.trace-chip.fail { background: #fef2f2; color: #dc2626; }
-.trace-chip b { color: #6366f1; }
-.trace-time { margin-left: auto; color: #9ca3af; }
-.follow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--border); }
-.follow-label { font-size: 12px; color: #9ca3af; }
-.follow-chip { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
-.follow-chip:hover { background: #e0e7ff; }
+
+.sl-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #1e293b;
+}
+.sl-sub {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sk {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
+  background-size: 200% 100%;
+  animation: sk 1.2s infinite;
+}
+.sk.w60 { width: 60%; }
+.sk.w80 { width: 80%; }
+.sk.w40 { width: 40%; }
+@keyframes sk {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* 空状态插画 */
+.empty {
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-illustration {
+  width: 170px;
+  height: auto;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.04));
+  user-select: none;
+}
+
+.empty-icon-wrap {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+
+.empty-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.empty-sub {
+  font-size: 13px;
+  color: #94a3b8;
+  max-width: 380px;
+  line-height: 1.6;
+}
+
+/* 工具追踪与追问 */
+.trace {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+.trace-label { color: #94a3b8; }
+.trace-chip {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.trace-chip.fail {
+  background: #fef2f2;
+  color: #dc2626;
+}
+.trace-chip b { color: #2563eb; }
+.trace-time {
+  margin-left: auto;
+  color: #94a3b8;
+}
+
+.follow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.follow-label { font-size: 12px; color: #94a3b8; }
+.follow-chip {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12.5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.follow-chip:hover {
+  background: #dbeafe;
+}
 </style>
