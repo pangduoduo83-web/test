@@ -52,18 +52,34 @@ interface ChatState {
   setSelectedModel: (m: string) => void;
   selectedThinking: ThinkingSelection;
   setSelectedThinking: (mode: ThinkingSelection) => void;
+  /** 会话级「自动批准」:非破坏性的修改计划由服务端直接执行,不再逐次确认。 */
+  autoApprove: boolean;
+  setAutoApprove: (v: boolean) => void;
 }
 
 let abortController: AbortController | null = null;
 /** Sequence number of the last event applied for the active run (for `?after=` re-attach). */
 let lastSeq = 0;
+/** How many change plans the current run auto-approved (for the run-end notice). */
+let runAutoApprovals = 0;
 const ACTIVE_CONV_KEY = "kicad-ai.activeConversation";
+const AUTO_APPROVE_KEY = "kicad-ai.autoApprove";
 const RECONNECT_DELAYS_MS = [800, 1500, 3000, 5000, 8000];
 export const CONTINUE_PROMPT = "继续执行上面的任务，从刚才中断的地方接着做；先用一句话说明接下来要做什么。";
 
 function rememberActive(id: string | null) {
   if (id) localStorage.setItem(ACTIVE_CONV_KEY, id);
   else localStorage.removeItem(ACTIVE_CONV_KEY);
+}
+
+function loadAutoApprove(id: string | null): boolean {
+  return !!id && localStorage.getItem(`${AUTO_APPROVE_KEY}.${id}`) === "1";
+}
+
+function rememberAutoApprove(id: string | null, value: boolean) {
+  if (!id) return;
+  if (value) localStorage.setItem(`${AUTO_APPROVE_KEY}.${id}`, "1");
+  else localStorage.removeItem(`${AUTO_APPROVE_KEY}.${id}`);
 }
 
 function newId(prefix = "m") {
@@ -163,6 +179,7 @@ export const useChat = create<ChatState>((set, get) => ({
   loadingDetail: false,
   selectedModel: localStorage.getItem("kicad-ai.selectedModel") || "auto",
   selectedThinking: (localStorage.getItem("kicad-ai.selectedThinking") as ThinkingSelection | null) || "auto",
+  autoApprove: false,
 
   setSelectedModel(m) {
     localStorage.setItem("kicad-ai.selectedModel", m);
@@ -172,6 +189,11 @@ export const useChat = create<ChatState>((set, get) => ({
   setSelectedThinking(mode) {
     localStorage.setItem("kicad-ai.selectedThinking", mode);
     set({ selectedThinking: mode });
+  },
+
+  setAutoApprove(v) {
+    rememberAutoApprove(get().activeId, v);
+    set({ autoApprove: v });
   },
 
   setContextTokens(n) {
@@ -224,6 +246,7 @@ export const useChat = create<ChatState>((set, get) => ({
       snapshotsThisSession: 0,
       error: null,
       runError: null,
+      autoApprove: loadAutoApprove(conv.id),
     });
     return conv;
   },
@@ -232,7 +255,7 @@ export const useChat = create<ChatState>((set, get) => ({
     detachStream();
     resetPendingDeltas();
     rememberActive(id);
-    set({ activeId: id, loadingDetail: true, error: null, runError: null, running: false, runStartedAt: null, reconnecting: false });
+    set({ activeId: id, loadingDetail: true, error: null, runError: null, running: false, runStartedAt: null, reconnecting: false, autoApprove: loadAutoApprove(id) });
     try {
       const detail = await api.conversation(id);
       if (get().activeId !== id) return; // user moved on while we were loading
@@ -259,6 +282,7 @@ export const useChat = create<ChatState>((set, get) => ({
 
   async deleteConversation(id) {
     await api.deleteConversation(id);
+    rememberAutoApprove(id, false);
     const conversations = get().conversations.filter((c) => c.id !== id);
     set({ conversations });
     if (get().activeId === id) {
@@ -283,7 +307,7 @@ export const useChat = create<ChatState>((set, get) => ({
     const selection = projectState.selection?.project_id === projectId ? projectState.selection : null;
     const userMsg: Message = { id: newId("u"), role: "user", content, created_at: new Date().toISOString() };
     set({ messages: [...get().messages, userMsg], todos: [], error: null, notice: null });
-    const { selectedModel, selectedThinking } = get();
+    const { selectedModel, selectedThinking, autoApprove } = get();
     await runStream(
       chatStreamPath(activeId),
       {
@@ -292,6 +316,7 @@ export const useChat = create<ChatState>((set, get) => ({
         model: selectedModel,
         thinking: selectedThinking === "auto" ? undefined : selectedThinking,
         selection: selection ?? undefined,
+        auto_approve: autoApprove,
       },
       set,
       get,
@@ -302,7 +327,7 @@ export const useChat = create<ChatState>((set, get) => ({
     const { activeId } = get();
     if (!activeId) return;
     set({ pendingInterrupt: null, notice: null });
-    const { selectedModel, selectedThinking } = get();
+    const { selectedModel, selectedThinking, autoApprove } = get();
     const selection = useProjects.getState().selection;
     await runStream(
       chatResumePath(activeId),
@@ -311,6 +336,7 @@ export const useChat = create<ChatState>((set, get) => ({
         model: selectedModel,
         thinking: selectedThinking === "auto" ? undefined : selectedThinking,
         selection: selection ?? undefined,
+        auto_approve: autoApprove,
       },
       set,
       get,
@@ -367,6 +393,7 @@ async function runStream(path: string, body: unknown, set: Set, get: Get) {
   const controller = (abortController = new AbortController());
   const conversationId = get().activeId;
   lastSeq = 0;
+  runAutoApprovals = 0;
   set({ running: true, runStartedAt: Date.now(), pendingInterrupt: null, runError: null, notice: null, reconnecting: false });
   sendPresenceStatus("busy");
   let ended = false;
@@ -399,6 +426,7 @@ async function attachToRun(conversationId: string, after: number, set: Set, get:
   detachStream();
   const controller = (abortController = new AbortController());
   lastSeq = after;
+  runAutoApprovals = 0;
   set({ running: true, runStartedAt: get().runStartedAt ?? Date.now(), reconnecting: false, runError: null });
   sendPresenceStatus("busy");
   const onEvent = (ev: StreamEvent) => {
@@ -765,7 +793,11 @@ function applyEvent(ev: StreamEvent, set: Set, get: Get) {
     case "custom": {
       if (ev.event === "file_changed") useProjects.getState().bumpPreview();
       else if (ev.event === "snapshot") set({ snapshotsThisSession: s.snapshotsThisSession + 1 });
-      else if (ev.event === "plan_action") {
+      else if (ev.event === "plan_auto_approved") {
+        runAutoApprovals += 1;
+        const count = typeof ev.count === "number" ? ev.count : 0;
+        set({ notice: `已按「自动批准」执行修改计划${count ? `（${count} 项）` : ""}` });
+      } else if (ev.event === "plan_action") {
         // Server-side execution of an approved plan: one event per action transition.
         const e = ev as unknown as { plan_call_id: string; index: number; tool: string; summary?: string; status: "running" | "done" | "error"; error?: string | null; diff?: FileDiff | null };
         const next = patchToolCall(s.messages, e.plan_call_id, (tc) => {
@@ -836,6 +868,7 @@ function applyEvent(ev: StreamEvent, set: Set, get: Get) {
     case "run_end":
       if (ev.interrupted) set({ notice: "代理正在等待你的确认" });
       else if (ev.cancelled) set({ notice: "本次运行已取消" });
+      else if (runAutoApprovals > 0) set({ notice: `本次已自动批准并执行 ${runAutoApprovals} 个修改计划` });
       else set({ notice: null });
       return;
   }

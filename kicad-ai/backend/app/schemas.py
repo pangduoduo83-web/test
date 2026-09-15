@@ -175,6 +175,8 @@ class ChatRequest(BaseModel):
     model: str | None = None
     thinking: Literal["default", "off", "fast", "deep"] | None = None
     selection: DesignSelection | None = None
+    # 会话级「自动批准」:非破坏性的修改计划由服务端直接批准执行,不再逐次弹确认。
+    auto_approve: bool = False
 
 
 class ResumeDecision(BaseModel):
@@ -188,6 +190,7 @@ class ResumeRequest(BaseModel):
     model: str | None = None
     thinking: Literal["default", "off", "fast", "deep"] | None = None
     selection: DesignSelection | None = None
+    auto_approve: bool = False
 
 
 # ---- tools / skills ---------------------------------------------------------

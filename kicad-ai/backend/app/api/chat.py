@@ -13,9 +13,10 @@ from fastapi.responses import StreamingResponse
 from langgraph.types import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent.change_plan import validate_change_plan
+from app.agent.change_plan import plan_from_action_request
 from app.agent.memory import ensure_user_memory
 from app.agent.streaming import stream_agent_events
+from app.agent.tools.registry import destructive_tool_names
 from app.api.conversations import refresh_conversation_stats
 from app.auth import get_current_user
 from app.db import User, get_session
@@ -57,15 +58,11 @@ def _approved_change_plan(state: Any, decisions: list[dict[str, Any]]) -> dict[s
                 continue
             for index, action_request in enumerate(requests):
                 decision = decisions[index] if index < len(decisions) else {}
-                if (
-                    isinstance(action_request, dict)
-                    and action_request.get("name") == "submit_change_plan"
-                    and decision.get("type") == "approve"
-                    and isinstance(action_request.get("args"), dict)
-                ):
-                    plan, error = validate_change_plan(action_request["args"])
-                    if error is None:
-                        return plan
+                if decision.get("type") != "approve":
+                    continue
+                plan, error = plan_from_action_request(action_request)
+                if error is None:
+                    return plan
     return None
 
 
@@ -116,6 +113,7 @@ async def _start_run(
     thinking: str | None = None,
     selection: DesignSelection | None = None,
     approved_plan: dict[str, Any] | None = None,
+    auto_approve: bool = False,
 ) -> StreamingResponse:
     conv = await get_owned_conversation(session, user, conversation_id)
     project = await get_owned_project(session, user, project_id or conv.project_id)
@@ -162,6 +160,8 @@ async def _start_run(
     agent = runtime.agent
     conv_id, user_id = conv.id, user.id
     timeout_seconds = runtime.settings.agent_run_timeout_seconds
+    destructive_tools = destructive_tool_names(runtime.settings.hitl_tools)
+    auto_approve_limit = runtime.settings.agent_auto_approve_limit
 
     def source() -> AsyncIterator[dict[str, Any]]:
         return stream_agent_events(
@@ -170,6 +170,9 @@ async def _start_run(
             config=config,
             context=context,
             timeout_seconds=timeout_seconds,
+            auto_approve=auto_approve,
+            destructive_tools=destructive_tools,
+            auto_approve_limit=auto_approve_limit,
         )
 
     async def finalize(_run: RunSession) -> None:
@@ -212,6 +215,7 @@ async def stream(
         model=payload.model,
         thinking=payload.thinking,
         selection=payload.selection,
+        auto_approve=payload.auto_approve,
     )
 
 
@@ -239,6 +243,7 @@ async def resume(
         thinking=payload.thinking,
         selection=payload.selection,
         approved_plan=approved_plan,
+        auto_approve=payload.auto_approve,
     )
 
 

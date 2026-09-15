@@ -200,6 +200,75 @@ async def test_layout_optimisation_flow(settings: Settings):
         await runtime.stop()
 
 
+def test_auto_approve_plan_rules():
+    """Only a single, non-destructive change plan may be approved silently."""
+    from types import SimpleNamespace
+
+    from app.agent.streaming import _auto_approve_plan
+
+    def interrupt(requests):
+        return SimpleNamespace(value={"action_requests": requests})
+
+    def plan(*tools):
+        return {
+            "name": "submit_change_plan",
+            "args": {"actions": [{"tool": tool, "args": {}} for tool in tools]},
+        }
+
+    safe = interrupt([plan("set_footprint_position")])
+    assert _auto_approve_plan([safe], {"delete_zone"}) is not None
+    # a destructive action inside the plan still needs the user
+    assert _auto_approve_plan([interrupt([plan("delete_zone")])], {"delete_zone"}) is None
+    # non-plan interrupts always ask
+    assert _auto_approve_plan([interrupt([{"name": "restore_file_version", "args": {"file_path": "x", "version_id": "1"}}])], {"restore_file_version"}) is None
+    # several requests at once are not batched away
+    assert _auto_approve_plan([safe, safe], set()) is None
+    # an unparsable plan is rejected
+    assert _auto_approve_plan([interrupt([{"name": "submit_change_plan", "args": {"actions": []}}])], set()) is None
+
+
+@pytest.mark.asyncio
+async def test_auto_approve_executes_without_confirmation(settings: Settings):
+    """With auto_approve on, a safe plan runs end-to-end without an interrupt."""
+    from app.kicad.pcb import Board
+
+    user_id = "u_auto"
+    ws_dir = settings.workspace_root / user_id / "projects" / "power_module"
+    shutil.copytree(settings.samples_dir / "power_module", ws_dir)
+    pcb = ws_dir / "power_module.kicad_pcb"
+
+    runtime = AgentRuntime(settings)
+    await runtime.start()
+    try:
+        await ensure_user_memory(runtime.store, user_id)
+        ctx = AgentContext(user_id=user_id, conversation_id="conv_auto", project_name="power_module", pcb_path=str(pcb), workspace_root=str(settings.workspace_root / user_id))
+        events = [
+            ev
+            async for ev in stream_agent_events(
+                runtime.agent,
+                input_payload={"messages": [{"role": "user", "content": "帮我优化一下电源模块的布局，电容尽量靠近芯片的电源引脚，并检查是否有 DRC 问题。"}]},
+                config=runtime.thread_config("conv_auto", user_id),
+                context=ctx,
+                auto_approve=True,
+                destructive_tools={"delete_zone", "clear_board_outline"},
+                auto_approve_limit=4,
+            )
+        ]
+        types = [e["type"] for e in events]
+        # The plan was approved server-side: no confirmation card was surfaced.
+        assert not any(e["type"] == "interrupt" for e in events), types
+        assert not any(e["type"] == "error" for e in events), [e for e in events if e["type"] == "error"]
+        auto = [e for e in events if e["type"] == "custom" and e["event"] == "plan_auto_approved"]
+        assert auto and auto[0]["count"] == 2, auto
+        assert events[-1]["type"] == "run_end" and events[-1]["interrupted"] is False
+        plan = next(e for e in events if e["type"] == "tool_result" and e["name"] == "submit_change_plan")
+        assert plan["ok"] and plan["data"]["approved"] is True and plan["data"]["executed"] == 2
+        assert any(e["type"] == "tool_result" and e["name"] == "run_drc_check" for e in events)
+        assert Board.load(pcb).get_footprint("C3").x == 132.3
+    finally:
+        await runtime.stop()
+
+
 @pytest.mark.asyncio
 async def test_per_run_thinking_override(settings: Settings):
     """The compiled graph can switch thinking without being rebuilt."""

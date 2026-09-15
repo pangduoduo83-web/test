@@ -7,7 +7,9 @@ langchain-openai>=1.6.0
 langchain-anthropic>=1.7.0
 
 # --- Upstream KiCad-AI-Assistant tools, called in-process (no MCP) ----------
-kcaa>=0.2.2
+# Pinned: 0.2.3/0.2.4 changed tool signatures the app was written against
+# (e.g. list_symbol_properties(reference) → (references: list)).
+kcaa==0.2.2
 
 # --- Persistence (checkpoints + long-term store) ---------------------------
 langgraph-checkpoint-sqlite>=3.1.1

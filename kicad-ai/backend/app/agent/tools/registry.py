@@ -7,6 +7,7 @@ path validation, UI categorisation) independent of where a tool comes from
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -209,3 +210,16 @@ def get_policy(tool_name: str) -> ToolPolicy:
     # Unknown tools (e.g. new upstream additions) are treated as queries but
     # still get path validation through PATH_ARG_NAMES.
     return ToolPolicy(kind="query", category="pcb_query")
+
+
+def destructive_tool_names(hitl_tools: Iterable[str] = ()) -> set[str]:
+    """Tools whose execution must stay behind an explicit user confirmation.
+
+    Registry mutations flagged ``confirm`` plus anything the operator listed in
+    ``hitl_tools``. ``submit_change_plan`` is excluded: it *is* the approval
+    gate, so gating it again would defeat batch approval.
+    """
+    names = {name for name, policy in TOOL_POLICIES.items() if policy.confirm and policy.kind != "harness"}
+    names.update(hitl_tools)
+    names.discard("submit_change_plan")
+    return names

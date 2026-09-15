@@ -1,4 +1,4 @@
-import { Code2, Crosshair, Image, Loader2, Paperclip, Quote, Send, Square, Wrench, X } from "lucide-react";
+import { Code2, Crosshair, Image, Loader2, Paperclip, Quote, Send, ShieldCheck, Square, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { ModelOption, ThinkingMode } from "@/lib/types";
 import { useChat } from "@/store/chat";
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function Composer({ draft, onDraftChange, onOpenTools, onAttach, modelPresets, serverModel, serverThinking, onSelectDesign }: Props) {
-  const { send, cancel, running, reconnecting, pendingInterrupt } = useChat();
+  const { send, cancel, running, reconnecting, pendingInterrupt, autoApprove, setAutoApprove } = useChat();
   const selection = useProjects((s) => s.selection);
   const setSelection = useProjects((s) => s.setSelection);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -108,6 +108,22 @@ export function Composer({ draft, onDraftChange, onOpenTools, onAttach, modelPre
           <div className="flex flex-wrap items-center gap-1.5 text-slate-500">
             <ModelSelector presets={modelPresets} serverModel={serverModel} />
             <ThinkingSelector presets={modelPresets} serverThinking={serverThinking} />
+            <button
+              type="button"
+              onClick={() => setAutoApprove(!autoApprove)}
+              aria-pressed={autoApprove}
+              title={
+                autoApprove
+                  ? "自动批准已开启：模型提交的非破坏性修改计划会自动执行，不再逐次弹确认（删除、清空板框、恢复快照等破坏性操作仍需你确认）。点击关闭。"
+                  : "自动批准：开启后，模型提交的非破坏性修改计划会自动执行，减少确认点击；破坏性操作仍需你确认。"
+              }
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] transition-colors ${
+                autoApprove ? "bg-brand-50 font-medium text-brand-700" : "text-slate-500 hover:bg-slate-100 hover:text-ink"
+              }`}
+            >
+              <ShieldCheck size={14} />
+              自动批准{autoApprove ? "：开" : ""}
+            </button>
             <span className="mx-0.5 h-3.5 w-[1px] bg-line" />
             <ToolBtn icon={<Paperclip size={14} />} label="附件" onClick={onAttach} />
             <ToolBtn icon={<Image size={14} />} label="图片" onClick={() => onDraftChange(draft + (draft ? "\n" : "") + "请重点分析此区域电路与封装...")} />

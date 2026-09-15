@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     # full payload spilled to the user's workspace) before reaching the model.
     tool_result_max_chars: int = 24_000
     enable_subagents: bool = True
+    # Max non-destructive change plans one run may auto-approve when the user
+    # turns on 「自动批准」. Destructive plans always ask first.
+    agent_auto_approve_limit: int = 8
     hitl_tools: list[str] = Field(
         default_factory=lambda: [
             "restore_file_version",

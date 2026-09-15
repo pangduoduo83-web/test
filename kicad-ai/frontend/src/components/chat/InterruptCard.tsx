@@ -7,6 +7,7 @@ import { useChat } from "@/store/chat";
 export function InterruptCard({ interrupt }: { interrupt: PendingInterrupt }) {
   const resume = useChat((s) => s.resume);
   const running = useChat((s) => s.running);
+  const autoApprove = useChat((s) => s.autoApprove);
   const [reason, setReason] = useState("");
   const requests = interrupt.value?.action_requests ?? [];
   if (!requests.length) return null;
@@ -23,6 +24,11 @@ export function InterruptCard({ interrupt }: { interrupt: PendingInterrupt }) {
         {isPlan ? <ClipboardCheck size={16} className="shrink-0 text-brand-600" /> : <ShieldAlert size={16} className="text-amber-600 shrink-0" />}
         <span>{isPlan ? "整批修改计划待确认" : "需要你的确认：以下操作可能不可逆"}</span>
       </div>
+      {autoApprove && (
+        <div className="border-b border-amber-100 bg-amber-50/50 px-3.5 py-1.5 text-[11px] leading-relaxed text-amber-700">
+          已开启「自动批准」；{isPlan ? "该计划含删除、清空等破坏性操作，" : "该操作需单独确认，"}仍需你确认。
+        </div>
+      )}
       {isPlan ? (
         <div className="px-3.5 py-3">
           <h4 className="text-[13px] font-semibold text-ink">{plan.title || "设计修改计划"}</h4>

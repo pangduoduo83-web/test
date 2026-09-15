@@ -29,6 +29,7 @@ from langgraph.errors import GraphRecursionError
 from langgraph.types import Command
 
 from app.agent.budget import RunBudgetExceeded
+from app.agent.change_plan import plan_from_action_request
 from app.agent.context import AgentContext
 from app.agent.tools.registry import get_policy
 
@@ -37,6 +38,11 @@ log = logging.getLogger(__name__)
 # Steps LangGraph spends per model→tools round in the deep agent graph
 # (model node + after_model hooks + tools node); used only for user-facing hints.
 STEPS_PER_ROUND = 4
+
+# Hard ceiling on how many safe plans one run may auto-approve. Past this the
+# interrupt is handed back to the user, so a runaway model cannot silently make
+# an unbounded number of edits.
+AUTO_APPROVE_LIMIT = 8
 
 
 def _source(ns: tuple[str, ...] | list[str]) -> str:
@@ -138,6 +144,30 @@ def _interrupt_payload(interrupts: Any) -> dict[str, Any]:
     return {"type": "interrupt", "interrupts": items}
 
 
+def _auto_approve_plan(interrupts: list[Any], destructive_tools: set[str]) -> tuple[list[dict[str, Any]], dict[str, Any]] | None:
+    """Decide whether a pending interrupt is a safe plan we may approve silently.
+
+    Only a single ``submit_change_plan`` request whose actions are all
+    non-destructive qualifies. Anything else (destructive edits, other tools,
+    multiple requests) returns ``None`` so the user still reviews it.
+    """
+    if len(interrupts) != 1:
+        return None
+    value = getattr(interrupts[0], "value", interrupts[0])
+    if not isinstance(value, dict):
+        return None
+    requests = value.get("action_requests")
+    if not isinstance(requests, list) or len(requests) != 1:
+        return None
+    plan, error = plan_from_action_request(requests[0])
+    if error is not None or plan is None:
+        return None
+    for action in plan.get("actions") or []:
+        if str(action.get("tool")) in destructive_tools:
+            return None
+    return [{"type": "approve"}], plan
+
+
 def recursion_limit_message(limit: int) -> str:
     rounds = max(1, limit // STEPS_PER_ROUND)
     return (
@@ -188,8 +218,17 @@ async def stream_agent_events(
     config: dict[str, Any],
     context: AgentContext,
     timeout_seconds: float | None = None,
+    auto_approve: bool = False,
+    destructive_tools: set[str] | None = None,
+    auto_approve_limit: int = AUTO_APPROVE_LIMIT,
 ) -> AsyncIterator[dict[str, Any]]:
-    """Run the agent and yield UI events."""
+    """Run the agent and yield UI events.
+
+    With *auto_approve* on, a pending change plan whose actions are all
+    non-destructive (per *destructive_tools*) is approved and executed without
+    a round-trip to the user. Destructive plans and every other interrupt are
+    still surfaced for confirmation.
+    """
     run_id = uuid.uuid4().hex
     yield {"type": "run_start", "run_id": run_id, "at": datetime.now(timezone.utc).isoformat()}
     # Echo the user's message so a client that (re)attaches to the run can show
@@ -202,6 +241,7 @@ async def stream_agent_events(
                 yield {"type": "user_message", "content": content if isinstance(content, str) else str(content)}
                 break
 
+    destructive = destructive_tools or set()
     current_key: str | None = None
     current_msg_id: str | None = None
     announced_tool_calls: set[str] = set()
@@ -209,20 +249,66 @@ async def stream_agent_events(
     index_to_name: dict[int, str] = {}
     usage_totals = {"input_tokens": 0, "output_tokens": 0}
     saw_interrupt = False
+    auto_approvals = 0
 
     async def chunks() -> AsyncIterator[dict[str, Any]]:
-        # The deadline lives here, around the graph awaits, so an expiry surfaces
-        # as TimeoutError to the loop below rather than as a bare cancellation.
-        async with _Deadline(timeout_seconds):
-            async for chunk in agent.astream(
-                input_payload,
-                config=config,
-                context=context,
-                stream_mode=["updates", "messages", "custom"],
-                subgraphs=True,
-                version="v2",
-            ):
-                yield chunk
+        nonlocal auto_approvals
+        payload: dict[str, Any] | Command = input_payload
+        loop = asyncio.get_running_loop()
+        # One wall-clock budget for the whole turn, shared across auto-resumes.
+        deadline = loop.time() + timeout_seconds if timeout_seconds and timeout_seconds > 0 else None
+        while True:
+            remaining = None
+            if deadline is not None:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    raise TimeoutError
+            pending_interrupts: list[Any] = []
+            # The deadline lives here, around the graph awaits, so an expiry
+            # surfaces as TimeoutError to the loop below rather than as a bare
+            # cancellation.
+            async with _Deadline(remaining):
+                async for chunk in agent.astream(
+                    payload,
+                    config=config,
+                    context=context,
+                    stream_mode=["updates", "messages", "custom"],
+                    subgraphs=True,
+                    version="v2",
+                ):
+                    data = chunk.get("data")
+                    if chunk.get("type") == "updates" and isinstance(data, dict) and "__interrupt__" in data:
+                        rest = dict(data)
+                        interrupt_update = rest.pop("__interrupt__")
+                        pending_interrupts.extend(interrupt_update if isinstance(interrupt_update, (list, tuple)) else [interrupt_update])
+                        if rest:  # other node updates in the same super-step
+                            yield {**chunk, "data": rest}
+                        continue
+                    yield chunk
+            if not pending_interrupts:
+                return
+            decision = None
+            if auto_approve and auto_approvals < max(0, auto_approve_limit):
+                decision = _auto_approve_plan(pending_interrupts, destructive)
+            if decision is None:
+                # Hand the interrupt to the outer loop (and the user).
+                yield {"type": "updates", "ns": (), "data": {"__interrupt__": tuple(pending_interrupts)}}
+                return
+            decisions, plan = decision
+            context.extra["approved_change_plan"] = plan
+            config["configurable"]["approved_change_plan"] = plan
+            payload = Command(resume={"decisions": decisions})
+            auto_approvals += 1
+            yield {
+                "type": "custom",
+                "ns": (),
+                "data": {
+                    "type": "plan_auto_approved",
+                    "title": plan.get("title"),
+                    "count": len(plan.get("actions") or []),
+                    "auto_approvals": auto_approvals,
+                },
+            }
 
     try:
         async for chunk in chunks():

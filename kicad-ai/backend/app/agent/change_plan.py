@@ -7,6 +7,19 @@ from typing import Any
 from app.agent.tools.registry import get_policy
 
 
+def plan_from_action_request(action_request: Any) -> tuple[dict[str, Any] | None, str | None]:
+    """Validate one interrupt ``action_request`` and return its cleaned plan.
+
+    Shared by the resume endpoint (manual approval) and the auto-approve path in
+    ``app.agent.streaming`` so both authorise exactly the plan the user was shown.
+    """
+    if not isinstance(action_request, dict):
+        return None, "无效的操作请求"
+    if action_request.get("name") != "submit_change_plan":
+        return None, "不是设计修改计划"
+    return validate_change_plan(action_request.get("args"))
+
+
 def validate_change_plan(value: Any) -> tuple[dict[str, Any] | None, str | None]:
     if not isinstance(value, dict):
         return None, "修改计划格式无效"
