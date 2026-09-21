@@ -37,10 +37,11 @@
           <span v-else class="sub-text">整体成果</span>
         </template>
       </el-table-column>
-      <el-table-column label="附件" width="80">
+      <el-table-column label="附件" min-width="130">
         <template #default="{ row }">
           <el-link v-if="row.attachmentUrl" :href="row.attachmentUrl" target="_blank" type="primary">查看</el-link>
-          <span v-else>-</span>
+          <el-link v-for="file in row.attachments || []" :key="file.url" :href="file.url" target="_blank" rel="noopener" type="primary" style="display:block">{{ file.name }}</el-link>
+          <span v-if="!row.attachmentUrl && !row.attachments?.length">-</span>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="90">
@@ -64,13 +65,13 @@
     </div>
 
     <GradeDialog v-model="gradeVisible" :submission="grading" :project="gradingProject"
-                 :ai-review-fn="adminAiReview" :grade-fn="adminGradeSubmission" :return-fn="adminReturnSubmission" @graded="load" />
+                 :ai-review-fn="adminAiReview" :ai-status-fn="adminAiReviewStatus" :grade-fn="adminGradeSubmission" :return-fn="adminReturnSubmission" @graded="load" />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { adminAiReview, adminGradeSubmission, adminListProjects, adminListSubmissions, adminListUsers, adminReturnSubmission } from '../../api'
+import { adminAiReview, adminAiReviewStatus, adminGradeSubmission, adminListProjects, adminListSubmissions, adminListUsers, adminReturnSubmission } from '../../api'
 import GradeDialog from '../../components/GradeDialog.vue'
 import { downloadCsv } from '../../utils/csv'
 

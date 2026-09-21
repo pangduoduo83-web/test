@@ -10,7 +10,7 @@ from fastapi import HTTPException
 
 from app.agent.context import AgentContext
 from app.db import Project, User
-from app.kicad import workspace as ws
+from app.kicad import sexpr, workspace as ws
 from app.kicad.pcb import Board
 from app.kicad.sch import Schematic
 from app.schemas import DesignSelection
@@ -72,6 +72,31 @@ def test_selection_is_resolved_from_file_and_client_bounds_are_ignored(owned_pro
     block = context.context_block()
     assert "current_design_selection" in block
     assert '"C3"' in block and '"U1"' in block
+
+
+@pytest.mark.parametrize("net_reference", ['"+3V3"', '3', '"3"'])
+def test_selection_preview_accepts_track_net_names_and_codes(owned_project, net_reference):
+    import xml.etree.ElementTree as ET
+
+    _, _, directory = owned_project
+    board = Board.load(directory / "power_module.kicad_pcb")
+    assert board.nets[3] == "+3V3"
+    existing_segments = next(net["track_segments"] for net in board.list_nets() if net["code"] == 3)
+    board.tree.append(sexpr.loads(
+        '(segment (start 131 69) (end 139 77) (width 0.25) '
+        f'(layer "F.Cu") (net {net_reference}))'
+    ))
+    before = sexpr.dumps(board.tree)
+
+    svg = ET.fromstring(board.render_svg())
+    selection = board.selection_map()
+    assert svg.attrib["viewBox"] == f'0 0 {selection["canvas"]["width"]} {selection["canvas"]["height"]}'
+    assert len(selection["elements"]) == 9
+    nets = {net["name"]: net for net in board.list_nets()}
+    assert nets["+3V3"]["track_segments"] == existing_segments + 1
+    assert "+3V3" not in {net["net"] for net in board.ratsnest()}
+    assert "+3V3" not in board.info()["unrouted_nets"]
+    assert sexpr.dumps(board.tree) == before
 
 
 def test_unknown_reference_is_rejected(owned_project):

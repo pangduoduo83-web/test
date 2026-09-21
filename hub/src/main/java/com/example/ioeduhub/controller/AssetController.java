@@ -19,13 +19,18 @@ import java.util.concurrent.TimeUnit;
 public class AssetController {
 
     private final AssetService assetService;
+    private final com.example.ioeduhub.service.OssFileResponse cloud;
 
-    public AssetController(AssetService assetService) {
+    public AssetController(AssetService assetService, com.example.ioeduhub.service.OssFileResponse cloud) {
         this.assetService = assetService;
+        this.cloud = cloud;
     }
 
     @GetMapping("/hub-assets/{sha}.{ext}")
-    public ResponseEntity<Resource> serve(@PathVariable String sha, @PathVariable String ext) {
+    public ResponseEntity<Resource> serve(@PathVariable String sha, @PathVariable String ext,
+            javax.servlet.http.HttpServletRequest request, javax.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        com.example.ioeduhub.entity.HubAsset remote = assetService.remote(sha, ext);
+        if (remote != null) { cloud.serve(remote.getObjectKey(), sha + "." + ext, request, response); return null; }
         Path file = assetService.resolve(sha, ext);
         if (file == null) {
             return ResponseEntity.notFound().build();
@@ -36,5 +41,12 @@ public class AssetController {
                 .contentType(mediaType)
                 .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic())
                 .body(new FileSystemResource(file));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/api/hub-admin/assets/migrate")
+    public com.example.ioeduhub.common.ApiResponse<java.util.Map<String, Object>> migrate(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "true") boolean dryRun,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "10") int limit) {
+        return com.example.ioeduhub.common.ApiResponse.ok(assetService.migrate(dryRun, limit));
     }
 }

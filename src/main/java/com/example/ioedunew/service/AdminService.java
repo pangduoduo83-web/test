@@ -518,6 +518,14 @@ public class AdminService {
         p.setResources(requireJsonArray(p.getResources(), "学习资源"));
         p.setEquipmentNames(requireJsonArray(p.getEquipmentNames(), "所需设备"));
         p.setAssessments(requireJsonArray(p.getAssessments(), "成果考核项"));
+        p.setReviewRubric(ReviewRubric.validate(p.getReviewRubric()).toString());
+        if (p.getSubmissionRequirements() != null && p.getSubmissionRequirements().length() > 4000)
+            throw new BusinessException("提交要求最多4000字");
+        try {
+            for (JsonNode assessment : objectMapper.readTree(p.getAssessments())) {
+                if (assessment.has("rubric")) ReviewRubric.validate(assessment.get("rubric").toString());
+            }
+        } catch (java.io.IOException e) { throw new BusinessException("考核项格式错误"); }
     }
 
     private String orEmptyArray(String json) {

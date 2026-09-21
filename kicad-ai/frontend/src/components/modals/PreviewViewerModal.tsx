@@ -39,28 +39,35 @@ export function PreviewViewerModal({
       return;
     }
     let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
-    const fetcher = mode === "pcb" ? fetchPreviewBlobUrl(project.id) : fetchPreviewSchBlobUrl(project.id);
-    fetcher
-      .then((next) => {
-        if (cancelled) {
-          URL.revokeObjectURL(next);
-          return;
-        }
-        setUrl((previous) => {
-          if (previous) URL.revokeObjectURL(previous);
-          return next;
+    const timer = window.setTimeout(() => {
+      const fetcher = mode === "pcb"
+        ? fetchPreviewBlobUrl(project.id, "auto", controller.signal)
+        : fetchPreviewSchBlobUrl(project.id, "auto", controller.signal);
+      void fetcher
+        .then((next) => {
+          if (cancelled) {
+            URL.revokeObjectURL(next);
+            return;
+          }
+          setUrl((previous) => {
+            if (previous) URL.revokeObjectURL(previous);
+            return next;
+          });
+        })
+        .catch((reason) => {
+          if (!cancelled) setError((reason as Error).message);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
         });
-      })
-      .catch((reason) => {
-        if (!cancelled) setError((reason as Error).message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    }, 180);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
+      controller.abort();
     };
   }, [open, project?.id, project?.pcb_file, project?.schematic_file, project?.pro_file, mode, previewVersion, reloadKey]);
 

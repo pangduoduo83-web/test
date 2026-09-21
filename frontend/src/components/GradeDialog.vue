@@ -1,6 +1,6 @@
 <template>
   <!-- 成果评分弹窗:管理端与教师端共用,评分/AI 预评审接口由调用方注入 -->
-  <el-dialog :model-value="modelValue" title="成果评分" width="600px" @update:model-value="(v) => $emit('update:modelValue', v)" @open="reset">
+  <el-dialog :model-value="modelValue" title="成果评分" width="min(900px, calc(100vw - 24px))" class="review-dialog" @update:model-value="(v) => $emit('update:modelValue', v)" @open="reset">
     <template v-if="submission">
       <div class="sub-head">
         <div class="sub-who">
@@ -12,10 +12,7 @@
         <span class="muted">提交于 {{ fmt(submission.submittedAt) }}</span>
       </div>
       <div class="sub-content">{{ submission.content }}</div>
-      <a v-if="submission.attachmentUrl" :href="submission.attachmentUrl" target="_blank" class="sub-attach">
-        <img v-if="isImage(submission.attachmentUrl)" :src="submission.attachmentUrl" alt="附件" />
-        <span v-else>查看附件</span>
-      </a>
+      <SubmissionAttachments :submission="submission" />
 
       <div class="skill-req-bar">
         <span class="muted">项目技能要求:</span>
@@ -27,16 +24,40 @@
       </div>
 
       <div class="ai-review-bar">
-        <el-button size="small" :loading="aiReviewing" @click="runAiReview">✨ AI 预评审(建议分 + 评语草稿 + 技能证据)</el-button>
-        <span v-if="aiResult" class="ai-review-tip">建议 {{ aiResult.suggestedScore }} 分,已填入下方,可修改</span>
+        <el-button type="primary" plain :loading="aiReviewing" @click="runAiReview(!!aiResult)"><Sparkles v-if="!aiReviewing" :size="15" style="margin-right:6px" />{{ aiResult ? '重新评审' : 'AI 分析成果材料' }}</el-button>
+        <el-button v-if="aiResult" :disabled="aiReviewing || reviewJob?.stale" @click="applySuggestion">填入AI建议</el-button>
+        <span v-if="aiResult" class="ai-review-tip">建议 {{ aiResult.suggestedScore }} 分</span>
+      </div>
+      <div v-if="reviewJob && reviewJob.status !== 'IDLE'" class="ai-review-box">
+        <div class="review-status-heading"><span class="status-dot" :class="{ running: aiReviewing, failed: reviewJob.status === 'FAILED' }"></span><b>{{ reviewJob.message }}</b></div>
+        <el-progress v-if="aiReviewing" :percentage="reviewJob.progress || 0" />
+        <div v-if="aiReviewing" class="muted">可以关闭页面，后台会继续处理；重新打开即可查看进度。</div>
+        <el-alert v-if="reviewJob.stale" title="材料、评分标准或模型配置已变更，请重新评审。" type="warning" :closable="false" />
+        <div v-for="material in reviewJob.materials || []" :key="material.id" class="material-status">
+          <div class="material-status-head"><b>{{ material.name || '等待解析' }}</b><span class="badge" :class="material.status === 'DONE' ? 'badge-green' : material.status === 'FAILED' ? 'badge-red' : 'badge-yellow'">{{ { DONE: '分析完成', PARTIAL: '部分分析', FAILED: '未能分析', PARSING: '解析中' }[material.status] || '等待解析' }}</span><el-button v-if="['FAILED', 'PARTIAL'].includes(material.status)" text size="small" :disabled="aiReviewing" @click="runAiReview(true, material.url)">重试</el-button></div>
+          <div v-for="(warning, i) in material.warnings" :key="i" class="ai-review-line bad">{{ warning }}</div>
+        </div>
       </div>
       <div v-if="aiResult" class="ai-review-box">
+        <div class="result-heading"><span><Sparkles :size="17" />AI 评审建议</span><b>{{ aiResult.suggestedScore }}<small> / 100 分</small></b></div>
         <div class="ai-review-summary">{{ aiResult.summary }}</div>
-        <div v-if="aiResult.strengths?.length" class="ai-review-line good">✓ {{ aiResult.strengths.join(';') }}</div>
-        <div v-if="aiResult.weaknesses?.length" class="ai-review-line bad">△ {{ aiResult.weaknesses.join(';') }}</div>
+        <div v-for="row in aiResult.criteria || []" :key="row.name" class="criterion">
+          <div class="criterion-head"><b>{{ row.name }}</b><el-tag v-if="row.needsConfirmation" type="warning" size="small">需要核实</el-tag><span>{{ row.score }} <small>/ {{ row.maxScore }} 分</small></span></div>
+          <el-progress :percentage="row.maxScore ? Math.round(row.score / row.maxScore * 100) : 0" :show-text="false" :stroke-width="4" color="#818cf8" />
+          <div class="criterion-reason">{{ row.reason }}</div>
+          <details v-for="source in row.evidence || []" :key="source.id">
+            <summary>{{ source.name || '成果说明' }} · {{ source.location }}</summary>
+            <p class="source-text">{{ source.text }}</p>
+            <a v-if="source.url" :href="sourceLink(source)" target="_blank" rel="noopener">打开原件{{ source.page ? '对应页' : source.seconds != null ? '对应时间' : '' }}</a>
+          </details>
+        </div>
+        <div v-if="aiResult.strengths?.length" class="ai-review-line good">✓ {{ aiResult.strengths.join('；') }}</div>
+        <div v-if="aiResult.weaknesses?.length" class="ai-review-line bad">△ {{ aiResult.weaknesses.join('；') }}</div>
+        <div v-for="check in aiResult.pendingChecks || []" :key="check" class="ai-review-line bad">待核实：{{ check }}</div>
         <div class="ai-review-note">{{ aiResult.note }}</div>
       </div>
 
+      <div class="grade-section-title"><ClipboardCheck :size="17" />教师确认<span>核对材料与建议后，填写最终评分</span></div>
       <el-form :model="gradeForm" label-width="70px">
         <el-form-item label="分数">
           <el-input-number v-model="gradeForm.score" :min="0" :max="100" />
@@ -66,7 +87,9 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch, onBeforeUnmount } from 'vue'
+import { Sparkles, ClipboardCheck } from 'lucide-vue-next'
+import SubmissionAttachments from './SubmissionAttachments.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const props = defineProps({
@@ -76,6 +99,7 @@ const props = defineProps({
   project: { type: Object, default: null },
   /** (submissionId) => Promise<aiResult> */
   aiReviewFn: { type: Function, required: true },
+  aiStatusFn: { type: Function, required: true },
   /** (submissionId, body) => Promise */
   gradeFn: { type: Function, required: true },
   /** (submissionId, feedback) => Promise;不传则不显示「退回修改」 */
@@ -87,6 +111,9 @@ const gradeForm = reactive({ score: 80, feedback: '' })
 const saving = ref(false)
 const aiReviewing = ref(false)
 const aiResult = ref(null)
+const reviewJob = ref(null)
+let pollTimer
+let generation = 0
 const evidenceRows = ref([])
 
 const arr = (v) => {
@@ -97,28 +124,49 @@ const requirements = computed(() => arr(props.project?.skillRequirements).filter
 const fmt = (v) => (v || '').replace('T', ' ').slice(0, 16)
 const isImage = (url) => /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url || '')
 
-const reset = () => {
-  gradeForm.score = 80
-  gradeForm.feedback = ''
-  aiResult.value = null
-  evidenceRows.value = []
+const stopPolling = () => { generation++; clearTimeout(pollTimer); aiReviewing.value = false }
+const active = state => ['QUEUED', 'PARSING', 'REVIEWING'].includes(state)
+const sourceLink = source => {
+  if (!/^\/uploads\/\d{6}\/[\w-]+\.[a-z0-9]+$/i.test(source.url || '')) return undefined
+  return source.url + (source.page ? `#page=${source.page}` : source.seconds != null ? `#t=${source.seconds}` : '')
 }
-
-const runAiReview = async () => {
+const applySuggestion = () => {
+  if (!aiResult.value || reviewJob.value?.stale) return
+  gradeForm.score = aiResult.value.suggestedScore
+  gradeForm.feedback = aiResult.value.feedbackDraft || ''
+  evidenceRows.value = (aiResult.value.skillEvidence || []).map(ev => ({ ...ev, accepted: true }))
+  ElMessage.success('已填入AI建议，请核对后提交评分')
+}
+const receive = (job, token, id) => {
+  if (token !== generation || !props.modelValue || props.submission?.id !== id) return
+  reviewJob.value = job
+  aiReviewing.value = active(job.status)
+  if (job.result) aiResult.value = job.result
+  if (aiReviewing.value) pollTimer = setTimeout(() => poll(token, id), 2500)
+}
+const poll = async (token, id) => {
+  try { receive(await props.aiStatusFn(id), token, id) }
+  catch { if (token === generation) { aiReviewing.value = false; reviewJob.value = { ...reviewJob.value, message: '进度获取失败，可重新打开查看；后台任务继续运行。' } } }
+}
+const reset = () => {
+  stopPolling()
+  gradeForm.score = 80; gradeForm.feedback = ''
+  aiResult.value = null; reviewJob.value = null; evidenceRows.value = []
+  if (props.submission) poll(generation, props.submission.id)
+}
+const runAiReview = async (force = false, retryAttachment) => {
+  stopPolling()
+  const token = generation, id = props.submission.id
   aiReviewing.value = true
   try {
-    const res = await props.aiReviewFn(props.submission.id)
-    aiResult.value = res
-    gradeForm.score = res.suggestedScore
-    if (res.feedbackDraft) gradeForm.feedback = res.feedbackDraft
-    evidenceRows.value = (res.skillEvidence || []).map((ev) => ({ ...ev, accepted: true }))
-    ElMessage.success(evidenceRows.value.length
-      ? `AI 预评审完成,建议已填入,并提取到 ${evidenceRows.value.length} 条技能证据,请核对`
-      : 'AI 预评审完成,建议已填入,可自行调整')
-  } catch (e) { /* 已提示 */ } finally {
-    aiReviewing.value = false
-  }
+    const job = await props.aiReviewFn(id, { force, retryAttachment })
+    if (token === generation && !job.result) aiResult.value = null
+    receive(job, token, id)
+  } catch { if (token === generation) aiReviewing.value = false }
 }
+watch(() => props.modelValue, visible => { if (!visible) stopPolling() })
+watch(() => props.submission?.id, () => { if (props.modelValue) reset() })
+onBeforeUnmount(stopPolling)
 
 const returnForRevision = async () => {
   if (!gradeForm.feedback.trim()) { ElMessage.warning('退回时请在评语里写明需要修改的地方'); return }
@@ -160,6 +208,20 @@ const submitGrade = async () => {
 </script>
 
 <style scoped>
+:global(.review-dialog.el-dialog) { --el-dialog-margin-top: 5vh; max-height: 90vh; display: flex; flex-direction: column; border-radius: 16px; }
+:global(.review-dialog .el-dialog__header) { flex-shrink: 0; padding-bottom: 18px; }
+:global(.review-dialog .el-dialog__body) { overflow-y: auto; min-height: 0; overscroll-behavior: contain; padding-right: 4px; }
+:global(.review-dialog .el-dialog__footer) { flex-shrink: 0; padding-top: 16px; border-top: 1px solid #e5e7eb; margin-top: 12px; }
+.review-status-heading { display: flex; align-items: center; gap: 9px; }.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }.status-dot.running { background: var(--brand-blue); box-shadow: 0 0 0 4px #dbeafe; }.status-dot.failed { background: #ef4444; }
+.material-status { background: rgba(255,255,255,.8); border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px !important; }.material-status-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }.material-status-head>b { flex: 1; min-width: 120px; overflow-wrap: anywhere; }.material-status .ai-review-line { margin-top: 6px; font-size: 12px; line-height: 1.6; }
+.result-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #6b21a8; }.result-heading>span { display: flex; gap: 7px; align-items: center; font-weight: 600; }.result-heading>b { font-size: 28px; font-variant-numeric: tabular-nums; }.result-heading small { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+.criterion-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }.criterion-head>span:last-child { margin-left: auto; color: var(--brand-blue); font-weight: 600; font-size: 16px; }.criterion-head small { color: var(--text-secondary); font-weight: 400; font-size: 12px; }.criterion-reason { margin-top: 9px; color: #4b5563; }.criterion details { border-radius: 8px; background: #fff; padding: 8px 10px; }.criterion summary { font-size: 12px; }.grade-section-title { display: flex; align-items: center; gap: 8px; font-weight: 600; margin: 22px 0 16px; }.grade-section-title span { font-size: 12px; color: var(--text-secondary); font-weight: 400; margin-left: auto; }
+@media(max-width:600px) { .grade-section-title { flex-wrap: wrap; }.grade-section-title span { width: 100%; margin-left: 0; }.evidence-row { flex-wrap: wrap; }.evidence-basis { flex-basis: 100% !important; white-space: normal !important; }.sub-head { align-items: flex-start; } }
+.criterion { border-top: 1px solid #ddd6fe; padding: 10px 0; line-height: 1.7; }
+.criterion b { margin-right: 8px; }.criterion details { margin-top: 6px; }
+.criterion summary { cursor: pointer; color: #2563eb; }.source-text { white-space: pre-wrap; max-height: 180px; overflow: auto; }
+.material-status { padding: 6px 0; }.ai-review-bar { flex-wrap: wrap; }
+
 .muted { color: var(--text-secondary); font-size: 12px; }
 .sub-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .sub-who { display: flex; align-items: center; gap: 8px; font-size: 14px; }

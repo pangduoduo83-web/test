@@ -97,7 +97,7 @@
           <template v-if="richDesc">
             <template v-for="(seg, i) in richDesc" :key="i">
               <rich-text v-if="seg.type === 'html'" class="rich-html" :nodes="seg.content" />
-              <video v-else class="rich-video" :src="seg.src" controls />
+              <VideoPlayer v-else class="rich-video" :src="seg.src" />
             </template>
           </template>
           <text v-else class="full-desc">{{ project.description || project.summary || '暂无详细描述' }}</text>
@@ -303,6 +303,7 @@
 </template>
 
 <script setup>
+import VideoPlayer from '@/components/VideoPlayer.vue'
 import { computed, ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import {

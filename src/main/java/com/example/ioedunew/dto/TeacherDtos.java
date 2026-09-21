@@ -18,4 +18,10 @@ public class TeacherDtos {
     public static class CoverUpdateRequest {
         private String coverUrl;
     }
+
+    /** 教师私有的参考答案/参考实现,不返回给学生。 */
+    @Data
+    public static class ReferenceAnswerUpdateRequest {
+        private String referenceAnswer;
+    }
 }

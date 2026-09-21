@@ -151,7 +151,13 @@ public class OpenAiCompatGateway implements LlmGateway {
         for (ChatMessage m : request.getMessages()) {
             ObjectNode n = messages.addObject();
             n.put("role", m.getRole());
-            if (m.getContent() != null || m.getToolCalls().isEmpty()) {
+            if (!m.getImageUrls().isEmpty()) {
+                ArrayNode parts = n.putArray("content");
+                parts.addObject().put("type", "text").put("text", m.getContent() == null ? "" : m.getContent());
+                for (String image : m.getImageUrls()) {
+                    parts.addObject().put("type", "image_url").putObject("image_url").put("url", image);
+                }
+            } else if (m.getContent() != null || m.getToolCalls().isEmpty()) {
                 n.put("content", m.getContent() == null ? "" : m.getContent());
             }
             if ("tool".equals(m.getRole())) {

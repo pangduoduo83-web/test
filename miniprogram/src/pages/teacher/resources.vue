@@ -117,7 +117,7 @@ const pickFile = () => {
       }
       uni.showLoading({ title: '上传中...' })
       try {
-        const d = await uploadDocFile(f.path)
+        const d = await uploadDocFile(f.path, f)
         draft.url = d.url
         if (!draft.name) draft.name = f.name || d.name
         uni.showToast({ title: '附件已上传', icon: 'none' })
@@ -136,7 +136,7 @@ const pickImage = () => {
     success: async (res) => {
       uni.showLoading({ title: '上传中...' })
       try {
-        const d = await uploadImage(res.tempFilePaths[0])
+        const d = await uploadImage(res.tempFilePaths[0], res.tempFiles?.[0])
         draft.url = d.url
         uni.showToast({ title: '图片已上传', icon: 'none' })
       } catch (e) {

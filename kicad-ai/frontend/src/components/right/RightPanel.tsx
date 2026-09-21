@@ -158,31 +158,39 @@ function PreviewCard({
       return;
     }
     let cancelled = false;
+    const controller = new AbortController();
     setRefreshing(true);
-    const fetcher = viewMode === "pcb" ? fetchPreviewBlobUrl(project.id) : fetchPreviewSchBlobUrl(project.id);
-    fetcher
-      .then((u) => {
-        if (cancelled) {
-          URL.revokeObjectURL(u);
-          return;
-        }
-        setUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return u;
+    // Coalesce rapid edits in a change plan; keep the last image while loading.
+    const timer = window.setTimeout(() => {
+      const fetcher = viewMode === "pcb"
+        ? fetchPreviewBlobUrl(project.id, "auto", controller.signal)
+        : fetchPreviewSchBlobUrl(project.id, "auto", controller.signal);
+      void fetcher
+        .then((u) => {
+          if (cancelled) {
+            URL.revokeObjectURL(u);
+            return;
+          }
+          setUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return u;
+          });
+          setError(null);
+          setChanged(previewVersion > 0);
+        })
+        .catch((e) => {
+          if (!cancelled) setError((e as Error).message);
+        })
+        .finally(() => {
+          if (!cancelled) setRefreshing(false);
         });
-        setError(null);
-        setChanged(previewVersion > 0);
-      })
-      .catch((e) => {
-        if (!cancelled) setError((e as Error).message);
-      })
-      .finally(() => {
-        if (!cancelled) setRefreshing(false);
-      });
+    }, 180);
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
+      controller.abort();
     };
-  }, [project?.id, project?.pcb_file, project?.schematic_file, previewVersion, viewMode]);
+  }, [project?.id, project?.pcb_file, project?.schematic_file, project?.pro_file, previewVersion, viewMode]);
 
   const [downloading, setDownloading] = useState(false);
   const downloadProject = async () => {
@@ -433,7 +441,7 @@ function SessionCard() {
         <Row label="工具调用" value={String(Math.max(toolCalls, conv?.tool_call_count ?? 0))} />
         <div
           className="flex items-center justify-between gap-3"
-          title={`上下文使用率：${pct}%\n当前约 ${Math.round(approxTokens / 1000)}k / ${Math.round(safeLimit / 1000)}k tokens。\n包含系统提示词、116项EDA工具规范、当前工程与对话历史。接近 100% 时建议开启新对话。`}
+          title={`上下文使用率：${pct}%\n当前约 ${Math.round(approxTokens / 1000)}k / ${Math.round(safeLimit / 1000)}k tokens。\n包含系统提示词、当前任务所需工具、当前工程与对话历史。接近 100% 时建议开启新对话。`}
         >
           <dt className="text-slate-500 cursor-help" title="反映当前会话的消息、工具调用与系统提示词占大模型上下文窗口的比例">上下文使用</dt>
           <dd className="flex items-center gap-2">

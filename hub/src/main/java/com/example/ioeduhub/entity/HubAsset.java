@@ -32,6 +32,12 @@ public class HubAsset {
     @Column(length = 100)
     private String mime;
 
+    @Column(length = 512)
+    private String objectKey;
+
+    @Column(length = 64)
+    private String bucket;
+
     private Long uploadedByTenantId;
 
     @Column(nullable = false)

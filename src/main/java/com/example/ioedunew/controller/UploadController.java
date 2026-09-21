@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import com.example.ioedunew.entity.StoredFile;
+import com.example.ioedunew.service.OssFileResponse;
 import java.net.URLConnection;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
@@ -22,15 +25,20 @@ import java.util.concurrent.TimeUnit;
 public class UploadController {
 
     private final UploadStorage storage;
+    private final OssFileResponse cloud;
 
-    public UploadController(UploadStorage storage) {
+    public UploadController(UploadStorage storage, OssFileResponse cloud) {
         this.storage = storage;
+        this.cloud = cloud;
     }
 
     @GetMapping("/uploads/**")
-    public ResponseEntity<Resource> serve(HttpServletRequest request) {
+    public ResponseEntity<Resource> serve(HttpServletRequest request, HttpServletResponse response) throws java.io.IOException {
         String uri = request.getRequestURI();
         String relative = uri.length() > "/uploads/".length() ? uri.substring("/uploads/".length()) : "";
+        if (!relative.matches("\\d{6}/[A-Za-z0-9_-]+\\.[A-Za-z0-9]{1,10}")) return ResponseEntity.notFound().build();
+        StoredFile remote = storage.remote(relative);
+        if (remote != null) { cloud.serve(remote.getObjectKey(), relative, request, response); return null; }
         Path file = storage.resolveForRead(relative);
         if (file == null || !file.toFile().isFile()) {
             return ResponseEntity.notFound().build();

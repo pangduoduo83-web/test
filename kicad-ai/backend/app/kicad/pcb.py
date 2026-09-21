@@ -279,6 +279,15 @@ class Board:
     def segments(self) -> list[list]:
         return children(self.tree, "segment")
 
+    def _net_code(self, item: list) -> int:
+        """Resolve numeric IDs and named track references without rewriting the board."""
+        net = value(item, "net", 0)
+        if isinstance(net, str):
+            for code, name in self.nets.items():
+                if name == net:
+                    return code
+        return int(net)
+
     def vias(self) -> list[list]:
         return children(self.tree, "via")
 
@@ -315,7 +324,7 @@ class Board:
                 if p.net_name:
                     net_pads[p.net_name] = net_pads.get(p.net_name, 0) + 1
         routed_nets = {
-            self.nets.get(int(value(s, "net", 0)), "") for s in self.segments()
+            self.nets.get(self._net_code(s), "") for s in self.segments()
         }
         unrouted = [n for n, c in net_pads.items() if c > 1 and n not in routed_nets]
         return {
@@ -347,7 +356,7 @@ class Board:
                 pads_by_net.setdefault(p.net_code, []).append(f"{f.ref}.{p.number}")
         segs_by_net: dict[int, int] = {}
         for s in self.segments():
-            code = int(value(s, "net", 0))
+            code = self._net_code(s)
             segs_by_net[code] = segs_by_net.get(code, 0) + 1
         out = []
         for code, name in sorted(self.nets.items()):
@@ -366,7 +375,7 @@ class Board:
 
     def ratsnest(self) -> list[dict[str, Any]]:
         """Approximate unrouted connections: nets with >1 pad and no tracks."""
-        routed = {int(value(s, "net", 0)) for s in self.segments()}
+        routed = {self._net_code(s) for s in self.segments()}
         out = []
         for net in self.list_nets():
             if net["pad_count"] > 1 and net["code"] not in routed:

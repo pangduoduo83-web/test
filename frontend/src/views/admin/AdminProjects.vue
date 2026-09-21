@@ -48,7 +48,9 @@
     </div>
 
     <ProjectEditDialog v-model="editVisible" :project="editing" mode="admin" :teachers="teachers"
-                       :skill-dimensions="skillDimensions" :save-fn="saveProject" @saved="load" />
+                       :skill-dimensions="skillDimensions" :save-fn="saveProject"
+                       :reference-answer-fn="adminProjectReferenceAnswer"
+                       :save-reference-answer-fn="adminUpdateReferenceAnswer" @saved="load" />
     <AiDraftDialog v-model="draftVisible" :skill-dimensions="skillDimensions" @drafted="(d) => { editing = d; editVisible = true }" />
   </div>
 </template>
@@ -59,7 +61,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Sparkles } from 'lucide-vue-next'
 import {
-  adminCreateProject, adminDeleteProject, adminListProjects, adminListSkillDimensions, adminListUsers, adminUpdateProject
+  adminCreateProject, adminDeleteProject, adminListProjects, adminListSkillDimensions, adminListUsers, adminUpdateProject,
+  adminProjectReferenceAnswer, adminUpdateReferenceAnswer
 } from '../../api'
 import ProjectEditDialog from '../../components/ProjectEditDialog.vue'
 import AiDraftDialog from '../../components/AiDraftDialog.vue'

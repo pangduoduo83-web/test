@@ -18,7 +18,9 @@ http.interceptors.response.use(
     if (body && typeof body === 'object' && 'code' in body) {
       if (body.code === 0) return body.data
       ElMessage.error(body.message || '请求失败')
-      return Promise.reject(new Error(body.message))
+      const error = new Error(body.message)
+      error.status = Number(body.code)
+      return Promise.reject(error)
     }
     return body
   },

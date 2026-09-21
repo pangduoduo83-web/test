@@ -1,5 +1,6 @@
 import { Code2, Crosshair, Image, Loader2, Paperclip, Quote, Send, ShieldCheck, Square, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useShallow } from "zustand/react/shallow";
 import type { ModelOption, ThinkingMode } from "@/lib/types";
 import { useChat } from "@/store/chat";
 import { useProjects } from "@/store/projects";
@@ -17,7 +18,10 @@ interface Props {
 }
 
 export function Composer({ draft, onDraftChange, onOpenTools, onAttach, modelPresets, serverModel, serverThinking, onSelectDesign }: Props) {
-  const { send, cancel, running, reconnecting, pendingInterrupt, autoApprove, setAutoApprove } = useChat();
+  const { send, cancel, running, reconnecting, pendingInterrupt, autoApprove, setAutoApprove } = useChat(useShallow((s) => ({
+    send: s.send, cancel: s.cancel, running: s.running, reconnecting: s.reconnecting,
+    pendingInterrupt: s.pendingInterrupt, autoApprove: s.autoApprove, setAutoApprove: s.setAutoApprove,
+  })));
   const selection = useProjects((s) => s.selection);
   const setSelection = useProjects((s) => s.setSelection);
   const ref = useRef<HTMLTextAreaElement>(null);

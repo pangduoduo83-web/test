@@ -43,6 +43,11 @@ public class Submission {
     @Column(length = 255)
     private String attachmentUrl;
 
+    @com.fasterxml.jackson.annotation.JsonRawValue
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = com.example.ioedunew.common.RawJsonStringDeserializer.class)
+    @Column(columnDefinition = "LONGTEXT")
+    private String attachments = "[]";
+
     /** 对应的考核项名称;为空表示整体单一成果(兼容旧数据) */
     @Column(length = 50)
     private String assessmentName;

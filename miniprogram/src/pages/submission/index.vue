@@ -2,6 +2,8 @@
   <view class="page">
     <view class="card head-card">
       <text class="p-title">{{ projectTitle }}</text>
+      <text v-if="requirements" class="muted">提交要求：{{ requirements }}</text>
+      <text v-for="rule in defaultRubric" :key="rule.name" class="muted">{{ rule.name }} · {{ rule.points }}分：{{ rule.description }}</text>
       <text class="p-sub muted">完成项目后在此提交成果,管理员评分 ≥60 分即判定项目完成并获得经验值</text>
     </view>
 
@@ -28,6 +30,8 @@
             <text v-else class="badge badge-gray">未提交</text>
           </view>
           <text v-if="a.desc" class="assess-desc muted">{{ a.desc }}</text>
+          <text v-for="rule in a.rubric || []" :key="rule.name" class="muted">{{ rule.name }} · {{ rule.points }}分：{{ rule.description }}</text>
+          <SubmissionFiles :model-value="latestFor(a.name)?.attachments || []" />
           <view v-if="latestFor(a.name) && latestFor(a.name).feedback" class="assess-feedback">
             评语:{{ latestFor(a.name).feedback }}
           </view>
@@ -42,19 +46,10 @@
               class="field-textarea"
               :placeholder="`描述「${a.name}」的完成情况...`"
               placeholder-class="ph"
-              :maxlength="1000"
+              :maxlength="2000"
             />
-            <view class="attach-row">
-              <view v-if="attachmentUrl" class="attach-preview">
-                <image :src="fullUrl(attachmentUrl)" class="attach-img" mode="aspectFill" @click="preview" />
-                <text class="attach-del" @click="attachmentUrl = ''">×</text>
-              </view>
-              <view v-else class="attach-add" @click="chooseShot">
-                <text class="attach-plus">+</text>
-                <text class="attach-text">成果截图(选填)</text>
-              </view>
-            </view>
-            <button class="btn-gradient" :disabled="submitting" @click="submit(a.name)">
+            <SubmissionFiles v-model="attachments" editable :disabled="submitting" @busy="uploading = $event" />
+            <button class="btn-gradient" :disabled="submitting || uploading" @click="submit(a.name)">
               {{ submitting ? '提交中...' : `提交「${a.name}」` }}
             </button>
           </view>
@@ -88,6 +83,7 @@
         mode="widthFix"
         @click="previewLast"
       />
+      <SubmissionFiles :model-value="last.attachments || []" />
       <text class="last-time muted">提交于 {{ relativeTime(last.submittedAt) }}</text>
     </view>
 
@@ -99,19 +95,10 @@
         class="field-textarea"
         placeholder="描述你的实现思路、完成情况、遇到的问题与解决办法..."
         placeholder-class="ph"
-        :maxlength="1000"
+        :maxlength="2000"
       />
-      <view class="attach-row">
-        <view v-if="attachmentUrl" class="attach-preview">
-          <image :src="fullUrl(attachmentUrl)" class="attach-img" mode="aspectFill" @click="preview" />
-          <text class="attach-del" @click="attachmentUrl = ''">×</text>
-        </view>
-        <view v-else class="attach-add" @click="chooseShot">
-          <text class="attach-plus">+</text>
-          <text class="attach-text">成果截图(选填)</text>
-        </view>
-      </view>
-      <button class="btn-gradient" :disabled="submitting" @click="submit('')">
+      <SubmissionFiles v-model="attachments" editable :disabled="submitting" @busy="uploading = $event" />
+            <button class="btn-gradient" :disabled="submitting || uploading" @click="submit('')">
         {{ submitting ? '提交中...' : '提交成果' }}
       </button>
     </view>
@@ -128,7 +115,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { fetchMySubmission, fetchMySubmissions, fetchProjectDetail, submitWork } from '@/api'
-import { uploadImage } from '@/utils/request'
+import SubmissionFiles from '@/components/SubmissionFiles.vue'
 import { fullUrl } from '@/config'
 import { asList, relativeTime } from '@/utils/format'
 
@@ -139,16 +126,19 @@ const subs = ref([])
 const assessments = ref([])
 const activeAssessment = ref('')
 const content = ref('')
-const attachmentUrl = ref('')
+const attachments = ref([])
+const uploading = ref(false)
+const requirements = ref('')
+const defaultRubric = ref([])
 const submitting = ref(false)
 
-const canSubmit = computed(() => !last.value || last.value.status === 'GRADED')
+const canSubmit = computed(() => !last.value || ['GRADED', 'RETURNED'].includes(last.value.status))
 
 const latestFor = (name) => subs.value.find((s) => (s.assessmentName || '') === name) || null
 
 const canSubmitFor = (name) => {
   const latest = latestFor(name)
-  return !latest || latest.status === 'GRADED'
+  return !latest || ['GRADED', 'RETURNED'].includes(latest.status)
 }
 
 const overallScore = computed(() => {
@@ -164,9 +154,10 @@ const overallScore = computed(() => {
 })
 
 const toggleForm = (name) => {
+  if (uploading.value) return
   activeAssessment.value = activeAssessment.value === name ? '' : name
   content.value = ''
-  attachmentUrl.value = ''
+  attachments.value = []
 }
 
 const load = async () => {
@@ -185,37 +176,18 @@ onLoad((options) => {
   fetchProjectDetail(options.projectId)
     .then((d) => {
       assessments.value = asList(d.project?.assessments)
+      requirements.value = d.project?.submissionRequirements || ''
+      defaultRubric.value = asList(d.project?.reviewRubric)
     })
     .catch(() => {})
 })
-
-const chooseShot = () => {
-  uni.chooseImage({
-    count: 1,
-    sizeType: ['compressed'],
-    success: async (res) => {
-      uni.showLoading({ title: '上传中...' })
-      try {
-        const d = await uploadImage(res.tempFilePaths[0])
-        attachmentUrl.value = d.url
-      } catch (e) {
-        // 已提示
-      } finally {
-        uni.hideLoading()
-      }
-    }
-  })
-}
-
-const preview = () => {
-  uni.previewImage({ urls: [fullUrl(attachmentUrl.value)] })
-}
 
 const previewLast = () => {
   uni.previewImage({ urls: [fullUrl(last.value.attachmentUrl)] })
 }
 
 const submit = async (assessName) => {
+  if (uploading.value) return
   if (!content.value.trim()) {
     uni.showToast({ title: '请填写成果说明', icon: 'none' })
     return
@@ -224,12 +196,12 @@ const submit = async (assessName) => {
   try {
     await submitWork(projectId.value, {
       content: content.value.trim(),
-      attachmentUrl: attachmentUrl.value || undefined,
+      attachments: attachments.value,
       assessmentName: assessName || undefined
     })
     uni.showToast({ title: '提交成功,等待评审', icon: 'success' })
     content.value = ''
-    attachmentUrl.value = ''
+    attachments.value = []
     activeAssessment.value = ''
     load()
   } catch (e) {

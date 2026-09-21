@@ -87,7 +87,7 @@ const chooseAvatar = () => {
     success: async (res) => {
       uni.showLoading({ title: '上传中...' })
       try {
-        const d = await uploadImage(res.tempFilePaths[0])
+        const d = await uploadImage(res.tempFilePaths[0], res.tempFiles?.[0])
         avatarUrl.value = d.url
         uni.showToast({ title: '头像已上传,记得保存', icon: 'none' })
       } catch (e) {

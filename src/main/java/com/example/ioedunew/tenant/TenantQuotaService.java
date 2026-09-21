@@ -14,6 +14,9 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -54,7 +57,7 @@ public class TenantQuotaService {
                 java.sql.Date.valueOf(LocalDate.now().withDayOfMonth(1))));
         m.put("aiRunsMonth", count("SELECT IFNULL(SUM(runs),0) FROM " + db + ".ai_usage_daily WHERE day >= ?",
                 java.sql.Date.valueOf(LocalDate.now().withDayOfMonth(1))));
-        m.put("storageMb", Math.round(dirSize(t.getCode()) / 1024.0 / 1024.0));
+        m.put("storageMb", Math.round(storageSize(t) / 1024.0 / 1024.0));
         m.put("maxUsers", t.getMaxUsers());
         m.put("storageLimitMb", t.getStorageLimitMb());
         m.put("aiMonthlyTokens", t.getAiMonthlyTokens());
@@ -71,13 +74,19 @@ public class TenantQuotaService {
         }
     }
 
-    /** 当前租户上传前检查(按目录占用 + 本次文件大小) */
+    /** 当前租户上传前检查(OSS账本 + 未迁移本地文件 + 本次大小)。 */
     public void checkStorageQuota(long additionalBytes) {
         Tenant t = current();
         if (t == null || t.getStorageLimitMb() == null) {
             return;
         }
-        long used = dirSize(t.getCode()) + additionalBytes;
+        invalidateStorage(t.getCode());
+        Long reserved;
+        try {
+            reserved = jdbc.queryForObject("SELECT COALESCE(SUM(size_bytes),0) FROM `" + t.getDbName()
+                    + "`.direct_uploads WHERE completed=0 AND expires_at > ?", Long.class, java.sql.Timestamp.valueOf(java.time.LocalDateTime.now()));
+        } catch (Exception e) { throw new BusinessException(503, "上传配额暂不可用，请确认数据库迁移已完成"); }
+        long used = storageSize(t) + additionalBytes + (reserved == null ? 0 : reserved);
         if (used > t.getStorageLimitMb() * 1024L * 1024L) {
             throw new BusinessException(409, "本站存储空间已达上限(" + t.getStorageLimitMb() + " MB),请清理文件或联系平台扩容");
         }
@@ -100,18 +109,29 @@ public class TenantQuotaService {
     }
 
     /** 租户上传目录大小(默认租户还要算上多租户之前的旧目录),5 分钟缓存 */
-    private long dirSize(String code) {
+    public void invalidateStorage(String code) { dirSizeCache.remove(code); }
+
+    private long storageSize(Tenant tenant) {
+        String code = tenant.getCode();
         long[] cached = dirSizeCache.get(code);
         long now = System.currentTimeMillis();
         if (cached != null && now - cached[1] < DIR_SIZE_CACHE_MS) {
             return cached[0];
         }
         Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
-        long size = sizeOf(root.resolve(code));
+        // Fail closed when the ledger cannot be read; never silently treat OSS usage as zero.
+        List<Map<String, Object>> cloud;
+        try { cloud = jdbc.queryForList("SELECT relative_path, size_bytes FROM `" + tenant.getDbName() + "`.stored_files"); }
+        catch (Exception e) { throw new BusinessException(503, "存储用量暂不可用，请确认数据库迁移已完成"); }
+        Set<String> stored = new HashSet<>(); long size = 0;
+        for (Map<String, Object> row : cloud) { stored.add((String) row.get("relative_path")); size += ((Number) row.get("size_bytes")).longValue(); }
+        // Local copies kept after migration must not be billed a second time.
+        size += sizeOf(root.resolve(code), root.resolve(code), stored);
         if (code.equals(props.getDefaultCode())) {
             // 旧目录:root 下直接的 yyyyMM 子目录
             try (java.util.stream.Stream<Path> s = Files.list(root)) {
-                size += s.filter(p -> Files.isDirectory(p) && p.getFileName().toString().matches("\\d{6}")).mapToLong(this::sizeOf).sum();
+                size += s.filter(p -> Files.isDirectory(p) && p.getFileName().toString().matches("\\d{6}"))
+                        .mapToLong(p -> sizeOf(p, root, stored)).sum();
             } catch (IOException ignored) {
             }
         }
@@ -119,12 +139,13 @@ public class TenantQuotaService {
         return size;
     }
 
-    private long sizeOf(Path dir) {
+    private long sizeOf(Path dir, Path base, Set<String> stored) {
         if (!Files.isDirectory(dir)) {
             return 0;
         }
         try (java.util.stream.Stream<Path> s = Files.walk(dir)) {
-            return s.filter(Files::isRegularFile).mapToLong(p -> {
+            return s.filter(p -> Files.isRegularFile(p, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                    .filter(p -> !stored.contains(base.relativize(p).toString().replace('\\', '/'))).mapToLong(p -> {
                 try {
                     return Files.size(p);
                 } catch (IOException e) {

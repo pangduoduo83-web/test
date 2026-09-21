@@ -61,10 +61,14 @@ public class MiscDtos {
     @Data
     public static class SubmissionRequest {
         @NotNull(message = "成果说明不能为空")
+        @Size(max = 2000, message = "成果说明不能超过2000字")
         private String content;
 
         /** 成果截图地址,可为空 */
         private String attachmentUrl;
+
+        @Size(max = 8, message = "最多提交8个附件")
+        private List<Map<String, Object>> attachments;
 
         /** 对应考核项名称;项目未设置考核项时留空 */
         private String assessmentName;

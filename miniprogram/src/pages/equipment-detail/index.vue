@@ -53,7 +53,7 @@
       <template v-if="richDesc">
         <template v-for="(seg, i) in richDesc" :key="i">
           <rich-text v-if="seg.type === 'html'" class="rich-html" :nodes="seg.content" />
-          <video v-else class="rich-video" :src="seg.src" controls />
+          <VideoPlayer v-else class="rich-video" :src="seg.src" />
         </template>
       </template>
       <text v-else class="desc">{{ equip.description }}</text>
@@ -117,6 +117,7 @@
 </template>
 
 <script setup>
+import VideoPlayer from '@/components/VideoPlayer.vue'
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { fetchEquipmentDetail, fetchEquipmentFavorites, toggleEquipmentFavorite } from '@/api'

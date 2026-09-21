@@ -39,6 +39,7 @@ export function humanBytes(n: number): string {
 
 export const TOOL_LABELS: Record<string, string> = {
   submit_change_plan: "提交整批修改计划",
+  expand_design_tools: "补充任务所需工具",
   get_board_info: "获取 PCB 板信息",
   list_footprints: "列出封装位置",
   get_footprint: "获取封装详情",

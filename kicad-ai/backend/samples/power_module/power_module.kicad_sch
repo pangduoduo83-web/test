@@ -2,7 +2,7 @@
 	(version 20231120)
 	(generator "eeschema")
 	(generator_version "8.0")
-	(uuid "00000000-0000-0000-0000-000000000000")
+	(uuid "167f3442-9733-4d54-82bc-35c33cf7e7e7")
 	(paper "A4")
 	(title_block
 		(title "Power Module 3V3")
@@ -135,7 +135,7 @@
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (at 68.58 63.5 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000011"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000012"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "J1") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "J1") (unit 1))))
 	)
 	(symbol
 		(lib_id "Device:C")
@@ -151,7 +151,7 @@
 		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric" (at 72.0852 74.93 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000021"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000022"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "C1") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "C1") (unit 1))))
 	)
 	(symbol
 		(lib_id "Device:C")
@@ -167,7 +167,7 @@
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 79.7052 74.93 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000031"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000032"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "C3") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "C3") (unit 1))))
 	)
 	(symbol
 		(lib_id "Regulator_Linear:AMS1117-3.3")
@@ -184,7 +184,7 @@
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000041"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000042"))
 		(pin "3" (uuid "70000000-0000-0000-0000-000000000043"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "U1") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "U1") (unit 1))))
 	)
 	(symbol
 		(lib_id "Device:C")
@@ -200,7 +200,7 @@
 		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric" (at 113.9952 74.93 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000051"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000052"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "C2") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "C2") (unit 1))))
 	)
 	(symbol
 		(lib_id "Device:C")
@@ -216,7 +216,7 @@
 		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 121.6152 74.93 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000061"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000062"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "C4") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "C4") (unit 1))))
 	)
 	(symbol
 		(lib_id "Device:R")
@@ -232,7 +232,7 @@
 		(property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 127.762 74.93 90) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000071"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000072"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "R1") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "R1") (unit 1))))
 	)
 	(symbol
 		(lib_id "Device:LED")
@@ -248,7 +248,7 @@
 		(property "Footprint" "LED_SMD:LED_0603_1608Metric" (at 129.54 86.36 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000081"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000082"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "D1") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "D1") (unit 1))))
 	)
 	(symbol
 		(lib_id "Connector:Conn_01x02")
@@ -264,7 +264,7 @@
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" (at 140.97 63.5 0) (effects (font (size 1.27 1.27)) (hide yes)))
 		(pin "1" (uuid "70000000-0000-0000-0000-000000000091"))
 		(pin "2" (uuid "70000000-0000-0000-0000-000000000092"))
-		(instances (project "power_module" (path "/00000000-0000-0000-0000-000000000000" (reference "J2") (unit 1))))
+		(instances (project "power_module" (path "/167f3442-9733-4d54-82bc-35c33cf7e7e7" (reference "J2") (unit 1))))
 	)
 	(sheet_instances
 		(path "/" (page "1"))

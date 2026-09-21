@@ -36,10 +36,12 @@ public class AssetService {
 
     private final AssetRepo assetRepo;
     private final Path root;
+    private final OssObjectStore oss;
 
-    public AssetService(AssetRepo assetRepo, HubProperties props) {
+    public AssetService(AssetRepo assetRepo, HubProperties props, OssObjectStore oss) {
         this.assetRepo = assetRepo;
         this.root = Paths.get(props.getAssetDir()).toAbsolutePath().normalize();
+        this.oss = oss;
     }
 
     public HubAsset store(MultipartFile file, Long tenantId) throws IOException {
@@ -69,14 +71,17 @@ public class AssetService {
                 return existing;
             }
             Path target = pathOf(sha, ext);
-            Files.createDirectories(target.getParent());
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
             HubAsset asset = new HubAsset();
             asset.setSha256(sha);
             asset.setExt(ext);
-            asset.setSize(Files.size(target));
-            asset.setMime(file.getContentType());
+            asset.setSize(Files.size(tmp));
+            asset.setMime(AssetContent.contentType(original));
             asset.setUploadedByTenantId(tenantId);
+            if (oss.enabled()) writeCloud(asset, tmp);
+            else {
+                Files.createDirectories(target.getParent());
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
             return assetRepo.save(asset);
         } finally {
             Files.deleteIfExists(tmp);
@@ -90,6 +95,43 @@ public class AssetService {
         }
         Path p = pathOf(sha, ext.toLowerCase(Locale.ROOT));
         return Files.isRegularFile(p) ? p : null;
+    }
+
+    public HubAsset remote(String sha, String ext) {
+        if (sha == null || !SHA.matcher(sha).matches() || !ALLOWED_EXT.contains(ext)) return null;
+        HubAsset asset = assetRepo.findBySha256(sha).orElse(null);
+        if (asset == null || !ext.equals(asset.getExt()) || asset.getObjectKey() == null) return null;
+        if (!oss.bucket().equals(asset.getBucket()) || !key(asset).equals(asset.getObjectKey()))
+            throw new BusinessException(503, "商店文件存储配置不匹配，请联系平台管理员");
+        return asset;
+    }
+
+    private String key(HubAsset asset) { return oss.prefix() + "/hub/" + asset.getSha256().substring(0, 2) + "/" + asset.getSha256() + "." + asset.getExt(); }
+    private void writeCloud(HubAsset asset, Path file) throws IOException {
+        try (InputStream in = Files.newInputStream(file)) { oss.put(key(asset), in, asset.getSize(), AssetContent.contentType(asset.getSha256() + "." + asset.getExt()), asset.getSha256()); }
+        com.aliyun.oss.model.ObjectMetadata metadata = oss.metadata(key(asset));
+        if (metadata == null || metadata.getContentLength() != asset.getSize()
+                || !asset.getSha256().equals(metadata.getUserMetadata().get("sha256"))) throw new IOException("OSS文件校验失败");
+        asset.setObjectKey(key(asset)); asset.setBucket(oss.bucket());
+    }
+
+    public java.util.Map<String, Object> migrate(boolean dryRun, int limit) {
+        if (!oss.enabled()) throw new BusinessException("请先启用 OSS 存储");
+        if (limit < 1 || limit > 50) throw new BusinessException("每批数量须为1至50");
+        org.springframework.data.domain.Page<HubAsset> page = assetRepo.findByObjectKeyIsNull(org.springframework.data.domain.PageRequest.of(0, limit));
+        java.util.List<String> completed = new java.util.ArrayList<>();
+        java.util.Map<String, String> failures = new java.util.LinkedHashMap<>();
+        for (HubAsset asset : page) {
+            if (dryRun) { completed.add(asset.url()); continue; }
+            try {
+                Path file = resolve(asset.getSha256(), asset.getExt());
+                if (file == null) throw new IOException("原文件不存在");
+                writeCloud(asset, file); assetRepo.saveAndFlush(asset); completed.add(asset.url());
+            } catch (Exception e) { failures.put(asset.url(), "迁移未完成，请检查OSS及旧文件后重试"); }
+        }
+        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("dryRun", dryRun); result.put("files", completed); result.put("failures", failures);
+        result.put("pending", page.getTotalElements() - (dryRun ? 0 : completed.size())); return result;
     }
 
     private Path pathOf(String sha, String ext) {

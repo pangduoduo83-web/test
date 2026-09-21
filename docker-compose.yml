@@ -45,6 +45,24 @@ services:
       # KiCad AI 设计助手内网地址(大屏 / 管理端拉用量),内部令牌与 PLATFORM_TOKEN 相同
       IOEDU_KICAD_AI_URL: ${KICAD_AI_URL:-http://kicad-ai:8000}
       IOEDU_MASTER_KEY: ${MASTER_KEY:-}
+      # 文件统一存入 OSS；local 模式用于兼容原部署
+      IOEDU_STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      IOEDU_OSS_ENDPOINT: ${OSS_ENDPOINT:-}
+      IOEDU_OSS_REGION: ${OSS_REGION:-}
+      IOEDU_OSS_BUCKET: ${OSS_BUCKET:-}
+      IOEDU_OSS_PREFIX: ${OSS_PREFIX:-ioedu}
+      IOEDU_OSS_PUBLIC_DOMAIN: ${OSS_PUBLIC_DOMAIN:-}
+      IOEDU_OSS_SIGNED_URL_SECONDS: ${OSS_SIGNED_URL_SECONDS:-3600}
+      IOEDU_OSS_DIRECT_UPLOAD: ${OSS_DIRECT_UPLOAD:-false}
+      IOEDU_OSS_UPLOAD_ENDPOINT: ${OSS_UPLOAD_ENDPOINT:-}
+      IOEDU_OSS_UPLOAD_SECONDS: ${OSS_UPLOAD_SECONDS:-900}
+      IOEDU_CDN_DOMAIN: ${CDN_DOMAIN:-}
+      IOEDU_CDN_AUTH_KEY: ${CDN_AUTH_KEY:-}
+      IOEDU_CDN_AUTH_SECONDS: ${CDN_AUTH_SECONDS:-7200}
+      IOEDU_VIDEO_HLS: ${VIDEO_HLS:-false}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_SESSION_TOKEN: ${OSS_SESSION_TOKEN:-}
       # 微信小程序(不用小程序可留空)
       IOEDU_WECHAT_APPID: ${WECHAT_APPID:-}
       IOEDU_WECHAT_SECRET: ${WECHAT_SECRET:-}
@@ -56,7 +74,7 @@ services:
       IOEDU_AI_DAILY_RUNS: ${AI_DAILY_RUNS:-50}
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom -Duser.timezone=Asia/Shanghai}
     volumes:
-      # 上传文件持久化,容器重建不丢失
+      # 保留旧上传文件供兼容与迁移；OSS 模式新上传不写入此卷
       - ioedu-uploads:/app/uploads
     depends_on:
       mysql:
@@ -90,6 +108,24 @@ services:
       # 商店后台「客户站点」页一键开通站点:调用后端平台接口,令牌与 PLATFORM_TOKEN 相同
       HUB_PLATFORM_API_URL: http://backend:8080
       HUB_PLATFORM_TOKEN: ${PLATFORM_TOKEN:-}
+      # 文件统一存入 OSS；local 模式用于兼容原部署
+      IOEDU_STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      IOEDU_OSS_ENDPOINT: ${OSS_ENDPOINT:-}
+      IOEDU_OSS_REGION: ${OSS_REGION:-}
+      IOEDU_OSS_BUCKET: ${OSS_BUCKET:-}
+      IOEDU_OSS_PREFIX: ${OSS_PREFIX:-ioedu}
+      IOEDU_OSS_PUBLIC_DOMAIN: ${OSS_PUBLIC_DOMAIN:-}
+      IOEDU_OSS_SIGNED_URL_SECONDS: ${OSS_SIGNED_URL_SECONDS:-3600}
+      IOEDU_OSS_DIRECT_UPLOAD: ${OSS_DIRECT_UPLOAD:-false}
+      IOEDU_OSS_UPLOAD_ENDPOINT: ${OSS_UPLOAD_ENDPOINT:-}
+      IOEDU_OSS_UPLOAD_SECONDS: ${OSS_UPLOAD_SECONDS:-900}
+      IOEDU_CDN_DOMAIN: ${CDN_DOMAIN:-}
+      IOEDU_CDN_AUTH_KEY: ${CDN_AUTH_KEY:-}
+      IOEDU_CDN_AUTH_SECONDS: ${CDN_AUTH_SECONDS:-7200}
+      IOEDU_VIDEO_HLS: ${VIDEO_HLS:-false}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_SESSION_TOKEN: ${OSS_SESSION_TOKEN:-}
       # 站点访问地址模板,{code} 替换为站点编码,仅用于后台展示
       HUB_SITE_URL_TEMPLATE: ${SITE_URL_TEMPLATE:-}
       JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom -Duser.timezone=Asia/Shanghai}
@@ -155,6 +191,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ${IOEDU_FRONTEND_IMAGE:-ioedu-frontend:latest}
     build: ./frontend
     container_name: ioedu-frontend
     ports:

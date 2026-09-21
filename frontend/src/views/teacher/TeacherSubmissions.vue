@@ -46,6 +46,7 @@
             </div>
             <div class="sub-content">{{ s.content }}</div>
             <div class="sub-foot">
+              <a v-for="file in s.attachments || []" :key="file.url" :href="file.url" target="_blank" rel="noopener" class="link">{{ file.name }}</a>
               <a v-if="s.attachmentUrl" :href="s.attachmentUrl" target="_blank" class="link">查看附件</a>
               <span v-if="s.status !== 'SUBMITTED'" class="muted">{{ s.status === 'RETURNED' ? '退回意见' : '评语' }}:{{ s.feedback || '无' }} · {{ s.graderName }} · {{ fmt(s.gradedAt) }}</span>
             </div>
@@ -63,14 +64,14 @@
     </div>
 
     <GradeDialog v-model="gradeVisible" :submission="grading" :project="gradingProject"
-                 :ai-review-fn="teacherAiReview" :grade-fn="teacherGradeSubmission" :return-fn="teacherReturnSubmission" @graded="onGraded" />
+                 :ai-review-fn="teacherAiReview" :ai-status-fn="teacherAiReviewStatus" :grade-fn="teacherGradeSubmission" :return-fn="teacherReturnSubmission" @graded="onGraded" />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { BookOpen, CircleCheckBig, Clock } from 'lucide-vue-next'
-import { teacherAiReview, teacherGradeSubmission, teacherListSubmissions, teacherProjects, teacherReturnSubmission } from '../../api'
+import { teacherAiReview, teacherAiReviewStatus, teacherGradeSubmission, teacherListSubmissions, teacherProjects, teacherReturnSubmission } from '../../api'
 import GradeDialog from '../../components/GradeDialog.vue'
 
 const emit = defineEmits(['refresh-pending'])

@@ -18,7 +18,7 @@ import com.example.ioedunew.repository.ProjectRepository;
 import com.example.ioedunew.service.AdminService;
 import com.example.ioedunew.service.AiClient;
 import com.example.ioedunew.service.AiConfigService;
-import com.example.ioedunew.service.AiReviewService;
+import com.example.ioedunew.service.ReviewJobService;
 import com.example.ioedunew.service.AuthService;
 import com.example.ioedunew.service.BorrowService;
 import com.example.ioedunew.service.NotificationService;
@@ -58,7 +58,7 @@ public class AdminController {
     private final TeacherService teacherService;
     private final NotificationService notificationService;
 
-    private final AiReviewService aiReviewService;
+    private final ReviewJobService aiReviewService;
     private final AiConfigService aiConfigService;
     private final AiClient aiClient;
     private final SiteConfigService siteConfigService;
@@ -73,7 +73,7 @@ public class AdminController {
                            SubmissionService submissionService,
                            TeacherService teacherService,
                            NotificationService notificationService,
-                           AiReviewService aiReviewService,
+                           ReviewJobService aiReviewService,
                            AiConfigService aiConfigService,
                            AiClient aiClient,
                            SiteConfigService siteConfigService,
@@ -119,8 +119,13 @@ public class AdminController {
 
     /** AI 预评审:给出建议分与评语草稿,仅供教师参考 */
     @PostMapping("/submissions/{id}/ai-review")
-    public ApiResponse<Map<String, Object>> aiReview(@PathVariable Long id) {
-        return ApiResponse.ok(aiReviewService.review(id));
+    public ApiResponse<Map<String, Object>> aiReview(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
+        return ApiResponse.ok(aiReviewService.start(id, body != null && Boolean.TRUE.equals(body.get("force")), body == null || body.get("retryAttachment") == null ? null : String.valueOf(body.get("retryAttachment"))));
+    }
+
+    @GetMapping("/submissions/{id}/ai-review")
+    public ApiResponse<Map<String, Object>> reviewStatus(@PathVariable Long id) {
+        return ApiResponse.ok(aiReviewService.status(id));
     }
 
     @PostMapping("/submissions/{id}/grade")
@@ -216,6 +221,20 @@ public class AdminController {
     public ApiResponse<Project> updateProject(@PathVariable Long id, @RequestBody Project project) {
         project.setId(id);
         return ApiResponse.ok(adminService.saveProject(project));
+    }
+
+    @GetMapping("/projects/{id}/reference-answer")
+    public ApiResponse<Map<String, Object>> referenceAnswer(@PathVariable Long id,
+                                                              @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        return ApiResponse.ok(teacherService.referenceAnswer(user.getId(), true, id));
+    }
+
+    @PutMapping("/projects/{id}/reference-answer")
+    public ApiResponse<Map<String, Object>> updateReferenceAnswer(@PathVariable Long id,
+                                                                   @RequestBody com.example.ioedunew.dto.TeacherDtos.ReferenceAnswerUpdateRequest req,
+                                                                   @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        return ApiResponse.ok(teacherService.updateReferenceAnswer(user.getId(), true, id,
+                req == null ? null : req.getReferenceAnswer()));
     }
 
     @DeleteMapping("/projects/{id}")

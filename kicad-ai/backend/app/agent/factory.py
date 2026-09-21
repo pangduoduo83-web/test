@@ -37,6 +37,7 @@ from app.agent.middleware import KiCadPolicyMiddleware
 from app.agent.model_router import ModelRouter, ModelRouterMiddleware
 from app.agent.prompts import build_system_prompt
 from app.agent.subagents import build_subagents
+from app.agent.tool_routing import expand_design_tools
 from app.agent.tools.kcaa_direct import load_kcaa_tools
 from app.agent.tools.mcp import load_mcp_tools
 from app.agent.tools.native import NATIVE_TOOLS
@@ -145,7 +146,7 @@ class AgentRuntime:
 
     async def _collect_tools(self) -> list[BaseTool]:
         tools: dict[str, BaseTool] = {}
-        for t in NATIVE_TOOLS:
+        for t in [*NATIVE_TOOLS, expand_design_tools]:
             if t.name in HEADLESS_EXCLUDED_TOOLS:
                 continue
             tools[t.name] = t

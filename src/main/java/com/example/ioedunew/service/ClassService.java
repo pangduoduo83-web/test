@@ -5,6 +5,7 @@ import com.example.ioedunew.config.AuthUser;
 import com.example.ioedunew.entity.ClassAnnouncement;
 import com.example.ioedunew.entity.ClassAssignment;
 import com.example.ioedunew.entity.ClassMember;
+import com.example.ioedunew.entity.ClassTeacher;
 import com.example.ioedunew.entity.CourseClass;
 import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.LearningActivity;
@@ -13,6 +14,7 @@ import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.ClassAnnouncementRepository;
 import com.example.ioedunew.repository.ClassAssignmentRepository;
 import com.example.ioedunew.repository.ClassMemberRepository;
+import com.example.ioedunew.repository.ClassTeacherRepository;
 import com.example.ioedunew.repository.CourseClassRepository;
 import com.example.ioedunew.repository.EnrollmentRepository;
 import com.example.ioedunew.repository.ProjectRepository;
@@ -31,7 +33,7 @@ import java.util.Optional;
 
 /**
  * 课程班:建班 / 加入码 / 成员 / 按班布置项目 / 公告。
- * 归属边界:教师只能操作 teacherId 是自己的班;管理员可操作全部班并指定授课教师。
+ * 归属边界:班级负责人和协作教师都可查看班级并执行教学操作;只有负责人/管理员可管理班级设置与教师名单。
  * 布置项目 = 给全班每个成员建报名记录(已报名的沿用),统一写入班级截止日期;之后加入的成员也自动补齐。
  */
 @Service
@@ -42,6 +44,7 @@ public class ClassService {
 
     private final CourseClassRepository classRepo;
     private final ClassMemberRepository memberRepo;
+    private final ClassTeacherRepository classTeacherRepo;
     private final ClassAssignmentRepository assignmentRepo;
     private final ClassAnnouncementRepository announcementRepo;
     private final UserRepository userRepository;
@@ -52,12 +55,14 @@ public class ClassService {
     private final LearningActivityService activityService;
 
     public ClassService(CourseClassRepository classRepo, ClassMemberRepository memberRepo,
+                        ClassTeacherRepository classTeacherRepo,
                         ClassAssignmentRepository assignmentRepo, ClassAnnouncementRepository announcementRepo,
                         UserRepository userRepository, ProjectRepository projectRepository,
                         EnrollmentRepository enrollmentRepository, NotificationService notificationService,
                         ProjectStatsService statsService, LearningActivityService activityService) {
         this.classRepo = classRepo;
         this.memberRepo = memberRepo;
+        this.classTeacherRepo = classTeacherRepo;
         this.assignmentRepo = assignmentRepo;
         this.announcementRepo = announcementRepo;
         this.userRepository = userRepository;
@@ -71,9 +76,19 @@ public class ClassService {
     // ---------- 教师 / 管理员 ----------
 
     public List<Map<String, Object>> list(AuthUser viewer) {
-        List<CourseClass> classes = viewer.isAdmin()
-                ? classRepo.findAllByOrderByUpdatedAtDesc()
-                : classRepo.findByTeacherIdOrderByUpdatedAtDesc(viewer.getId());
+        List<CourseClass> classes;
+        if (viewer.isAdmin()) {
+            classes = classRepo.findAllByOrderByUpdatedAtDesc();
+        } else {
+            java.util.Set<Long> ids = new java.util.HashSet<>();
+            for (ClassTeacher link : classTeacherRepo.findByTeacherId(viewer.getId())) {
+                ids.add(link.getClassId());
+            }
+            classes = classRepo.findAllById(ids).stream()
+                    .sorted(java.util.Comparator.comparing(CourseClass::getUpdatedAt,
+                            java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                    .collect(java.util.stream.Collectors.toList());
+        }
         List<Map<String, Object>> out = new ArrayList<>();
         for (CourseClass c : classes) {
             out.add(view(c));
@@ -99,12 +114,24 @@ public class ClassService {
         c.setJoinCode(newCode());
         c.setCreatedBy(viewer.getId());
         classRepo.save(c);
+        ClassTeacher owner = new ClassTeacher();
+        owner.setClassId(c.getId());
+        owner.setTeacherId(teacher.getId());
+        owner.setRole("OWNER");
+        owner.setAddedBy(viewer.getId());
+        classTeacherRepo.save(owner);
         return view(c);
     }
 
     @Transactional
     public Map<String, Object> update(AuthUser viewer, Long classId, Map<String, Object> body) {
         CourseClass c = owned(viewer, classId);
+        boolean changesSettings = body.containsKey("name") || body.containsKey("description")
+                || body.containsKey("joinEnabled") || body.get("status") != null
+                || Boolean.TRUE.equals(body.get("regenerateCode")) || body.get("teacherId") != null;
+        if (changesSettings) {
+            requireOwner(viewer, c);
+        }
         if (body.get("name") != null) {
             String v = String.valueOf(body.get("name")).trim();
             if (v.isEmpty() || v.length() > 60) {
@@ -131,8 +158,24 @@ public class ClassService {
         if (viewer.isAdmin() && body.get("teacherId") != null) {
             Long tid = Long.valueOf(String.valueOf(body.get("teacherId")));
             User teacher = userRepository.findById(tid).orElseThrow(() -> new BusinessException(404, "授课教师不存在"));
+            if (!"TEACHER".equals(teacher.getRole()) && !"ADMIN".equals(teacher.getRole())) {
+                throw new BusinessException("授课教师必须是教师或管理员账号");
+            }
+            Long oldOwnerId = c.getTeacherId();
             c.setTeacherId(teacher.getId());
             c.setTeacherName(teacher.getName());
+            if (!teacher.getId().equals(oldOwnerId)) {
+                if (oldOwnerId != null) {
+                    classTeacherRepo.findByClassIdAndTeacherId(classId, oldOwnerId).ifPresent(link -> link.setRole("TEACHER"));
+                }
+                ClassTeacher newOwner = classTeacherRepo.findByClassIdAndTeacherId(classId, teacher.getId())
+                        .orElseGet(() -> newTeacherLink(classId, teacher.getId(), "OWNER", viewer.getId()));
+                newOwner.setRole("OWNER");
+                classTeacherRepo.save(newOwner);
+                if (oldOwnerId != null) {
+                    classTeacherRepo.findByClassIdAndTeacherId(classId, oldOwnerId).ifPresent(classTeacherRepo::save);
+                }
+            }
         }
         c.setUpdatedAt(LocalDateTime.now());
         classRepo.save(c);
@@ -142,8 +185,9 @@ public class ClassService {
     /** 删除班级:只删班级、成员关系、作业与公告;学生的报名与成果不受影响 */
     @Transactional
     public void delete(AuthUser viewer, Long classId) {
-        owned(viewer, classId);
+        requireOwner(viewer, classId);
         memberRepo.deleteByClassId(classId);
+        classTeacherRepo.deleteByClassId(classId);
         assignmentRepo.deleteByClassId(classId);
         announcementRepo.deleteByClassId(classId);
         classRepo.deleteById(classId);
@@ -178,6 +222,9 @@ public class ClassService {
             members.add(row);
         }
         Map<String, Object> m = view(c);
+        m.put("teachers", teacherViews(classId));
+        m.put("canManageTeachers", viewer.isAdmin() || isOwner(viewer, c));
+        m.put("classRole", viewer.isAdmin() || isOwner(viewer, c) ? "OWNER" : "TEACHER");
         m.put("members", members);
         m.put("assignments", assignmentViews(assignments));
         m.put("announcements", announcementRepo.findTop20ByClassIdOrderByCreatedAtDesc(classId));
@@ -226,6 +273,59 @@ public class ClassService {
     public void removeMember(AuthUser viewer, Long classId, Long userId) {
         owned(viewer, classId);
         memberRepo.findByClassIdAndUserId(classId, userId).ifPresent(memberRepo::delete);
+    }
+
+    /** 返回班级教师列表,仅班级负责人/协作教师或管理员可查看。 */
+    public List<Map<String, Object>> teachers(AuthUser viewer, Long classId) {
+        CourseClass c = owned(viewer, classId);
+        return teacherViews(c.getId());
+    }
+
+    /** 按教师邮箱、手机号或用户 ID 添加协作教师;只有负责人/管理员可操作。 */
+    @Transactional
+    public Map<String, Object> addTeachers(AuthUser viewer, Long classId, List<String> identifiers) {
+        CourseClass c = requireOwner(viewer, classId);
+        List<String> added = new ArrayList<>();
+        List<String> existed = new ArrayList<>();
+        List<String> notFound = new ArrayList<>();
+        List<String> notTeacher = new ArrayList<>();
+        for (String raw : identifiers == null ? java.util.Collections.<String>emptyList() : identifiers) {
+            String key = raw == null ? "" : raw.trim();
+            if (key.isEmpty()) continue;
+            User teacher = findTeacher(key);
+            if (teacher == null) {
+                notFound.add(key);
+                continue;
+            }
+            if (!"TEACHER".equals(teacher.getRole()) && !"ADMIN".equals(teacher.getRole())) {
+                notTeacher.add(key);
+                continue;
+            }
+            if (classTeacherRepo.existsByClassIdAndTeacherId(classId, teacher.getId())) {
+                existed.add(key);
+                continue;
+            }
+            classTeacherRepo.save(newTeacherLink(classId, teacher.getId(), "TEACHER", viewer.getId()));
+            added.add(teacher.getName());
+            notificationService.create(teacher.getId(), "project", "你已加入协作班级「" + c.getName() + "」",
+                    "你现在可以查看该班学生、作业进度和公告,并协助布置作业与发布公告。");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("added", added);
+        out.put("existed", existed);
+        out.put("notFound", notFound);
+        out.put("notTeacher", notTeacher);
+        out.put("teachers", teacherViews(classId));
+        return out;
+    }
+
+    @Transactional
+    public void removeTeacher(AuthUser viewer, Long classId, Long teacherId) {
+        CourseClass c = requireOwner(viewer, classId);
+        if (teacherId.equals(c.getTeacherId())) {
+            throw new BusinessException("班级负责人不能移除,请先转交负责人");
+        }
+        classTeacherRepo.findByClassIdAndTeacherId(classId, teacherId).ifPresent(classTeacherRepo::delete);
     }
 
     /** 布置项目:全班建报名、写统一截止、通知每个学生 */
@@ -415,12 +515,41 @@ public class ClassService {
         return userRepository.findAll().stream().filter(u -> key.equals(u.getStudentNo())).findFirst().orElse(null);
     }
 
+    private User findTeacher(String key) {
+        try {
+            if (key.matches("^\\d+$")) {
+                User byId = userRepository.findById(Long.valueOf(key)).orElse(null);
+                if (byId != null) return byId;
+            }
+        } catch (NumberFormatException ignored) {
+            // 按邮箱或手机号继续查找
+        }
+        if (key.contains("@")) return userRepository.findByEmail(key).orElse(null);
+        return userRepository.findByPhone(key).orElse(null);
+    }
+
     private CourseClass owned(AuthUser viewer, Long classId) {
         CourseClass c = classRepo.findById(classId).orElseThrow(() -> new BusinessException(404, "班级不存在"));
-        if (!viewer.isAdmin() && !viewer.getId().equals(c.getTeacherId())) {
+        if (!viewer.isAdmin() && !classTeacherRepo.existsByClassIdAndTeacherId(classId, viewer.getId())) {
             throw new BusinessException(403, "该班级不属于你");
         }
         return c;
+    }
+
+    private CourseClass requireOwner(AuthUser viewer, Long classId) {
+        CourseClass c = classRepo.findById(classId).orElseThrow(() -> new BusinessException(404, "班级不存在"));
+        return requireOwner(viewer, c);
+    }
+
+    private CourseClass requireOwner(AuthUser viewer, CourseClass c) {
+        if (!viewer.isAdmin() && !isOwner(viewer, c)) {
+            throw new BusinessException(403, "只有班级负责人可以管理教师和班级设置");
+        }
+        return c;
+    }
+
+    private boolean isOwner(AuthUser viewer, CourseClass c) {
+        return viewer.getId().equals(c.getTeacherId());
     }
 
     private Map<String, Object> view(CourseClass c) {
@@ -435,9 +564,35 @@ public class ClassService {
         m.put("status", c.getStatus());
         m.put("memberCount", memberRepo.countByClassId(c.getId()));
         m.put("assignmentCount", assignmentRepo.countByClassId(c.getId()));
+        m.put("teacherCount", classTeacherRepo.findByClassIdOrderByCreatedAtAsc(c.getId()).size());
         m.put("createdAt", c.getCreatedAt());
         m.put("updatedAt", c.getUpdatedAt());
         return m;
+    }
+
+    private List<Map<String, Object>> teacherViews(Long classId) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (ClassTeacher link : classTeacherRepo.findByClassIdOrderByCreatedAtAsc(classId)) {
+            User u = userRepository.findById(link.getTeacherId()).orElse(null);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", link.getTeacherId());
+            m.put("name", u == null ? "已注销教师" : u.getName());
+            m.put("email", u == null ? null : u.getEmail());
+            m.put("role", link.getRole());
+            m.put("roleLabel", "OWNER".equals(link.getRole()) ? "负责人" : "协作教师");
+            m.put("addedAt", link.getCreatedAt());
+            out.add(m);
+        }
+        return out;
+    }
+
+    private ClassTeacher newTeacherLink(Long classId, Long teacherId, String role, Long addedBy) {
+        ClassTeacher link = new ClassTeacher();
+        link.setClassId(classId);
+        link.setTeacherId(teacherId);
+        link.setRole(role);
+        link.setAddedBy(addedBy);
+        return link;
     }
 
     private List<Map<String, Object>> assignmentViews(List<ClassAssignment> list) {

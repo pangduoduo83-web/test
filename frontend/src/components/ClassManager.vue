@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="class-manager">
     <div class="stat-grid">
       <div class="ref-stat-card">
         <div class="ref-stat-icon" style="background:linear-gradient(135deg,#60a5fa,#2563eb)"><Users :size="22" color="#fff" /></div>
@@ -26,21 +26,27 @@
 
       <el-empty v-if="classes.length === 0" description="还没有班级,点右上角新建一个" />
       <div v-else class="class-grid">
-        <div v-for="c in classes" :key="c.id" class="class-card" :class="{ archived: c.status === 'ARCHIVED' }" @click="openDetail(c)">
-          <div class="cc-top">
-            <span class="cc-avatar">{{ c.name[0] }}</span>
-            <div class="cc-title">
-              <b>{{ c.name }}</b>
-              <div class="cc-sub">{{ c.teacherName || '未指定教师' }}<span v-if="c.status === 'ARCHIVED'"> · 已归档</span></div>
-            </div>
+        <article v-for="c in classes" :key="c.id" class="class-card" :class="{ archived: c.status === 'ARCHIVED' }">
+          <button type="button" class="cc-main" :aria-label="'查看班级 ' + c.name" @click="openDetail(c)">
+            <span class="cc-top">
+              <span class="cc-avatar">{{ c.name[0] }}</span>
+              <span class="cc-title">
+                <b>{{ c.name }}</b>
+                <span class="cc-sub">{{ c.teacherName || '未指定教师' }}<span v-if="c.status === 'ARCHIVED'"> · 已归档</span></span>
+              </span>
+            </span>
+            <span class="cc-desc" :title="c.description || ''">{{ c.description || '暂无简介' }}</span>
+            <span class="cc-meta">
+              <span class="cc-metric"><span><Users :size="15" />学生</span><b>{{ c.memberCount || 0 }}<small>人</small></b></span>
+              <span class="cc-metric"><span><ClipboardList :size="15" />项目</span><b>{{ c.assignmentCount || 0 }}<small>个</small></b></span>
+              <span class="cc-metric"><span><GraduationCap :size="15" />教师</span><b>{{ c.teacherCount || 1 }}<small>位</small></b></span>
+            </span>
+          </button>
+          <div class="cc-footer">
+            <button type="button" class="cc-code" @click="copy(c.joinCode)" :aria-label="'复制' + c.name + '的加入码'" title="点击复制加入码"><KeyRound :size="15" /><span>加入码</span><b>{{ c.joinCode }}</b></button>
+            <button type="button" class="cc-open" @click="openDetail(c)">进入班级 <ArrowRight :size="16" /></button>
           </div>
-          <div class="cc-desc">{{ c.description || '暂无简介' }}</div>
-          <div class="cc-meta">
-            <span><Users :size="13" /> {{ c.memberCount }} 人</span>
-            <span><ClipboardList :size="13" /> {{ c.assignmentCount }} 个项目</span>
-            <span class="cc-code" @click.stop="copy(c.joinCode)" title="点击复制加入码"><KeyRound :size="13" /> {{ c.joinCode }}</span>
-          </div>
-        </div>
+        </article>
       </div>
     </div>
 
@@ -68,14 +74,14 @@
           <span class="cc-avatar big">{{ detail.name[0] }}</span>
           <div class="grow">
             <div class="d-title">{{ detail.name }} <span class="badge" :class="detail.status === 'ACTIVE' ? 'badge-green' : 'badge-gray'">{{ detail.status === 'ACTIVE' ? '进行中' : '已归档' }}</span></div>
-            <div class="d-sub">{{ detail.teacherName }} · {{ detail.members.length }} 名学生 · {{ detail.assignments.length }} 个项目</div>
+            <div class="d-sub">{{ detail.teacherName }} · {{ detail.teachers?.length || 1 }} 位教师 · {{ detail.members.length }} 名学生 · {{ detail.assignments.length }} 个项目</div>
           </div>
           <div class="join-box">
             <div class="join-label">加入码 <el-switch v-model="detail.joinEnabled" size="small" inline-prompt active-text="开" inactive-text="关" @change="(v) => patch({ joinEnabled: v })" /></div>
             <div class="join-code" @click="copy(detail.joinCode)" title="点击复制">{{ detail.joinCode }}</div>
             <div class="join-tip">学生在「我的班级」输入即可加入 · <a @click="regenerate">换一个</a></div>
           </div>
-          <el-dropdown @command="onCommand">
+          <el-dropdown v-if="detail.canManageTeachers" @command="onCommand">
             <el-button text>更多 ▾</el-button>
             <template #dropdown>
               <el-dropdown-menu>
@@ -88,6 +94,23 @@
         </div>
 
         <el-tabs v-model="tab">
+          <el-tab-pane :label="`教师 (${detail.teachers?.length || 0})`" name="teachers">
+            <div v-if="detail.canManageTeachers" class="tab-tools">
+              <el-input v-model="teacherIdentifiers" placeholder="输入教师邮箱、手机号或用户 ID,可批量加入" class="grow" />
+              <el-button type="primary" :loading="saving" @click="addTeachers"><UserPlus :size="15" /> 加入协作教师</el-button>
+            </div>
+            <p class="muted">协作教师可以查看本班学生、作业、进度和公告,并协助布置作业、发布公告。班级负责人和管理员负责班级设置与教师名单。</p>
+            <el-table :data="detail.teachers || []" size="small" max-height="300">
+              <el-table-column label="教师" min-width="160">
+                <template #default="{ row }"><b>{{ row.name }}</b><div class="muted">{{ row.email || '–' }}</div></template>
+              </el-table-column>
+              <el-table-column label="角色" width="110"><template #default="{ row }"><span class="badge" :class="row.role === 'OWNER' ? 'badge-blue' : 'badge-gray'">{{ row.roleLabel }}</span></template></el-table-column>
+              <el-table-column label="加入时间" width="150"><template #default="{ row }"><span class="muted">{{ fmt(row.addedAt) }}</span></template></el-table-column>
+              <el-table-column v-if="detail.canManageTeachers" label="操作" width="80">
+                <template #default="{ row }"><el-button v-if="row.role !== 'OWNER'" size="small" text type="danger" @click="removeTeacher(row)">移除</el-button></template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
           <el-tab-pane :label="`学生 (${detail.members.length})`" name="members">
             <div class="tab-tools">
               <el-input v-model="identifiers" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" placeholder="按学号 / 邮箱 / 手机号批量加入,逗号、空格或换行分隔" class="grow" />
@@ -193,10 +216,11 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ClipboardList, GraduationCap, KeyRound, Users } from 'lucide-vue-next'
+import { ArrowRight, ClipboardList, GraduationCap, KeyRound, UserPlus, Users } from 'lucide-vue-next'
 import {
-  teacherAddClassMembers, teacherAssignClass, teacherClassAnnounce, teacherClassDetail, teacherClasses, teacherCreateClass,
-  teacherDeleteClass, teacherProjects, teacherRemoveAssignment, teacherRemoveClassMember, teacherUpdateAssignment, teacherUpdateClass
+  teacherAddClassMembers, teacherAddClassTeachers, teacherAssignClass, teacherClassAnnounce, teacherClassDetail, teacherClasses,
+  teacherCreateClass, teacherDeleteClass, teacherProjects, teacherRemoveAssignment, teacherRemoveClassMember, teacherRemoveClassTeacher,
+  teacherUpdateAssignment, teacherUpdateClass
 } from '../api'
 import { downloadCsv } from '../utils/csv'
 
@@ -216,6 +240,7 @@ const detailVisible = ref(false)
 const detail = ref(null)
 const tab = ref('members')
 const identifiers = ref('')
+const teacherIdentifiers = ref('')
 const assignForm = reactive({ projectId: null, deadline: '', note: '' })
 const announceForm = reactive({ title: '', content: '' })
 const editVisible = ref(false)
@@ -257,6 +282,7 @@ const openDetail = async (c) => {
   detail.value = await teacherClassDetail(c.id)
   tab.value = 'members'
   identifiers.value = ''
+  teacherIdentifiers.value = ''
   Object.assign(assignForm, { projectId: null, deadline: '', note: '' })
   Object.assign(announceForm, { title: '', content: '' })
   detailVisible.value = true
@@ -325,6 +351,30 @@ const removeMember = async (row) => {
   await refresh()
 }
 
+const addTeachers = async () => {
+  const ids = teacherIdentifiers.value.split(/[\s,，;；]+/).map((s) => s.trim()).filter(Boolean)
+  if (!ids.length) { ElMessage.warning('请输入教师邮箱、手机号或用户 ID'); return }
+  saving.value = true
+  try {
+    const r = await teacherAddClassTeachers(detail.value.id, ids)
+    const parts = [`加入 ${r.added.length} 人`]
+    if (r.existed.length) parts.push(`${r.existed.length} 人已在班`)
+    if (r.notFound.length) parts.push(`未找到:${r.notFound.join('、')}`)
+    if (r.notTeacher.length) parts.push(`非教师账号:${r.notTeacher.join('、')}`)
+    ElMessage[r.notFound.length || r.notTeacher.length ? 'warning' : 'success'](parts.join(';'))
+    teacherIdentifiers.value = ''
+    await refresh()
+    tab.value = 'teachers'
+  } finally {
+    saving.value = false
+  }
+}
+const removeTeacher = async (row) => {
+  try { await ElMessageBox.confirm(`移除协作教师「${row.name}」?该教师将不能再查看本班信息。`, '移除协作教师', { type: 'warning' }) } catch (e) { return }
+  await teacherRemoveClassTeacher(detail.value.id, row.id)
+  await refresh()
+}
+
 const assign = async () => {
   if (!assignForm.projectId) { ElMessage.warning('请选择项目'); return }
   saving.value = true
@@ -388,26 +438,39 @@ onMounted(load)
 </script>
 
 <style scoped>
-.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+.class-manager { max-width: 1600px; margin: 0 auto; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
 .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
-.card-head h3 { margin: 0 0 4px; font-size: 16px; }
-.sub { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.card-head h3 { margin: 0 0 8px; font-size: 20px; }
+.card-head > .el-button { flex-shrink: 0; min-height: 40px; font-size: 14px; }
+.sub { max-width: 850px; margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.8; }
 .muted { font-size: 12px; color: var(--text-secondary); }
 .grow { flex: 1; min-width: 0; }
 
-.class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
-.class-card { border: 1px solid var(--border); border-radius: 14px; padding: 16px; cursor: pointer; transition: box-shadow .15s, transform .15s; background: #fff; }
+.class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); gap: 20px; margin-top: 22px; }
+.class-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; transition: box-shadow .15s, transform .15s; background: #fff; }
 .class-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
 .class-card.archived { opacity: .65; }
+.cc-main { display: block; width: 100%; padding: 22px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .cc-top { display: flex; align-items: center; gap: 12px; }
 .cc-avatar { width: 40px; height: 40px; border-radius: 12px; background: var(--brand-gradient-br); color: #fff; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
 .cc-avatar.big { width: 52px; height: 52px; font-size: 20px; }
-.cc-title b { font-size: 15px; }
-.cc-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.cc-desc { font-size: 13px; color: var(--text-secondary); margin: 12px 0; min-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cc-meta { display: flex; gap: 14px; font-size: 12px; color: var(--text-secondary); align-items: center; }
-.cc-meta span { display: inline-flex; align-items: center; gap: 4px; }
-.cc-code { margin-left: auto; font-family: ui-monospace, Menlo, Consolas, monospace; background: #f3f4f6; padding: 2px 8px; border-radius: 6px; color: #374151; }
+.cc-title { min-width: 0; }
+.cc-title b { display: block; font-size: 17px; line-height: 1.6; overflow-wrap: anywhere; }
+.cc-sub { display: block; font-size: 14px; color: var(--text-secondary); margin-top: 3px; line-height: 1.6; }
+.cc-desc { display: block; font-size: 14px; color: var(--text-secondary); margin: 18px 0; min-height: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 16px 12px; }
+.cc-metric { min-width: 0; }
+.cc-metric > span { display: flex; align-items: center; gap: 5px; color: #7e8aa0; font-size: 14px; white-space: nowrap; }
+.cc-metric svg { flex-shrink: 0; }
+.cc-metric b { display: block; margin-top: 9px; color: #304363; font-size: 24px; line-height: 1.3; white-space: nowrap; }
+.cc-metric small { margin-left: 6px; color: #8c97a8; font-size: 13px; font-weight: 400; }
+.cc-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 20px; border-top: 1px solid #edf0f6; background: #fafbfe; }
+.cc-code, .cc-open { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 5px 0; border: 0; background: transparent; font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.cc-code { color: #7a879c; }
+.cc-code b { color: #52627f; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; letter-spacing: .5px; }
+.cc-open { color: #476ed7; }
+.cc-code:hover, .cc-code:hover b, .cc-open:hover { color: #3057c7; }
 
 .d-head { display: flex; align-items: center; gap: 14px; }
 .d-title { font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
@@ -428,4 +491,11 @@ onMounted(load)
 .announce-item { padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; }
 .an-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
 .an-body { font-size: 13px; color: #374151; margin-top: 6px; white-space: pre-wrap; line-height: 1.6; }
+@media (max-width: 600px) {
+  .stat-grid { grid-template-columns: 1fr; gap: 12px; }
+  .class-manager > .card { padding: 20px 16px; }
+  .card-head { flex-direction: column; gap: 16px; }
+  .cc-main { padding: 20px 16px; }
+  .cc-footer { padding: 12px 16px; }
+}
 </style>

@@ -63,24 +63,38 @@
       </el-tab-pane>
 
       <el-tab-pane label="高级内容" name="advanced">
-        <p class="json-tip">以下内容按行编辑,保存时自动生成 JSON;学生端「项目详情」与 AI 导师都按此展示与引导。</p>
+        <p class="json-tip">完善教学安排、成果要求与评分标准，学生可在项目详情中查看，AI 评审也会参考这些内容。</p>
 
+        <div class="adv-section">
+          <h4>成果提交要求与默认评分细则</h4>
+          <el-input v-model="form.submissionRequirements" type="textarea" :rows="3" maxlength="4000" placeholder="例如：提交电路照片、运行演示视频、实验报告；说明必须展示的功能。" />
+          <ReviewRubricEditor v-model="reviewRubric" />
+        </div>
+        <div class="adv-section reference-answer-section">
+          <h4>教师标准答案 / 参考实现（选填）</h4>
+          <el-input v-model="form.referenceAnswer" type="textarea" :rows="6" maxlength="20000"
+                    show-word-limit placeholder="可填写关键结果、参考实现、代码要点、预期现象或评分时应核对的答案。留空则 AI 只按评分细则和提交材料判断。" />
+          <div class="field-tip">仅教师和 AI 评审可见，不会展示给学生；AI 会把它作为参考标准，不会把它当成学生证据。</div>
+        </div>
         <div class="adv-section">
           <div class="adv-head">
             <h4>成果考核项
               <span class="weight-sum" :class="{ ok: assessWeightSum === 100 }">权重合计 {{ assessWeightSum }}/100</span>
             </h4>
-            <el-button size="small" plain @click="assessRows.push({ name: '', weight: 0, desc: '' })">+ 添加考核项</el-button>
+            <el-button size="small" plain @click="assessRows.push({ name: '', weight: 0, desc: '', rubric: [] })">+ 添加考核项</el-button>
           </div>
           <p class="json-tip" style="margin-top:0">
             设置后学生按考核项分阶段提交成果,每项单独评分,全部评完自动按权重计算综合分(≥60 判定项目完成);留空则为整体单一成果。
           </p>
-          <div v-for="(a, i) in assessRows" :key="i" class="adv-row">
+          <div v-for="(a, i) in assessRows" :key="i">
+          <div class="adv-row">
             <el-input v-model="a.name" placeholder="考核项,如: 原理图设计" class="grow" />
             <span class="row-label">权重%</span>
             <el-input-number v-model="a.weight" :min="0" :max="100" :step="5" class="num-narrow" />
             <el-input v-model="a.desc" placeholder="要求说明(选填)" class="grow" />
             <el-button size="small" text type="danger" @click="assessRows.splice(i, 1)">删除</el-button>
+          </div>
+          <ReviewRubricEditor v-model="a.rubric" fallback="项目默认评分标准" />
           </div>
           <p v-if="!assessRows.length" class="empty-hint">未设置考核项,学生提交整体单一成果</p>
         </div>
@@ -181,6 +195,7 @@ import { ElMessage } from 'element-plus'
 import { fetchEquipment, uploadDocFile } from '../api'
 import ImageUploader from './ImageUploader.vue'
 import RichEditor from './RichEditor.vue'
+import ReviewRubricEditor from './ReviewRubricEditor.vue'
 import { loadSiteConfig, siteConfig as site } from '../utils/siteConfig'
 
 const props = defineProps({
@@ -194,7 +209,10 @@ const props = defineProps({
   /** 技能维度 [{name, enabled}] */
   skillDimensions: { type: Array, default: () => [] },
   /** (id|null, payload) => Promise */
-  saveFn: { type: Function, required: true }
+  saveFn: { type: Function, required: true },
+  /** 读取/保存教师私有参考答案；不传则隐藏该能力 */
+  referenceAnswerFn: { type: Function, default: null },
+  saveReferenceAnswerFn: { type: Function, default: null }
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
 
@@ -208,10 +226,11 @@ const emptyForm = {
   id: null, title: '', summary: '', description: '', difficulty: '入门', duration: '2周',
   teamSize: '1人', category: '', icon: '🔌', coverUrl: '', mentorId: null, author: '', license: 'GPL-3.0',
   layers: 2, pcbSize: '', cost: 0, verified: false, status: 'PUBLISHED',
-  tagsText: '', featuresText: '', goalsText: '', prereqText: '', equipNames: []
+  tagsText: '', featuresText: '', goalsText: '', prereqText: '', equipNames: [], submissionRequirements: '', referenceAnswer: ''
 }
 const form = reactive({ ...emptyForm })
 const assessRows = ref([])
+const reviewRubric = ref([])
 const assessWeightSum = computed(() => assessRows.value.reduce((s, a) => s + (Number(a.weight) || 0), 0))
 const skillRows = ref([])
 const syllabusRows = ref([])
@@ -235,7 +254,10 @@ const reset = () => {
   const row = props.project
   Object.assign(form, emptyForm)
   editTab.value = 'basic'
-  assessRows.value = arr(row?.assessments).map((a) => ({ name: a.name || '', weight: num(a.weight), desc: a.desc || '' }))
+  assessRows.value = arr(row?.assessments).map((a) => ({ name: a.name || '', weight: num(a.weight), desc: a.desc || '', rubric: arr(a.rubric).map(r => ({ ...r })) }))
+  reviewRubric.value = arr(row?.reviewRubric).map(r => ({ ...r }))
+  form.submissionRequirements = row?.submissionRequirements || ''
+  form.referenceAnswer = ''
   skillRows.value = arr(row?.skillRequirements).map((s) => ({ name: s.name || '', required: num(s.required) }))
   syllabusRows.value = arr(row?.syllabus).map((s) => ({ phase: s.phase || '', title: s.title || '', content: s.content || '', hours: num(s.hours) }))
   bomRows.value = arr(row?.bom).map((b) => ({ ref: b.ref || '', name: b.name || '', qty: num(b.qty, 1), footprint: b.footprint || '', price: num(b.price) }))
@@ -251,6 +273,12 @@ const reset = () => {
       goalsText: joinArr(row.learningGoals), prereqText: joinArr(row.prerequisites),
       equipNames: [...arr(row.equipmentNames)]
     })
+  }
+  if (row && props.referenceAnswerFn) {
+    props.referenceAnswerFn(row.id).then((result) => {
+      // Only apply the response while this project is still open; closing/reopening can replace the row.
+      if (form.id === row.id) form.referenceAnswer = result?.referenceAnswer || ''
+    }).catch(() => {})
   }
 }
 
@@ -305,7 +333,7 @@ const buildBom = () => bomRows.value.filter((b) => (b.name || '').trim())
 const buildResources = () => resourceRows.value.filter((r) => (r.name || '').trim())
   .map((r) => ({ type: r.type || '文档', name: r.name.trim(), url: r.url || '' }))
 const buildAssessments = () => assessRows.value.filter((a) => (a.name || '').trim())
-  .map((a) => ({ name: a.name.trim(), weight: num(a.weight), desc: (a.desc || '').trim() }))
+  .map((a) => ({ name: a.name.trim(), weight: num(a.weight), desc: (a.desc || '').trim(), rubric: a.rubric || [] }))
 
 const save = async () => {
   if (!form.title.trim()) { ElMessage.warning('请填写项目标题'); return }
@@ -314,6 +342,11 @@ const save = async () => {
     ElMessage.warning('成果考核项的权重合计必须等于 100')
     editTab.value = 'advanced'
     return
+  }
+  for (const rubric of [reviewRubric.value, ...assessments.map(a => a.rubric)]) {
+    if (rubric.length && (rubric.some(r => !r.name.trim()) || new Set(rubric.map(r => r.name.trim())).size !== rubric.length || rubric.reduce((sum, r) => sum + Number(r.points), 0) !== 100)) {
+      ElMessage.warning('评分细则名称不能留空或重复，分值合计必须为100'); return
+    }
   }
   saving.value = true
   try {
@@ -330,6 +363,8 @@ const save = async () => {
       prerequisites: JSON.stringify(splitText(form.prereqText)),
       equipmentNames: JSON.stringify(form.equipNames.filter(Boolean)),
       assessments: JSON.stringify(assessments),
+      reviewRubric: JSON.stringify(reviewRubric.value),
+      submissionRequirements: form.submissionRequirements,
       skillRequirements: JSON.stringify(buildSkills()),
       syllabus: JSON.stringify(buildSyllabus()),
       bom: JSON.stringify(buildBom()),
@@ -339,7 +374,11 @@ const save = async () => {
       payload.mentor = mentorUser ? mentorUser.name : null
       payload.mentorId = form.mentorId || null
     }
-    await props.saveFn(form.id, payload)
+    const saved = await props.saveFn(form.id, payload)
+    const projectId = form.id || saved?.id
+    if (projectId && props.saveReferenceAnswerFn) {
+      await props.saveReferenceAnswerFn(projectId, form.referenceAnswer)
+    }
     ElMessage.success('保存成功')
     emit('update:modelValue', false)
     emit('saved')

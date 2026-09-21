@@ -166,7 +166,7 @@ const chooseImg = () => {
     success: async (res) => {
       uni.showLoading({ title: '上传中...' })
       try {
-        const d = await uploadImage(res.tempFilePaths[0])
+        const d = await uploadImage(res.tempFilePaths[0], res.tempFiles?.[0])
         form.coverUrl = d.url
       } catch (e) {
         // 已提示

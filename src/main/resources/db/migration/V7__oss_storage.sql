@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS stored_files (
+ relative_path VARCHAR(190) NOT NULL PRIMARY KEY,
+ object_key VARCHAR(512) NOT NULL,
+ bucket VARCHAR(64) NOT NULL,
+ size_bytes BIGINT NOT NULL,
+ sha256 VARCHAR(64),
+ created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

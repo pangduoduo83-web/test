@@ -159,7 +159,7 @@
       <el-tabs v-model="tab">
         <el-tab-pane label="项目概览" name="overview">
           <h4 class="sec-head"><ClipboardList :size="16" color="#2563eb" /> 项目描述</h4>
-          <div v-if="isRich(project.description)" class="intro-box rich-content" v-html="project.description"></div>
+          <RichContent v-if="isRich(project.description)" class="intro-box rich-content" :html="project.description" />
           <div v-else class="intro-box intro-plain">{{ project.description || project.summary || '暂无详细描述' }}</div>
 
           <h4 class="sec-head"><Zap :size="16" color="#f59e0b" /> 项目特性</h4>
@@ -338,11 +338,12 @@
                 </el-button>
               </div>
               <div v-if="a.desc" class="assess-desc">{{ a.desc }}</div>
+              <div v-if="project.submissionRequirements" class="assess-desc">提交要求：{{ project.submissionRequirements }}</div>
+              <div v-for="rule in (a.rubric?.length ? a.rubric : project.reviewRubric || [])" :key="rule.name" class="assess-desc">{{ rule.name }} · {{ rule.points }}分：{{ rule.description }}</div>
 
               <div v-if="latestFor(a.name)" class="sub-last">
                 <div class="sub-content">{{ latestFor(a.name).content }}</div>
-                <img v-if="latestFor(a.name).attachmentUrl" :src="latestFor(a.name).attachmentUrl"
-                     class="sub-shot" alt="成果截图" />
+                <SubmissionAttachments :submission="latestFor(a.name)" />
                 <div v-if="latestFor(a.name).status !== 'SUBMITTED' && latestFor(a.name).feedback"
                      class="sub-grade" :class="{ pass: latestFor(a.name).status === 'GRADED' && latestFor(a.name).score >= 60 }">
                   {{ latestFor(a.name).status === 'RETURNED' ? '老师退回修改意见' : '评语' }}: {{ latestFor(a.name).feedback }}
@@ -351,13 +352,13 @@
               </div>
 
               <div v-if="activeAssessment === a.name" class="sub-form">
-                <el-input v-model="workContent" type="textarea" :rows="3" maxlength="1000" show-word-limit
+                <el-input v-model="workContent" type="textarea" :rows="3" maxlength="2000" show-word-limit
                           :placeholder="`描述「${a.name}」的完成情况与实现细节...`" />
                 <div class="sub-form-row">
                   <div class="sub-uploader">
-                    <ImageUploader v-model="workShot" />
+                    <SubmissionUploader v-model="workAttachments" :disabled="submittingWork" @busy="uploadingWork = $event" />
                   </div>
-                  <el-button type="primary" :loading="submittingWork" class="sub-submit"
+                  <el-button type="primary" :loading="submittingWork" :disabled="uploadingWork" class="sub-submit"
                              @click="doSubmitWork(a.name)">
                     提交「{{ a.name }}」成果
                   </el-button>
@@ -369,6 +370,8 @@
           <template v-else>
             <div class="pg-head">
               <b>我的成果</b>
+              <p v-if="project.submissionRequirements">提交要求：{{ project.submissionRequirements }}</p>
+              <p v-for="rule in project.reviewRubric || []" :key="rule.name">{{ rule.name }} · {{ rule.points }}分：{{ rule.description }}</p>
               <span v-if="mySubmission" class="badge"
                     :class="mySubmission.status === 'GRADED' ? (mySubmission.score >= 60 ? 'badge-green' : 'badge-red') : mySubmission.status === 'RETURNED' ? 'badge-red' : 'badge-yellow'">
                 {{ mySubmission.status === 'GRADED' ? `已评分 ${mySubmission.score} 分` : mySubmission.status === 'RETURNED' ? '已退回,请修改后重新提交' : '评审中' }}
@@ -378,7 +381,7 @@
 
             <div v-if="mySubmission" class="sub-last">
               <div class="sub-content">{{ mySubmission.content }}</div>
-              <img v-if="mySubmission.attachmentUrl" :src="mySubmission.attachmentUrl" class="sub-shot" alt="成果截图" />
+              <SubmissionAttachments :submission="mySubmission" />
               <div v-if="mySubmission.status === 'GRADED'" class="sub-grade" :class="{ pass: mySubmission.score >= 60 }">
                 <b>{{ mySubmission.score >= 60 ? '评审通过,项目判定完成!' : '未达标,可修改后再次提交。' }}</b>
                 <template v-if="mySubmission.feedback">评语: {{ mySubmission.feedback }}</template>
@@ -393,13 +396,13 @@
             </div>
 
             <div v-if="canSubmitWork" class="sub-form">
-              <el-input v-model="workContent" type="textarea" :rows="3" maxlength="1000" show-word-limit
+              <el-input v-model="workContent" type="textarea" :rows="3" maxlength="2000" show-word-limit
                         :placeholder="mySubmission ? '修改完善后可再次提交...' : '描述你的实现思路、完成情况与心得...'" />
               <div class="sub-form-row">
                 <div class="sub-uploader">
-                  <ImageUploader v-model="workShot" />
+                  <SubmissionUploader v-model="workAttachments" :disabled="submittingWork" @busy="uploadingWork = $event" />
                 </div>
-                <el-button type="primary" :loading="submittingWork" class="sub-submit" @click="doSubmitWork('')">
+                <el-button type="primary" :loading="submittingWork" :disabled="uploadingWork" class="sub-submit" @click="doSubmitWork('')">
                   {{ mySubmission ? '再次提交成果' : '提交成果' }}
                 </el-button>
               </div>
@@ -412,6 +415,7 @@
 </template>
 
 <script setup>
+import RichContent from '../../components/RichContent.vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -423,7 +427,8 @@ import {
   enrollProject, fetchDiscussions, fetchMySubmission, fetchMySubmissions, fetchProjectDetail,
   fetchSkills, postDiscussion, submitWork, toggleFavorite, updateProgress
 } from '../../api'
-import ImageUploader from '../../components/ImageUploader.vue'
+import SubmissionUploader from '../../components/SubmissionUploader.vue'
+import SubmissionAttachments from '../../components/SubmissionAttachments.vue'
 import TutorPanel from '../../components/TutorPanel.vue'
 
 const route = useRoute()
@@ -444,7 +449,8 @@ const mySubmission = ref(null)
 const mySubs = ref([])
 const activeAssessment = ref('')
 const workContent = ref('')
-const workShot = ref('')
+const workAttachments = ref([])
+const uploadingWork = ref(false)
 const submittingWork = ref(false)
 
 const fmtTime = (t) => (t || '').replace('T', ' ').slice(0, 16)
@@ -550,9 +556,10 @@ const overallScore = computed(() => {
 })
 
 const toggleForm = (name) => {
+  if (uploadingWork.value) { ElMessage.warning('附件上传中，请稍候'); return }
   activeAssessment.value = activeAssessment.value === name ? '' : name
   workContent.value = ''
-  workShot.value = ''
+  workAttachments.value = []
 }
 
 const loadSubmission = async () => {
@@ -564,6 +571,7 @@ const loadSubmission = async () => {
 }
 
 const doSubmitWork = async (assessName) => {
+  if (uploadingWork.value) { ElMessage.warning('请等待附件上传完成'); return }
   if (!workContent.value.trim()) {
     ElMessage.warning('请填写成果说明')
     return
@@ -572,12 +580,12 @@ const doSubmitWork = async (assessName) => {
   try {
     await submitWork(route.params.id, {
       content: workContent.value.trim(),
-      attachmentUrl: workShot.value || undefined,
+      attachments: workAttachments.value,
       assessmentName: assessName || undefined
     })
     ElMessage.success('提交成功,等待老师评审')
     workContent.value = ''
-    workShot.value = ''
+    workAttachments.value = []
     activeAssessment.value = ''
     await loadSubmission()
   } catch (e) { /* 已提示 */ } finally {

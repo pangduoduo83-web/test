@@ -246,9 +246,10 @@ export async function downloadAuthenticated(url: string, filename: string): Prom
 }
 
 /** Fetch an SVG with auth headers and return an object URL. */
-export async function fetchPreviewBlobUrl(projectId: string, engine = "auto"): Promise<string> {
+export async function fetchPreviewBlobUrl(projectId: string, engine = "auto", signal?: AbortSignal): Promise<string> {
   const res = await fetch(withBase(`/api/projects/${projectId}/preview.svg?t=${Date.now()}&engine=${encodeURIComponent(engine)}`), {
     headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+    signal,
   });
   if (!res.ok) throw new ApiError(res.status, "预览生成失败");
   const blob = await res.blob();
@@ -256,9 +257,10 @@ export async function fetchPreviewBlobUrl(projectId: string, engine = "auto"): P
 }
 
 /** Fetch a Schematic SVG with auth headers and return an object URL. */
-export async function fetchPreviewSchBlobUrl(projectId: string, engine = "auto"): Promise<string> {
+export async function fetchPreviewSchBlobUrl(projectId: string, engine = "auto", signal?: AbortSignal): Promise<string> {
   const res = await fetch(withBase(`/api/projects/${projectId}/preview_sch.svg?t=${Date.now()}&engine=${encodeURIComponent(engine)}`), {
     headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+    signal,
   });
   if (!res.ok) throw new ApiError(res.status, "原理图预览生成失败");
   const blob = await res.blob();

@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 public class SubmissionService {
 
     private final SubmissionRepository submissionRepository;
+    private final SubmissionMaterialService materials;
     private final EnrollmentRepository enrollmentRepository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
@@ -42,7 +43,8 @@ public class SubmissionService {
                              NotificationService notificationService,
                              SkillService skillService,
                              ProjectStatsService statsService,
-                             LearningActivityService activityService) {
+                             LearningActivityService activityService, SubmissionMaterialService materials) {
+        this.materials = materials;
         this.submissionRepository = submissionRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.projectRepository = projectRepository;
@@ -91,7 +93,8 @@ public class SubmissionService {
         s.setUserName(user.getName());
         s.setProjectTitle(project.getTitle());
         s.setContent(req.getContent().trim());
-        s.setAttachmentUrl(req.getAttachmentUrl());
+        s.setAttachments(materials.validate(userId, req.getAttachments()));
+        s.setAttachmentUrl(materials.validateLegacy(req.getAttachmentUrl()));
         s.setAssessmentName(assessmentName.isEmpty() ? null : assessmentName);
         Submission saved = submissionRepository.save(s);
         activityService.record(userId, LearningActivity.SUBMIT, projectId,

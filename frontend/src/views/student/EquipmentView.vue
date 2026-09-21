@@ -123,7 +123,7 @@
           </div>
         </div>
         <h4>设备描述</h4>
-        <div v-if="isRich(current.description)" class="dd-desc rich-content" v-html="current.description"></div>
+        <RichContent v-if="isRich(current.description)" class="dd-desc rich-content" :html="current.description" />
         <p v-else class="dd-desc">{{ current.description }}</p>
         <h4>技术规格</h4>
         <div><span v-for="s in arr(current.specs)" :key="s" class="chip">{{ s }}</span></div>
@@ -259,6 +259,7 @@
 </template>
 
 <script setup>
+import RichContent from '../../components/RichContent.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'

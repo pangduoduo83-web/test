@@ -52,6 +52,7 @@ def _m(cat: str, path_arg: str, confirm: bool = False) -> ToolPolicy:
 TOOL_POLICIES: dict[str, ToolPolicy] = {
     # ---- approval ----------------------------------------------------------
     "submit_change_plan": ToolPolicy(kind="harness", category="harness", confirm=True),
+    "expand_design_tools": ToolPolicy(kind="harness", category="harness"),
     # ---- project -----------------------------------------------------------
     "create_project": _q("project"),
     "switch_project": _q("project"),

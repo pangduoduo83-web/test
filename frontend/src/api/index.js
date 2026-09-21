@@ -1,22 +1,15 @@
 import http from './http'
+import { uploadAsset } from './upload'
 
 // ---------- 公开 ----------
 export const fetchPublicStats = () => http.get('/public/stats')
 export const fetchSiteConfig = () => http.get('/public/site-config')
 
 // ---------- 图片上传(返回 {url}) ----------
-export const uploadImage = (file) => {
-  const form = new FormData()
-  form.append('file', file)
-  return http.post('/upload', form, { timeout: 180000 })
-}
+export const uploadImage = (file) => uploadAsset(file, 'image')
 
 // ---------- 教学资料上传(教师/管理员,返回 {url, name}) ----------
-export const uploadDocFile = (file) => {
-  const form = new FormData()
-  form.append('file', file)
-  return http.post('/upload/file', form, { timeout: 180000 })
-}
+export const uploadDocFile = (file) => uploadAsset(file, 'file')
 
 // ---------- 认证 ----------
 export const login = (data) => http.post('/auth/login', data)
@@ -69,12 +62,16 @@ export const teacherUpdateResources = (id, resources) =>
   http.put(`/teacher/projects/${id}/resources`, { resources })
 export const teacherUpdateCover = (id, coverUrl) =>
   http.put(`/teacher/projects/${id}/cover`, { coverUrl })
+export const teacherProjectReferenceAnswer = (id) => http.get(`/teacher/projects/${id}/reference-answer`)
+export const teacherUpdateReferenceAnswer = (id, referenceAnswer) =>
+  http.put(`/teacher/projects/${id}/reference-answer`, { referenceAnswer })
 export const teacherProjectStudents = (id) => http.get(`/teacher/projects/${id}/students`)
 export const teacherSkillDimensions = () => http.get('/teacher/skill-dimensions')
 export const teacherListSubmissions = (params) => http.get('/teacher/submissions', { params })
 export const teacherGradeSubmission = (id, data) => http.post(`/teacher/submissions/${id}/grade`, data)
 export const teacherReturnSubmission = (id, feedback) => http.post(`/teacher/submissions/${id}/return`, { feedback })
-export const teacherAiReview = (id) => http.post(`/teacher/submissions/${id}/ai-review`, null, { timeout: 120000 })
+export const teacherAiReview = (id, body = {}) => http.post(`/teacher/submissions/${id}/ai-review`, body)
+export const teacherAiReviewStatus = (id) => http.get(`/teacher/submissions/${id}/ai-review`)
 export const teacherAnnounceProject = (id, data) => http.post(`/teacher/projects/${id}/announce`, data)
 export const teacherAtRisk = () => http.get('/teacher/at-risk')
 export const teacherRemindStudent = (projectId, studentId, message) => http.post(`/teacher/projects/${projectId}/remind/${studentId}`, { message })
@@ -82,10 +79,13 @@ export const teacherRemindStudent = (projectId, studentId, message) => http.post
 export const teacherClasses = () => http.get('/teacher/classes')
 export const teacherCreateClass = (data) => http.post('/teacher/classes', data)
 export const teacherClassDetail = (id) => http.get(`/teacher/classes/${id}`)
+export const teacherClassTeachers = (id) => http.get(`/teacher/classes/${id}/teachers`)
 export const teacherUpdateClass = (id, data) => http.put(`/teacher/classes/${id}`, data)
 export const teacherDeleteClass = (id) => http.delete(`/teacher/classes/${id}`)
 export const teacherAddClassMembers = (id, identifiers) => http.post(`/teacher/classes/${id}/members`, { identifiers })
 export const teacherRemoveClassMember = (id, userId) => http.delete(`/teacher/classes/${id}/members/${userId}`)
+export const teacherAddClassTeachers = (id, identifiers) => http.post(`/teacher/classes/${id}/teachers`, { identifiers })
+export const teacherRemoveClassTeacher = (id, teacherId) => http.delete(`/teacher/classes/${id}/teachers/${teacherId}`)
 export const teacherAssignClass = (id, data) => http.post(`/teacher/classes/${id}/assignments`, data)
 export const teacherUpdateAssignment = (id, assignmentId, data) => http.put(`/teacher/classes/${id}/assignments/${assignmentId}`, data)
 export const teacherRemoveAssignment = (id, assignmentId) => http.delete(`/teacher/classes/${id}/assignments/${assignmentId}`)
@@ -108,6 +108,9 @@ export const adminDeleteEquipment = (id) => http.delete(`/admin/equipment/${id}`
 export const adminListProjects = () => http.get('/admin/projects')
 export const adminCreateProject = (data) => http.post('/admin/projects', data)
 export const adminUpdateProject = (id, data) => http.put(`/admin/projects/${id}`, data)
+export const adminProjectReferenceAnswer = (id) => http.get(`/admin/projects/${id}/reference-answer`)
+export const adminUpdateReferenceAnswer = (id, referenceAnswer) =>
+  http.put(`/admin/projects/${id}/reference-answer`, { referenceAnswer })
 export const adminDeleteProject = (id) => http.delete(`/admin/projects/${id}`)
 export const adminProjectStudents = (id) => http.get(`/admin/projects/${id}/students`)
 export const adminListEnrollments = (params) => http.get('/admin/enrollments', { params })
@@ -126,7 +129,8 @@ export const adminSendNotification = (data) => http.post('/admin/notifications',
 export const adminDeleteNotification = (id) => http.delete(`/admin/notifications/${id}`)
 export const adminListDiscussions = (params) => http.get('/admin/discussions', { params })
 export const adminDeleteDiscussion = (id) => http.delete(`/admin/discussions/${id}`)
-export const adminAiReview = (id) => http.post(`/admin/submissions/${id}/ai-review`, null, { timeout: 120000 })
+export const adminAiReview = (id, body = {}) => http.post(`/admin/submissions/${id}/ai-review`, body)
+export const adminAiReviewStatus = (id) => http.get(`/admin/submissions/${id}/ai-review`)
 export const adminReturnSubmission = (id, feedback) => http.post(`/admin/submissions/${id}/return`, { feedback })
 export const adminAuditLogs = (params) => http.get('/admin/audit-logs', { params })
 export const adminScreen = () => http.get('/admin/screen', { timeout: 60000 })
@@ -187,6 +191,13 @@ export const storeLocalProjects = () => http.get('/store/local-projects')
 export const adminGetStoreSettings = () => http.get('/admin/store-settings')
 export const adminUpdateStoreSettings = (data) => http.put('/admin/store-settings', data)
 export const adminTestStoreSettings = () => http.post('/admin/store-settings/test')
-/** 商店返回的封面 /hub-assets/xxx 经本站后端代理展示 */
-export const storeAssetUrl = (url) =>
-  url && url.startsWith('/hub-assets/') ? url.replace('/hub-assets/', '/api/public/store-assets/') : url
+/** 商店封面经本站代理展示；版本标记避开旧代理曾返回并缓存的空图片。 */
+export const storeAssetUrl = (url) => {
+  if (!url || !url.startsWith('/hub-assets/')) return url
+  const asset = new URL(url.replace('/hub-assets/', '/api/public/store-assets/'), 'http://localhost')
+  asset.searchParams.set('assetVersion', '2')
+  return `${asset.pathname}${asset.search}${asset.hash}`
+}
+
+export const uploadSubmissionFile = (file, onUploadProgress) => uploadAsset(file, 'submission', onUploadProgress)
+export const fetchVideoPlayback = (url) => http.get('/media/playback', { params: { url } })

@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { Composer } from "@/components/chat/Composer";
 import { MessageList } from "@/components/chat/MessageList";
@@ -54,7 +55,10 @@ export function ChatPage() {
   const [previewMode, setPreviewMode] = useState<"pcb" | "sch" | null>(null);
   const [tools, setTools] = useState<ToolCategory[]>([]);
   const [info, setInfo] = useState<SystemInfo | null>(null);
-  const { loadConversations, error, notice, dismissError, setContextTokens } = useChat();
+  const { loadConversations, error, notice, dismissError, setContextTokens } = useChat(useShallow((s) => ({
+    loadConversations: s.loadConversations, error: s.error, notice: s.notice,
+    dismissError: s.dismissError, setContextTokens: s.setContextTokens,
+  })));
   const loadProjects = useProjects((s) => s.load);
   const presence = usePresence();
 

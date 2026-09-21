@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Link } from "react-router-dom";
 import { Avatar } from "@/components/ui/Avatar";
 import { relativeDay } from "@/lib/format";
@@ -40,7 +41,10 @@ const NAV: { key: PanelKey | "chat"; label: string; icon: React.ComponentType<{ 
 
 export function Sidebar({ collapsed, onToggle, onOpenPanel }: Props) {
   const user = useAuth((s) => s.user);
-  const { conversations, activeId, openConversation, newConversation, deleteConversation, running } = useChat();
+  const { conversations, activeId, openConversation, newConversation, deleteConversation, running } = useChat(useShallow((s) => ({
+    conversations: s.conversations, activeId: s.activeId, openConversation: s.openConversation,
+    newConversation: s.newConversation, deleteConversation: s.deleteConversation, running: s.running,
+  })));
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   return (

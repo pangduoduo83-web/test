@@ -34,9 +34,9 @@ public class ProjectPackager {
     private static final Pattern LOCAL_UPLOAD = Pattern.compile("/uploads/(\\d{6}/[A-Za-z0-9_-]+\\.[A-Za-z0-9]{1,10})");
     private static final Pattern HUB_ASSET = Pattern.compile("/hub-assets/([a-f0-9]{64})\\.([a-z0-9]{1,10})");
     private static final String[] TEXT_FIELDS = {"title", "summary", "description", "difficulty", "duration", "teamSize",
-            "category", "icon", "coverUrl", "author", "license", "pcbSize"};
+            "category", "icon", "coverUrl", "author", "license", "pcbSize", "submissionRequirements"};
     private static final String[] JSON_FIELDS = {"tags", "features", "learningGoals", "prerequisites", "skillRequirements",
-            "syllabus", "bom", "resources", "equipmentNames", "assessments"};
+            "syllabus", "bom", "resources", "equipmentNames", "assessments", "reviewRubric"};
 
     private final ObjectMapper objectMapper;
     private final UploadStorage storage;
@@ -81,6 +81,8 @@ public class ProjectPackager {
         n.set("resources", parse(p.getResources()));
         n.set("equipmentNames", parse(p.getEquipmentNames()));
         n.set("assessments", parse(p.getAssessments()));
+        n.set("reviewRubric", parse(p.getReviewRubric()));
+        n.put("submissionRequirements", p.getSubmissionRequirements());
         return n;
     }
 
@@ -94,12 +96,13 @@ public class ProjectPackager {
             if (mapping.containsKey(relative)) {
                 continue;
             }
-            Path file = storage.resolveForRead(relative);
-            if (file == null || !file.toFile().isFile()) {
+            if (!storage.exists(relative)) {
                 log.warn("发布项目:附件 {} 不存在,保留原地址", relative);
                 continue;
             }
-            mapping.put(relative, hubClient.uploadAsset(file));
+            try (UploadStorage.WorkingFile file = storage.materialize(relative, 100L * 1024 * 1024)) {
+                mapping.put(relative, hubClient.uploadAsset(file.path()));
+            } catch (IOException e) { throw new BusinessException(502, "读取项目附件失败，请重试"); }
         }
         for (Map.Entry<String, String> e : mapping.entrySet()) {
             text = text.replace("/uploads/" + e.getKey(), e.getValue());
@@ -120,10 +123,8 @@ public class ProjectPackager {
             }
             byte[] bytes = hubClient.downloadAsset(assetPath);
             String filename = UUID.randomUUID().toString().replace("-", "") + "." + m.group(2);
-            Path dir = storage.tenantRoot().resolve(month);
-            try {
-                Files.createDirectories(dir);
-                Files.write(dir.resolve(filename), bytes);
+            try (java.io.InputStream input = new java.io.ByteArrayInputStream(bytes)) {
+                storage.save(month + "/" + filename, input, bytes.length);
             } catch (IOException e) {
                 throw new BusinessException(500, "保存商店附件失败: " + e.getMessage());
             }
@@ -173,6 +174,8 @@ public class ProjectPackager {
         p.setResources(arrayText(payload, "resources"));
         p.setEquipmentNames(arrayText(payload, "equipmentNames"));
         p.setAssessments(arrayText(payload, "assessments"));
+        p.setReviewRubric(arrayText(payload, "reviewRubric"));
+        p.setSubmissionRequirements(payload.path("submissionRequirements").asText(null));
     }
 
     private JsonNode parse(String json) {

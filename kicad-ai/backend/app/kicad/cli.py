@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import get_settings
+from app.kicad import sexpr
 from app.kicad.compat import require_cli_compatible
 
 
@@ -90,11 +91,20 @@ def run_drc(pcb_path: Path, timeout: float = 120) -> dict[str, Any]:
     }
 
 
+def _require_schematic_root(sch_path: Path) -> None:
+    # KiCad 10 accepts a nil root without a command error, but loads an empty
+    # sheet: SVG contains only the frame and ERC incorrectly reports a pass.
+    # Raise so callers can use the built-in renderer/checker with a clear note.
+    if str(sexpr.value(sexpr.load(sch_path), "uuid", "")) == "00000000-0000-0000-0000-000000000000":
+        raise RuntimeError("原理图根 UUID 为全零，KiCad 会按空图处理；请修复图纸标识")
+
+
 def run_erc(sch_path: Path, timeout: float = 120) -> dict[str, Any]:
     cli = kicad_cli_path()
     if not cli:
         raise FileNotFoundError("kicad-cli not available")
     require_cli_compatible(sch_path, version())
+    _require_schematic_root(sch_path)
     with tempfile.TemporaryDirectory() as tmp:
         report = Path(tmp) / "erc.json"
         cmd = [
@@ -167,6 +177,7 @@ def export_sch_svg(sch_path: Path, timeout: float = 120) -> str:
     if not cli:
         raise FileNotFoundError("kicad-cli not available")
     require_cli_compatible(sch_path, version())
+    _require_schematic_root(sch_path)
     with tempfile.TemporaryDirectory() as tmp:
         cmd = [
             cli,

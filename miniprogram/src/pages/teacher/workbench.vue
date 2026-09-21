@@ -110,7 +110,7 @@ const changeCover = (p) => {
     success: async (res) => {
       uni.showLoading({ title: '上传中...' })
       try {
-        const d = await uploadImage(res.tempFilePaths[0])
+        const d = await uploadImage(res.tempFilePaths[0], res.tempFiles?.[0])
         await teacherUpdateCover(p.id, d.url)
         uni.showToast({ title: '封面已更新', icon: 'success' })
         load()

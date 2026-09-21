@@ -1,6 +1,7 @@
 package com.example.ioedunew.entity;
 
 import com.example.ioedunew.common.RawJsonStringDeserializer;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Data;
@@ -159,6 +160,19 @@ public class Project {
     @JsonDeserialize(using = RawJsonStringDeserializer.class)
     @Column(columnDefinition = "TEXT")
     private String assessments = "[]";
+
+    @JsonRawValue
+    @JsonDeserialize(using = RawJsonStringDeserializer.class)
+    @Column(columnDefinition = "TEXT")
+    private String reviewRubric = "[]";
+
+    @Column(columnDefinition = "TEXT")
+    private String submissionRequirements;
+
+    /** 教师私有的参考答案/参考实现,只供 AI 评审使用,不能随项目详情返回给学生。 */
+    @JsonIgnore
+    @Column(name = "reference_answer", columnDefinition = "TEXT")
+    private String referenceAnswer;
 
     /** PUBLISHED / DRAFT */
     @Column(nullable = false, length = 20)

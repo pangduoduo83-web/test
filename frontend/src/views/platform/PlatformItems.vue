@@ -240,7 +240,7 @@
 
               <div class="pv-section" v-if="payload.description">
                 <h4>项目介绍</h4>
-                <div class="rich" v-html="safeHtml(payload.description)"></div>
+                <RichContent class="rich" :html="safeHtml(payload.description)" />
               </div>
 
               <div class="pv-section" v-if="arr(payload.syllabus).length">
@@ -373,6 +373,7 @@
 </template>
 
 <script setup>
+import RichContent from '../../components/RichContent.vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Building2, CircleCheckBig, Clock3, Download, Eye, LayoutGrid, List, MessageSquareText, RefreshCw, Search, Star } from 'lucide-vue-next'

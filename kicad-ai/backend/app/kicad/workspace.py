@@ -15,6 +15,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from app.config import get_settings
 
@@ -192,6 +193,7 @@ def create_blank_project(user_id: str, name: str, title: str | None = None) -> P
             i += 1
     dest.mkdir(parents=True, exist_ok=True)
     proj_title = title or clean_name
+    root_uuid = str(uuid4())
 
     pro_content = json.dumps(
         {
@@ -224,6 +226,8 @@ def create_blank_project(user_id: str, name: str, title: str | None = None) -> P
                         "track_width": 0.25,
                         "via_diameter": 0.8,
                         "via_drill": 0.4,
+                        "wire_width": 6,
+                        "bus_width": 12,
                     }
                 ]
             },
@@ -231,7 +235,7 @@ def create_blank_project(user_id: str, name: str, title: str | None = None) -> P
                 "legacy_lib_dir": "",
                 "legacy_lib_list": [],
             },
-            "sheets": [["00000000-0000-0000-0000-000000000000", "Root"]],
+            "sheets": [[root_uuid, "Root"]],
         },
         indent=2,
     )
@@ -240,7 +244,7 @@ def create_blank_project(user_id: str, name: str, title: str | None = None) -> P
 \t(version 20231120)
 \t(generator "eeschema")
 \t(generator_version "8.0")
-\t(uuid "00000000-0000-0000-0000-000000000000")
+\t(uuid "{root_uuid}")
 \t(paper "A4")
 \t(title_block
 \t\t(title "{proj_title}")

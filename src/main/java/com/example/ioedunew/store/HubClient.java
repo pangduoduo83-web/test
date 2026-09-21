@@ -17,6 +17,9 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -39,7 +42,14 @@ public class HubClient {
         f.setConnectTimeout(3000);
         f.setReadTimeout(30000);
         this.restTemplate = new RestTemplate(f);
-        SimpleClientHttpRequestFactory uf = new SimpleClientHttpRequestFactory();
+        SimpleClientHttpRequestFactory uf = new SimpleClientHttpRequestFactory() {
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String method) throws IOException {
+                super.prepareConnection(connection, method);
+                // Handle asset redirects explicitly: HttpURLConnection does not follow HTTP -> HTTPS.
+                connection.setInstanceFollowRedirects(false);
+            }
+        };
         uf.setConnectTimeout(3000);
         uf.setReadTimeout(180000);
         this.uploadTemplate = new RestTemplate(uf);
@@ -96,12 +106,40 @@ public class HubClient {
     /** 下载商店附件(公开地址,不需要 API Key) */
     public byte[] downloadAsset(String assetPath) {
         try {
-            ResponseEntity<byte[]> resp = uploadTemplate.getForEntity(settings.baseUrl() + assetPath, byte[].class);
-            return resp.getBody();
+            URI target = URI.create(settings.baseUrl() + assetPath);
+            for (int redirects = 0; redirects <= 5; redirects++) {
+                // The URI overload preserves percent-encoded CDN signatures; no hub API key is sent.
+                ResponseEntity<byte[]> resp = uploadTemplate.getForEntity(target, byte[].class);
+                int status = resp.getStatusCodeValue();
+                if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
+                    URI location = resp.getHeaders().getLocation();
+                    if (location == null || redirects == 5) {
+                        throw new BusinessException(502, "商店附件跳转异常，请联系管理员");
+                    }
+                    URI next = target.resolve(location);
+                    String scheme = next.getScheme();
+                    if ((!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme))
+                            || next.getHost() == null || next.getUserInfo() != null
+                            || ("https".equalsIgnoreCase(target.getScheme()) && !"https".equalsIgnoreCase(scheme))) {
+                        throw new BusinessException(502, "商店附件跳转地址无效");
+                    }
+                    target = next;
+                    continue;
+                }
+                byte[] bytes = resp.getBody();
+                if (status != 200 || bytes == null || bytes.length == 0) {
+                    throw new BusinessException(502, "商店附件未返回有效内容，请稍后重试");
+                }
+                return bytes;
+            }
+            throw new BusinessException(502, "商店附件跳转异常，请联系管理员");
         } catch (HttpStatusCodeException e) {
             throw new BusinessException(502, "下载商店附件失败: HTTP " + e.getRawStatusCode());
         } catch (ResourceAccessException e) {
-            throw new BusinessException(502, "无法连接项目商店: " + e.getMessage());
+            // Connection errors can contain the signed URL. Keep temporary credentials out of API errors.
+            throw new BusinessException(502, "无法连接项目商店附件服务器，请稍后重试");
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(502, "商店附件跳转地址无效");
         }
     }
 

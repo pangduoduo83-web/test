@@ -11,6 +11,7 @@ public class ChatMessage {
 
     private String role;
     private String content;
+    private List<String> imageUrls = new ArrayList<>();
     /** assistant 消息发起的工具调用 */
     private List<ToolCall> toolCalls = new ArrayList<>();
     /** tool 消息对应的调用 id 与工具名 */

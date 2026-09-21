@@ -38,6 +38,7 @@ const router = createRouter({
       children: [
         { path: '', redirect: '/teacher/workbench' },
         { path: 'workbench', name: 'teacher-workbench', component: () => import('../views/teacher/TeacherWorkbench.vue') },
+        { path: 'projects', name: 'teacher-projects', component: () => import('../views/teacher/TeacherProjects.vue') },
         { path: 'classes', name: 'teacher-classes', component: () => import('../views/teacher/TeacherClasses.vue') },
         { path: 'submissions', name: 'teacher-submissions', component: () => import('../views/teacher/TeacherSubmissions.vue') }
       ]
@@ -95,6 +96,12 @@ router.beforeEach((to) => {
   if (to.meta.requiresAdmin && user?.role === 'LAB_ADMIN'
       && !/^\/admin\/(dashboard|equipment|borrows)/.test(to.path)) return '/admin/dashboard'
   if (to.meta.requiresTeacher && user?.role !== 'TEACHER' && user?.role !== 'ADMIN') return '/app/dashboard'
+  // 兼容旧版工作台中的项目入口及新建项目书签。
+  if (to.path === '/teacher/workbench' && (to.query.section === 'projects' || to.query.new === '1')) {
+    const query = { ...to.query }
+    delete query.section
+    return { path: '/teacher/projects', query, replace: true }
+  }
   return true
 })
 

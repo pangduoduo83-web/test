@@ -167,7 +167,7 @@
           <el-table-column label="Token 入/出" width="130"><template #default="{ row }">{{ row.promptTokens }} / {{ row.completionTokens }}</template></el-table-column>
           <el-table-column label="耗时" width="90"><template #default="{ row }">{{ row.latencyMs }} ms</template></el-table-column>
           <template #empty>
-            <div class="empty in-table"><div class="empty-icon">🧾</div><div class="empty-title">还没有调用记录</div><div class="muted">学生或教师在 AI 助手里发起对话后会记录在这里</div></div>
+            <div class="empty in-table"><div class="empty-icon"><FileText :size="26" /></div><div class="empty-title">还没有调用记录</div><div class="muted">学生或教师在 AI 助手里发起对话后会记录在这里</div></div>
           </template>
         </el-table>
         <el-pagination v-if="runsTotal > 20" layout="prev, pager, next" :total="runsTotal" :page-size="20" :current-page="runPage + 1"
@@ -226,7 +226,7 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 import {
-  Activity, BarChart3, Bot, ClipboardList, Eye, GitFork, Layers, PencilLine, ScrollText, Search, Sparkles, User, Users, Wrench
+  Activity, BarChart3, Bot, ClipboardList, Eye, FileText, GitFork, Layers, PencilLine, ScrollText, Search, Sparkles, User, Users, Wrench
 } from 'lucide-vue-next'
 import {
   adminAiPromoteSkill, adminAiRunTools, adminAiRuns, adminAiSkills, adminAiTools, adminAiUpdateTool, adminAiUsage,

@@ -11,6 +11,7 @@ RUN mvn -q package -Dmaven.test.skip=true
 
 # ---------- 运行阶段:JRE8(8u191+ 才支持容器内存感知) ----------
 FROM eclipse-temurin:8-jre
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /build/target/*.jar app.jar
 

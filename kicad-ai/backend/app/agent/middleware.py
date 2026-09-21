@@ -35,6 +35,7 @@ from langgraph.types import Command
 
 from app.agent.context import AgentContext
 from app.agent.results import DEFAULT_MAX_CHARS, shrink_tool_result
+from app.agent.tool_routing import select_design_tools
 from app.agent.tools.registry import ADMIN_ONLY_TOOLS, PATH_ARG_NAMES, get_policy
 from app.kicad import workspace as ws
 from app.kicad.diff import diff_files
@@ -51,6 +52,9 @@ NEAR_REPEAT_LIMIT = 8
 NEAR_REPEAT_GRID = 0.5  # numeric args are bucketed to this step for the coarse signature
 # Absolute ceiling for calls of one tool within a single human turn.
 TOOL_CALLS_PER_TURN_LIMIT = 60
+# A reminder, not a hard stop: complex designs may genuinely need more reads.
+QUERY_PROGRESS_THRESHOLD = 8
+QUERY_PROGRESS_MARKER = "\n\n# 本阶段查询进度 (由系统统计)"
 
 Snapshot = tuple[str, Path | None]  # (resolved file path, snapshot file or None)
 ChangedFile = tuple[str, str, Path | None]  # (absolute path, workspace-relative path, snapshot)
@@ -111,11 +115,20 @@ def _restrict_tools(request: Any) -> Any:
 def _prepare_model_request(request: Any) -> Any:
     """Refresh time and append the server-owned per-run project context."""
     request = _restrict_tools(request)
+    request, tool_hint = select_design_tools(request)
     system_message = getattr(request, "system_message", None)
     content = getattr(system_message, "content", None)
+    # Skills/framework middleware may already have converted the prompt into
+    # text blocks. Treat those like the plain prompt so context/progress also
+    # reaches real model calls, not just direct middleware invocations.
+    if isinstance(content, list) and all(
+        isinstance(block, str) or (isinstance(block, dict) and block.get("type") == "text")
+        for block in content
+    ):
+        content = "\n".join(block if isinstance(block, str) else block.get("text", "") for block in content)
     if not system_message or not isinstance(content, str):
         return request
-    updated = content
+    updated = content.split(QUERY_PROGRESS_MARKER, 1)[0]
     if "当前系统日期与时间：" in updated:
         from app.agent.prompts import current_time_str
 
@@ -147,9 +160,20 @@ def _prepare_model_request(request: Any) -> Any:
         block = configurable.get("agent_context_block") if isinstance(configurable, dict) else None
         if isinstance(block, str) and block:
             updated = f"{updated.rstrip()}\n\n{block}"
+    updated += tool_hint
+    messages = list(getattr(request, "messages", None) or [])
+    queries = _successful_design_queries(messages)
+    if queries >= QUERY_PROGRESS_THRESHOLD:
+        updated += (
+            f"{QUERY_PROGRESS_MARKER}\n"
+            f"本阶段已完成 {queries} 次设计或元件库查询，尚未产生新的文件修改。"
+            "若用户要求绘制或修改，请先判断已有结果是否足够提交首批 submit_change_plan；"
+            "足够就开始变更，不再扩展检索或重复讲计划。若仍缺关键条件，只查询直接影响"
+            "下一步的那一项，或提出具体问题。只读咨询保持只读，不要为了满足进度提示修改文件。"
+        )
     if updated == content:
         return request
-    return request.override(system_message=system_message.__class__(content=updated))
+    return request.override(system_message=system_message.model_copy(update={"content": updated}))
 
 
 def _default_for(policy_path_arg: str | None, ctx: AgentContext) -> str | None:
@@ -432,6 +456,61 @@ def detect_repeat(messages: list[Any], tool_call: dict[str, Any]) -> tuple[int, 
     return repeats, stalled
 
 
+def _query_phase(messages: list[Any]) -> list[Any]:
+    """Reads become fresh after an edit, partial plan execution or project switch.
+
+    Inspect tool results rather than proposed calls: a pending/rejected plan or
+    failed mutation has not changed the design and must not reset the guard.
+    This is scoped to message history, never shared between user conversations.
+    """
+    start = 0
+    names: dict[str, str] = {}
+    for index, message in enumerate(messages):
+        if isinstance(message, HumanMessage):
+            start = index + 1
+            names.clear()
+        elif isinstance(message, AIMessage):
+            names.update({tc["id"]: tc["name"] for tc in message.tool_calls if tc.get("id")})
+        elif isinstance(message, ToolMessage):
+            name = message.name or names.get(message.tool_call_id, "")
+            payload: dict[str, Any] = {}
+            if isinstance(message.content, str):
+                try:
+                    parsed = json.loads(message.content)
+                    if isinstance(parsed, dict):
+                        payload = parsed
+                except (ValueError, TypeError):
+                    pass
+            if name == "submit_change_plan":
+                executed = payload.get("executed")
+                # A partially failed batch still changes the drawing.
+                changed = isinstance(executed, int) and not isinstance(executed, bool) and executed > 0
+            else:
+                changed = (
+                    (get_policy(name).kind == "file_mutation"
+                     or name in {"create_project", "switch_project", "restore_file_version"})
+                    and message.status != "error"
+                    and payload.get("success") is not False
+                )
+            if changed:
+                start = index + 1
+    return messages[start:]
+
+
+def _successful_design_queries(messages: list[Any]) -> int:
+    phase = _query_phase(messages)
+    names = {tc["id"]: tc["name"] for m in phase if isinstance(m, AIMessage)
+             for tc in m.tool_calls if tc.get("id")}
+    count = 0
+    for message in phase:
+        if not isinstance(message, ToolMessage) or not KiCadPolicyMiddleware._succeeded(message):
+            continue
+        policy = get_policy(message.name or names.get(message.tool_call_id, ""))
+        if policy.kind == "query" and policy.category in {"pcb_query", "sch_query", "pcb_place", "library", "drc"}:
+            count += 1
+    return count
+
+
 def analyze_repeats(messages: list[Any], tool_call: dict[str, Any]) -> tuple[int, bool, int, int]:
     """``(exact_repeats, stalled, near_repeats, calls_of_tool)`` within the current turn.
 
@@ -449,17 +528,22 @@ def analyze_repeats(messages: list[Any], tool_call: dict[str, Any]) -> tuple[int
             start = i
             break
     turn = messages[start:]
+    total = sum(
+        1 for message in turn if isinstance(message, AIMessage)
+        for tc in message.tool_calls or []
+        if tc.get("id") != tcid and tc.get("name") == name
+    )
+    if get_policy(str(name)).kind == "query":
+        turn = _query_phase(turn)
     results = {m.tool_call_id: m for m in turn if isinstance(m, ToolMessage)}
     prior: list[str | None] = []
     near = 0
-    total = 0
     for m in turn:
         if not isinstance(m, AIMessage):
             continue
         for tc in m.tool_calls or []:
             if tc.get("id") == tcid or tc.get("name") != name:
                 continue
-            total += 1
             if _canonical(tc.get("args")) == sig:
                 prior.append(_text(results.get(tc.get("id"))))
             elif _coarse_signature(tc.get("args")) == coarse:

@@ -7,4 +7,5 @@ import java.util.Optional;
 
 public interface AssetRepo extends JpaRepository<HubAsset, Long> {
     Optional<HubAsset> findBySha256(String sha256);
+    org.springframework.data.domain.Page<HubAsset> findByObjectKeyIsNull(org.springframework.data.domain.Pageable page);
 }

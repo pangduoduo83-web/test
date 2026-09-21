@@ -41,6 +41,11 @@
 
 ### Deep Agents 的使用方式
 
+主代理会按本轮任务筛选原理图或 PCB 工具；同步、跨领域和不明确的任务保留完整工具。
+筛选使用本地规则，不增加模型请求。执行中可通过 `expand_design_tools` 补充另一领域的工具，
+扩展仅作用于当前用户轮次，仍受角色权限、整批审批和工作区边界约束。
+聊天输入框与导航只订阅自身需要的状态；预览将 180 ms 内的连续变更合并请求，取消过时请求，并保留旧图直到新图就绪。
+
 | 能力 | 实现 |
 | --- | --- |
 | 主代理 | `deepagents.create_deep_agent(model, tools, system_prompt, middleware, subagents, skills, memory, backend, interrupt_on, context_schema, checkpointer, store)` |

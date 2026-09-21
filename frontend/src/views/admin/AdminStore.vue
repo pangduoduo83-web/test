@@ -21,7 +21,7 @@
           <div v-for="it in items" :key="it.id" class="card item" :class="{ featured: it.featured }">
             <div class="cover" @click="openDetail(it)">
               <img v-if="it.coverUrl" :src="storeAssetUrl(it.coverUrl)" alt="" />
-              <div v-else class="cover-placeholder">📦</div>
+              <div v-else class="cover-placeholder"><Package :size="28" /></div>
               <el-tag v-if="it.localProjectId" size="small" type="success" class="badge">已安装 v{{ it.localVersionNo }}</el-tag>
               <el-tag v-if="it.updateAvailable" size="small" type="warning" class="badge badge-2">有新版本 v{{ it.currentVersionNo }}</el-tag>
               <span v-if="it.featured" class="featured-badge">★ 平台推荐</span>
@@ -66,7 +66,7 @@
             <template #default="{ row }">
               <div class="local-cell">
                 <img v-if="row.coverUrl" :src="row.coverUrl" class="local-thumb" alt="" />
-                <span v-else class="local-thumb">📦</span>
+                <span v-else class="local-thumb"><Package :size="20" /></span>
                 <div>
                   <div class="local-title">{{ row.title }}</div>
                   <div class="local-sub">{{ row.category || '未分类' }} · {{ row.difficulty }} · {{ row.mentor || '未指派讲师' }}
@@ -158,6 +158,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Package } from 'lucide-vue-next'
 import {
   adminGetStoreSettings, adminTestStoreSettings, adminUpdateStoreSettings,
   storeAssetUrl, storeInstall, storeItem, storeItems, storeLocalProjects, storePublish, storeStatus

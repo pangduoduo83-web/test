@@ -139,6 +139,30 @@ public class TeacherService {
         return projectRepository.save(p);
     }
 
+    /** 读取教师私有的参考答案/参考实现,学生端不会拿到该字段。 */
+    public Map<String, Object> referenceAnswer(Long userId, boolean admin, Long projectId) {
+        Project p = ownedProject(userId, admin, projectId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("referenceAnswer", p.getReferenceAnswer() == null ? "" : p.getReferenceAnswer());
+        return result;
+    }
+
+    /** 保存教师私有的参考答案/参考实现,供 AI 评审对照。 */
+    @Transactional
+    public Map<String, Object> updateReferenceAnswer(Long userId, boolean admin, Long projectId, String referenceAnswer) {
+        Project p = ownedProject(userId, admin, projectId);
+        String value = referenceAnswer == null ? "" : referenceAnswer.trim();
+        if (value.length() > 20000) {
+            throw new BusinessException("参考答案不能超过20000字");
+        }
+        p.setReferenceAnswer(value.isEmpty() ? null : value);
+        p.setUpdatedAt(LocalDateTime.now());
+        projectRepository.save(p);
+        Map<String, Object> result = new HashMap<>();
+        result.put("referenceAnswer", value);
+        return result;
+    }
+
     /** 项目报名学生与进度(附学生姓名/学号) */
     public List<Map<String, Object>> projectStudents(Long userId, boolean admin, Long projectId) {
         ownedProject(userId, admin, projectId);

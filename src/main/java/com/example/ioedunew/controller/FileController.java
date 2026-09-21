@@ -23,12 +23,12 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 文件上传接口:保存到当前租户目录 {upload-dir}/{租户}/yyyyMM/uuid.ext,
+ * 文件上传接口:经 UploadStorage 保存到当前租户的 OSS 或本地存储,
  * 由 UploadController 按 /uploads/** 对外提供。
  * 安全边界:
  * - /api/upload 仅允许常见图片扩展名,登录用户可用(头像/封面);
  * - /api/upload/file 允许教学资料类扩展名,仅教师/管理员可用;
- * - 大小上限由 multipart 配置控制(30MB)。
+ * - /api/upload/submission 记录上传者，成果附件上限100MB；其他上传接口仍为30MB。
  */
 @RestController
 @RequestMapping("/api/upload")
@@ -43,15 +43,18 @@ public class FileController {
             "zip", "rar", "7z", "mp4", "mp3");
 
     private final UploadStorage storage;
+    private final com.example.ioedunew.repository.SubmissionAssetRepository assets;
     private final com.example.ioedunew.tenant.TenantQuotaService quotaService;
 
-    public FileController(UploadStorage storage, com.example.ioedunew.tenant.TenantQuotaService quotaService) {
+    public FileController(UploadStorage storage, com.example.ioedunew.tenant.TenantQuotaService quotaService, com.example.ioedunew.repository.SubmissionAssetRepository assets) {
+        this.assets = assets;
         this.storage = storage;
         this.quotaService = quotaService;
     }
 
     @PostMapping
     public ApiResponse<Map<String, String>> upload(@RequestParam("file") MultipartFile file) throws IOException {
+        if (file.getSize() > 30L * 1024 * 1024) throw new BusinessException("图片不能超过30MB");
         return ApiResponse.ok(saveFile(file, IMAGE_EXT, "仅支持图片格式:" + String.join("/", IMAGE_EXT)));
     }
 
@@ -65,7 +68,22 @@ public class FileController {
         if (!user.isTeacher() && !user.isAdmin()) {
             throw new BusinessException(403, "仅教师或管理员可上传教学资料");
         }
+        if (file.getSize() > 30L * 1024 * 1024) throw new BusinessException("教学资料不能超过30MB");
         return ApiResponse.ok(saveFile(file, DOC_EXT, "不支持的文件类型,允许:" + String.join("/", DOC_EXT)));
+    }
+
+    @PostMapping("/submission")
+    public ApiResponse<Map<String, String>> uploadSubmission(@RequestParam("file") MultipartFile file,
+            @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) throws IOException {
+        if (file.getSize() > 100L * 1024 * 1024) throw new BusinessException("成果附件不能超过100MB");
+        Map<String, String> result = saveFile(file, Arrays.asList("png", "jpg", "jpeg", "webp", "pdf", "doc", "docx", "mp4", "mov", "webm"),
+                "支持 JPG/PNG/WebP、PDF、Word、MP4/MOV/WebM");
+        com.example.ioedunew.entity.SubmissionAsset asset = new com.example.ioedunew.entity.SubmissionAsset();
+        asset.setUserId(user.getId()); asset.setUrl(result.get("url"));
+        String name = result.get("name");
+        asset.setName(name.substring(0, Math.min(255, name.length()))); asset.setSize(file.getSize());
+        assets.save(asset);
+        return ApiResponse.ok(result);
     }
 
     private Map<String, String> saveFile(MultipartFile file, List<String> allowedExt, String typeError)
@@ -73,7 +91,6 @@ public class FileController {
         if (file == null || file.isEmpty()) {
             throw new BusinessException("请选择要上传的文件");
         }
-        quotaService.checkStorageQuota(file.getSize());
         String original = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
         int dot = original.lastIndexOf('.');
         String ext = dot < 0 ? "" : original.substring(dot + 1).toLowerCase(Locale.ROOT);
@@ -82,12 +99,10 @@ public class FileController {
         }
 
         String month = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        File dir = storage.tenantRoot().resolve(month).toFile();
-        if (!dir.exists() && !dir.mkdirs()) {
-            throw new BusinessException(500, "上传目录创建失败");
-        }
         String filename = UUID.randomUUID().toString().replace("-", "") + "." + ext;
-        file.transferTo(new File(dir, filename).getAbsoluteFile());
+        try (java.io.InputStream input = file.getInputStream()) {
+            storage.save(month + "/" + filename, input, file.getSize());
+        }
 
         Map<String, String> result = new HashMap<>();
         result.put("url", "/uploads/" + month + "/" + filename);

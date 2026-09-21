@@ -100,7 +100,8 @@ export const adminDeleteDiscussion = (id) => request({ url: `/admin/discussions/
 // ---------- AI ----------
 export const fetchAiPlan = () => get('/ai/learning-plan', null, { silent: true })
 export const generateAiPlan = (data) => post('/ai/learning-plan/generate', data)
-export const adminAiReview = (id) => post(`/admin/submissions/${id}/ai-review`)
+export const adminAiReview = (id, body = {}) => post(`/admin/submissions/${id}/ai-review`, body)
+export const adminAiReviewStatus = (id) => get(`/admin/submissions/${id}/ai-review`)
 export const adminGetAiSettings = () => get('/admin/ai-settings')
 export const adminUpdateAiSettings = (data) => put('/admin/ai-settings', data)
 export const adminTestAiSettings = () => post('/admin/ai-settings/test')

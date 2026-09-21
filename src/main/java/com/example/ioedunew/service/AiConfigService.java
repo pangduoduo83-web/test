@@ -90,7 +90,16 @@ public class AiConfigService {
         m.put("temperature", cfg.temperature);
         m.put("connectTimeoutMs", cfg.connectTimeoutMs);
         m.put("readTimeoutMs", cfg.readTimeoutMs);
+        m.put("mineruMode", mineruMode());
         m.put("dailyRunsPerUser", dailyRunsPerUser(defaultDailyRuns));
+        for (String kind : new String[]{"vision", "speech", "mineruCloud", "mineruLocal"}) {
+            AiConfig media = mediaConfig(kind);
+            m.put(kind + "BaseUrl", media.baseUrl);
+            m.put(kind + "Model", media.model);
+            m.put(kind + "Enabled", media.enabled);
+            m.put(kind + "ApiKeySet", !isBlank(media.apiKey));
+            m.put(kind + "ApiKeyMasked", mask(media.apiKey));
+        }
         return m;
     }
 
@@ -180,7 +189,41 @@ public class AiConfigService {
             }
             put(KEY_DAILY_RUNS, String.valueOf(v));
         }
+        for (String kind : new String[]{"vision", "speech", "mineruCloud", "mineruLocal"}) {
+            for (String field : new String[]{"BaseUrl", "Model", "ApiKey", "Enabled"}) {
+                String key = kind + field;
+                if (!body.containsKey(key) || body.get(key) == null) continue;
+                String value = String.valueOf(body.get(key)).trim();
+                if (field.equals("ApiKey")) {
+                    if (!value.isEmpty()) put("ai." + key, crypto.encrypt(value));
+                } else {
+                    if (field.equals("BaseUrl") && !value.isEmpty() && !value.matches("https?://[^\\s]+"))
+                        throw new BusinessException("模型服务地址必须以 http:// 或 https:// 开头");
+                    put("ai." + key, field.equals("BaseUrl") ? value.replaceAll("/+$", "") : value);
+                }
+            }
+        }
+        if (body.containsKey("mineruMode")) {
+            String mode = String.valueOf(body.get("mineruMode"));
+            if (!"cloud".equals(mode) && !"selfhost".equals(mode)) throw new BusinessException("MinerU模式必须为cloud或selfhost");
+            put("ai.mineruMode", mode);
+        }
         return view();
+    }
+
+    public String mineruMode() { return loadAll().getOrDefault("ai.mineruMode", "cloud"); }
+
+    public AiConfig mediaConfig(String kind) {
+        if (!java.util.Arrays.asList("vision", "speech", "mineruCloud", "mineruLocal").contains(kind)) throw new IllegalArgumentException("模型类型错误");
+        Map<String, String> db = loadAll();
+        AiConfig cfg = new AiConfig();
+        cfg.enabled = !"false".equalsIgnoreCase(db.get(KEY_ENABLED)) && "true".equalsIgnoreCase(db.get("ai." + kind + "Enabled"));
+        cfg.baseUrl = db.getOrDefault("ai." + kind + "BaseUrl", "");
+        cfg.model = db.getOrDefault("ai." + kind + "Model", "");
+        cfg.apiKey = crypto.decrypt(db.get("ai." + kind + "ApiKey"));
+        cfg.maxTokens = 1600; cfg.temperature = 0.1;
+        cfg.connectTimeoutMs = 15000; cfg.readTimeoutMs = 120000;
+        return cfg;
     }
 
     // ---------- 内部工具 ----------

@@ -10,28 +10,33 @@ description: PCB 走线、布线、打过孔与铺铜工作流：从板框设定
 
 ## 标准执行流程
 
+按目标选择必要查询，已有有效板情不重复读取。局部布线不必重新规划整板。
+下面描述的是流程，参数以当前工具 schema 为准。所有修改动作通过 `submit_change_plan`
+提交并按顺序执行；检查结果足够时就提交首批动作，不要只解释计划或遍历所有网络。
+
 ### 1. 读取现状与飞线网络
-1. 调用 `get_board_info` 获取板层结构、尺寸和已有走线条数。
-2. 调用 `list_nets` 查看所有网络名称与节点数量。
-3. 调用 `get_ratsnest` 获取未布线的焊盘对列表（飞线）。
-4. 确认板框：若板框缺失或需要重设尺寸，调用 `set_board_outline_rect(x1, y1, x2, y2)` 创建清晰的 Edge.Cuts 边界。
+1. 缺少有效板情时，调用 `get_board_info` 获取板层结构、尺寸和已有走线条数。
+2. 目标网络未知时，调用 `list_nets`；已知网络则直接定位相关焊盘。
+3. 需要选择未布线连接时，调用 `get_ratsnest` 获取焊盘对列表（飞线）。
+4. 确认板框：若任务需要且板框缺失，用 `set_board_outline_rect` 设置已确认的外形。
 
 ### 2. 点对点走线 (Pad to Pad Routing)
-1. 优先走关键信号线和短飞线，调用 `pcb_route_pad_to_pad(from_ref, from_pad, to_ref, to_pad, layer="F.Cu", width=0.25)`。
+1. 优先走关键信号线和短飞线，用 `pcb_route_pad_to_pad`，按 schema 指定实际焊盘和层，计划中明确 width。
 2. 线宽选择：
    - 信号线（通用）：0.2 mm ~ 0.25 mm
    - 电源走线（大电流）：0.5 mm ~ 1.0 mm
-3. 换层与过孔：若顶层受阻或连接到内层/底层，调用 `pcb_add_vias(position=[x, y], net_name="网络名", drill=0.3, size=0.6)`。
+3. 换层与过孔：用 `pcb_add_vias` 的 vias 数组，每个过孔明确 diameter 和 drill，满足当前项目约束。
 4. 走线修改：若发现走线重叠或需要优化布线路径，调用 `pcb_delete_tracks` / `pcb_delete_vias` 清除目标网络的走线，再重新调用 `pcb_route_pad_to_pad`。
 
 ### 3. 大面积铺地铜 (Copper Pour / Zone)
-1. 信号走线完成后，调用 `add_zone(net_name="GND", layer="B.Cu", polygon_points=[[x1,y1], [x2,y2], [x3,y3], [x4,y4]])` 为底层铺设完整的 GND 地平面。
-2. 铺铜后或修改走线后，调用 `refill_zones` 重新灌铜，确保避让间距正确。
+1. 用 `add_zone` 添加 GND 铜区，按实际 schema 指定边界，计划中明确 clearance。
+2. 只有工具支持无桌面执行时使用 `refill_zones`；若报告需要 IPC 则说明未完成灌铜，不反复重试或启动桌面。
 
 ### 4. DRC 闭环验证
 1. 调用 `run_drc_check` 运行设计规则检查。
 2. 核查结果中的 `error_count` 与 `unconnected_count`。
-3. 若存在 clearance 违规，微调走线或移动封装；若有 unconnected 项，补全相应走线直至通过。
+3. 按违规类型定位原因后再修复，不用随机微移代替分析；unconnected 是未布线连接，
+   只在布线任务范围内处理。最多两种有依据的修复方法，仍不改善时汇报剩余问题。
 
 ## 经验法则
 - PCB 坐标单位为毫米，+Y 向下，必须对齐板级栅格（0.1 mm 或 0.05 mm）。

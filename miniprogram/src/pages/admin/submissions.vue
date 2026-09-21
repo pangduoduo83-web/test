@@ -43,6 +43,7 @@
           mode="widthFix"
           @click="preview(s)"
         />
+        <SubmissionFiles :model-value="s.attachments || []" />
         <text class="sc-time muted">提交于 {{ relativeTime(s.submittedAt) }}</text>
 
         <view v-if="s.status === 'GRADED'" class="graded-box">
@@ -65,10 +66,17 @@
         <button class="ai-btn" :disabled="aiReviewing" @click="runAiReview">
           {{ aiReviewing ? 'AI 分析中...' : 'AI 预评审(建议分+评语草稿)' }}
         </button>
+        <text class="muted">{{ reviewMessage }}</text>
+        <text v-if="aiReviewing" class="muted">后台处理中，离开页面后仍会继续</text>
         <view v-if="aiResult" class="ai-box">
+          <view class="review-result-head"><text>AI 评审建议</text><text class="review-total">{{ aiResult.suggestedScore }}<text class="review-total-unit"> / 100分</text></text></view>
+          <button class="review-apply" @click="applyReview">填入AI建议</button>
+          <view v-for="row in aiResult.criteria || []" :key="row.name" class="review-criterion"><view class="review-criterion-head"><text>{{ row.name }}</text><text>{{ row.score }} / {{ row.maxScore }}分</text></view><text v-if="row.needsConfirmation" class="badge badge-yellow">需要核实</text><text class="review-reason">{{ row.reason }}</text></view>
           <text class="ai-box-summary">{{ aiResult.summary }}</text>
           <text v-if="aiResult.strengths && aiResult.strengths.length" class="ai-box-line good">✓ {{ aiResult.strengths.join(';') }}</text>
           <text v-if="aiResult.weaknesses && aiResult.weaknesses.length" class="ai-box-line bad">△ {{ aiResult.weaknesses.join(';') }}</text>
+          <text v-for="check in aiResult.pendingChecks || []" :key="check" class="ai-box-line bad">待核实：{{ check }}</text>
+          <SubmissionFiles :model-value="grading?.attachments || []" />
           <text class="ai-box-note muted">{{ aiResult.note }}</text>
         </view>
 
@@ -108,9 +116,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
-import { adminListSubmissions, adminGradeSubmission, adminAiReview } from '@/api'
+import { ref, watch, onBeforeUnmount } from 'vue'
+import SubmissionFiles from '@/components/SubmissionFiles.vue'
+import { onShow, onHide, onPullDownRefresh } from '@dcloudio/uni-app'
+import { adminListSubmissions, adminGradeSubmission, adminAiReview, adminAiReviewStatus } from '@/api'
 import { fullUrl } from '@/config'
 import { relativeTime } from '@/utils/format'
 
@@ -158,19 +167,35 @@ const openGrade = (s) => {
   aiResult.value = null
 }
 
+let reviewTimer
+let generation = 0
+const reviewMessage = ref('')
+const stopReview = () => { generation++; clearTimeout(reviewTimer); aiReviewing.value = false }
+const receiveReview = (job, id, token) => {
+  if (token !== generation || grading.value?.id !== id) return
+  reviewMessage.value = job.stale ? '评分标准或配置已变更，请重新评审' : job.message || ''
+  aiReviewing.value = ['QUEUED', 'PARSING', 'REVIEWING'].includes(job.status)
+  if (job.stale) aiResult.value = null
+  else if (job.result) aiResult.value = job.result
+  if (aiReviewing.value) reviewTimer = setTimeout(() => pollReview(id, token), 2500)
+}
+const applyReview = () => {
+  if (!aiResult.value) return
+  score.value = aiResult.value.suggestedScore
+  feedback.value = aiResult.value.feedbackDraft || ''
+}
+const pollReview = async (id, token) => {
+  try { receiveReview(await adminAiReviewStatus(id), id, token) } catch { if (token === generation) aiReviewing.value = false }
+}
+watch(grading, value => { stopReview(); aiResult.value = null; if (value) pollReview(value.id, generation) })
+onHide(stopReview)
+onBeforeUnmount(stopReview)
 const runAiReview = async () => {
+  stopReview()
+  const id = grading.value.id, token = generation
   aiReviewing.value = true
-  try {
-    const res = await adminAiReview(grading.value.id)
-    aiResult.value = res
-    score.value = res.suggestedScore
-    if (res.feedbackDraft) feedback.value = res.feedbackDraft
-    uni.showToast({ title: '建议已填入,可调整', icon: 'none' })
-  } catch (e) {
-    // 已提示
-  } finally {
-    aiReviewing.value = false
-  }
+  try { const job = await adminAiReview(id, { force: true }); if(token === generation) aiResult.value = null; receiveReview(job, id, token) }
+  catch { if (token === generation) aiReviewing.value = false }
 }
 
 const confirmGrade = async () => {
@@ -190,7 +215,7 @@ const confirmGrade = async () => {
   }
 }
 
-onShow(load)
+onShow(() => { load(); if (grading.value) pollReview(grading.value.id, generation) })
 
 onPullDownRefresh(async () => {
   await load()
@@ -199,6 +224,8 @@ onPullDownRefresh(async () => {
 </script>
 
 <style lang="scss" scoped>
+.review-result-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; color: #6b21a8; font-size: 26rpx; font-weight: 600; }.review-total { font-size: 42rpx; }.review-total-unit { font-size: 22rpx; font-weight: 400; }.review-apply { width: 100%; background: #fff; color: #2563eb; border: 1rpx solid #dbeafe; border-radius: 16rpx; font-size: 24rpx; padding: 10rpx; line-height: 1.6; }.review-apply::after { border: none; }.review-criterion { padding: 20rpx 0; border-top: 1rpx solid #e5e7eb; }.review-criterion-head { display: flex; justify-content: space-between; gap: 12rpx; font-size: 26rpx; font-weight: 600; }.review-criterion-head text:last-child { color: #2563eb; white-space: nowrap; }.review-reason { display: block; font-size: 24rpx; line-height: 1.7; margin-top: 10rpx; color: #4b5563; }
+
 .page {
   padding: 24rpx 24rpx 40rpx;
 }
@@ -340,6 +367,9 @@ onPullDownRefresh(async () => {
 
 .modal {
   width: 640rpx;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-sizing: border-box;
   background: #fff;
   border-radius: 28rpx;
   padding: 40rpx 36rpx;

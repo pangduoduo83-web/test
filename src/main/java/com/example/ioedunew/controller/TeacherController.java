@@ -8,7 +8,7 @@ import com.example.ioedunew.entity.ClassAnnouncement;
 import com.example.ioedunew.entity.Project;
 import com.example.ioedunew.entity.Submission;
 import com.example.ioedunew.repository.UserRepository;
-import com.example.ioedunew.service.AiReviewService;
+import com.example.ioedunew.service.ReviewJobService;
 import com.example.ioedunew.service.ClassService;
 import com.example.ioedunew.service.SkillDimensionService;
 import com.example.ioedunew.service.SubmissionService;
@@ -38,13 +38,13 @@ public class TeacherController {
 
     private final TeacherService teacherService;
     private final SubmissionService submissionService;
-    private final AiReviewService aiReviewService;
+    private final ReviewJobService aiReviewService;
     private final SkillDimensionService skillDimensionService;
     private final ClassService classService;
     private final UserRepository userRepository;
 
     public TeacherController(TeacherService teacherService, SubmissionService submissionService,
-                             AiReviewService aiReviewService, SkillDimensionService skillDimensionService,
+                             ReviewJobService aiReviewService, SkillDimensionService skillDimensionService,
                              ClassService classService, UserRepository userRepository) {
         this.teacherService = teacherService;
         this.submissionService = submissionService;
@@ -98,6 +98,20 @@ public class TeacherController {
         return ApiResponse.ok(teacherService.updateCover(user.getId(), user.isAdmin(), id, req.getCoverUrl()));
     }
 
+    @GetMapping("/projects/{id}/reference-answer")
+    public ApiResponse<Map<String, Object>> referenceAnswer(@PathVariable Long id,
+                                                              @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        return ApiResponse.ok(teacherService.referenceAnswer(user.getId(), user.isAdmin(), id));
+    }
+
+    @PutMapping("/projects/{id}/reference-answer")
+    public ApiResponse<Map<String, Object>> updateReferenceAnswer(@PathVariable Long id,
+                                                                   @RequestBody TeacherDtos.ReferenceAnswerUpdateRequest req,
+                                                                   @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        return ApiResponse.ok(teacherService.updateReferenceAnswer(user.getId(), user.isAdmin(), id,
+                req == null ? null : req.getReferenceAnswer()));
+    }
+
     @GetMapping("/projects/{id}/students")
     public ApiResponse<List<Map<String, Object>>> projectStudents(@PathVariable Long id,
                                                                   @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
@@ -114,12 +128,19 @@ public class TeacherController {
     }
 
     @PostMapping("/submissions/{id}/ai-review")
-    public ApiResponse<Map<String, Object>> aiReview(@PathVariable Long id,
+    public ApiResponse<Map<String, Object>> aiReview(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body,
                                                      @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
         if (!user.isAdmin()) {
             submissionService.requireMentor(id, user.getId());
         }
-        return ApiResponse.ok(aiReviewService.review(id));
+        return ApiResponse.ok(aiReviewService.start(id, body != null && Boolean.TRUE.equals(body.get("force")), body == null || body.get("retryAttachment") == null ? null : String.valueOf(body.get("retryAttachment"))));
+    }
+
+    @GetMapping("/submissions/{id}/ai-review")
+    public ApiResponse<Map<String, Object>> reviewStatus(@PathVariable Long id,
+            @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        if (!user.isAdmin()) submissionService.requireMentor(id, user.getId());
+        return ApiResponse.ok(aiReviewService.status(id));
     }
 
     @PostMapping("/submissions/{id}/grade")
@@ -185,6 +206,32 @@ public class TeacherController {
     @GetMapping("/classes/{id}")
     public ApiResponse<Map<String, Object>> classDetail(@PathVariable Long id, @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
         return ApiResponse.ok(classService.detail(user, id));
+    }
+
+    @GetMapping("/classes/{id}/teachers")
+    public ApiResponse<List<Map<String, Object>>> classTeachers(@PathVariable Long id,
+                                                                @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        return ApiResponse.ok(classService.teachers(user, id));
+    }
+
+    /** body: { identifiers: ["教师邮箱、手机号或用户ID", ...] }, 仅负责人/管理员可用 */
+    @PostMapping("/classes/{id}/teachers")
+    public ApiResponse<Map<String, Object>> addClassTeachers(@PathVariable Long id,
+                                                             @RequestBody Map<String, Object> body,
+                                                             @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        List<String> ids = new java.util.ArrayList<>();
+        Object raw = body.get("identifiers");
+        if (raw instanceof List) {
+            for (Object o : (List<?>) raw) ids.add(String.valueOf(o));
+        }
+        return ApiResponse.ok(classService.addTeachers(user, id, ids));
+    }
+
+    @DeleteMapping("/classes/{id}/teachers/{teacherId}")
+    public ApiResponse<Void> removeClassTeacher(@PathVariable Long id, @PathVariable Long teacherId,
+                                                @RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user) {
+        classService.removeTeacher(user, id, teacherId);
+        return ApiResponse.ok();
     }
 
     /** body: { name?, description?, joinEnabled?, status?, regenerateCode?, teacherId?(仅管理员) } */

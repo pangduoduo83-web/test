@@ -1,348 +1,274 @@
 <template>
-  <div>
-    <!-- 统计卡 -->
-    <div class="stat-grid">
-      <div class="ref-stat-card">
-        <div class="ref-stat-icon" style="background:linear-gradient(135deg,#60a5fa,#2563eb)"><BookOpen :size="22" color="#fff" /></div>
-        <div><div class="ref-stat-value">{{ stats.projectCount }}</div><div class="ref-stat-label">我的项目</div></div>
-      </div>
-      <div class="ref-stat-card">
-        <div class="ref-stat-icon" style="background:linear-gradient(135deg,#4ade80,#16a34a)"><Users :size="22" color="#fff" /></div>
-        <div><div class="ref-stat-value">{{ stats.studentTotal }}</div><div class="ref-stat-label">报名学生 · 已完成 {{ stats.completedTotal }}</div></div>
-      </div>
-      <div class="ref-stat-card clickable" @click="$router.push('/teacher/submissions')">
-        <div class="ref-stat-icon" style="background:linear-gradient(135deg,#facc15,#f59e0b)"><ClipboardCheck :size="22" color="#fff" /></div>
-        <div><div class="ref-stat-value">{{ stats.pendingSubmissions }}</div><div class="ref-stat-label">待评审成果 →</div></div>
-      </div>
-      <div class="ref-stat-card clickable" @click="riskVisible = true">
-        <div class="ref-stat-icon" style="background:linear-gradient(135deg,#f87171,#dc2626)"><AlertTriangle :size="22" color="#fff" /></div>
-        <div><div class="ref-stat-value">{{ atRisk.length }}</div><div class="ref-stat-label">掉队学生 →</div></div>
-      </div>
-    </div>
-
-    <!-- 掉队名单 -->
-    <div v-if="atRisk.length" class="card risk-card">
-      <div class="card-head">
-        <h3><AlertTriangle :size="16" color="#dc2626" /> 需要关注的学生</h3>
-        <span class="hint">已过截止、14 天没有学习动作、或时间过半进度不到 30%</span>
-      </div>
-      <div class="risk-list">
-        <div v-for="(r, i) in atRisk.slice(0, riskVisible ? 100 : 5)" :key="i" class="risk-item">
-          <div class="grow">
-            <b>{{ r.studentName }}</b><span class="muted"> {{ r.studentNo || '' }} · {{ r.projectTitle }}</span>
-            <div class="risk-reasons"><span v-for="rs in r.reasons" :key="rs" class="badge badge-red">{{ rs }}</span></div>
+  <div class="workbench-page" :aria-busy="loading">
+    <el-alert v-if="loadFailed" title="部分工作台数据未能加载，请重试。" type="error" :closable="false" class="load-error">
+      <button class="text-action" type="button" @click="load">重新加载</button>
+    </el-alert>
+    <section class="todo-panel" :class="{ 'todo-clear': !totalTodo && !loading && !loadFailed }" aria-labelledby="todo-title">
+      <div class="todo-heading">
+        <div class="todo-heading-main">
+          <span class="todo-alert"><component :is="totalTodo || loading || loadFailed ? AlertTriangle : CircleCheckBig" :size="27" /></span>
+          <div>
+            <div class="todo-title-row">
+              <h2 id="todo-title">今日待办</h2>
+              <span v-if="loading" class="todo-count">正在同步教学数据...</span>
+              <span v-else-if="loadFailed" class="todo-count">待办数据待更新</span>
+              <span v-else-if="totalTodo" class="todo-count">今天有 <b>{{ totalTodo }}</b> 项高优先任务需要处理</span>
+              <span v-else class="todo-count">暂无紧急待办，教学有序进行</span>
+            </div>
+            <p>先处理影响学生进度的事项，再安排项目内容更新。</p>
           </div>
-          <div class="risk-meta">进度 {{ r.progress }}%<br /><span class="muted">最近活动 {{ fmt(r.lastActiveAt) }}</span></div>
-          <el-button size="small" @click="nudge(r)">提醒 TA</el-button>
         </div>
-        <el-button v-if="atRisk.length > 5 && !riskVisible" text type="primary" @click="riskVisible = true">查看全部 {{ atRisk.length }} 人</el-button>
+        <button class="todo-primary" type="button" :disabled="loading" @click="handlePrimaryTodo">
+          <span>{{ loadFailed ? '重新加载' : totalTodo ? '立即处理' : '查看项目' }}</span><ArrowRight :size="18" />
+        </button>
       </div>
+
+      <div class="todo-grid">
+        <button class="todo-item todo-danger" type="button" @click="openRiskDialog()">
+          <span class="todo-item-icon"><AlertTriangle :size="22" /></span>
+          <span class="todo-item-copy">
+            <span class="todo-item-label">风险学生</span>
+            <strong>{{ loading || !riskLoaded ? '—' : riskStudentCount }}</strong>
+            <small :title="riskSummary">{{ riskSummary }}</small>
+          </span>
+          <ChevronRight :size="18" class="todo-chevron" />
+        </button>
+        <button class="todo-item todo-slate" type="button" @click="goSubmissions">
+          <span class="todo-item-icon"><FileCheck2 :size="22" /></span>
+          <span class="todo-item-copy">
+            <span class="todo-item-label">待评审成果</span>
+            <strong>{{ loading || !statsLoaded ? '—' : stats.pendingSubmissions }}</strong>
+            <small>{{ !statsLoaded ? '待评审数据待更新' : stats.pendingSubmissions ? '学生已提交成果，等待你的评审' : '暂无待处理成果' }}</small>
+          </span>
+          <ChevronRight :size="18" class="todo-chevron" />
+        </button>
+        <button class="todo-item todo-blue" type="button" @click="goProjects('attention')">
+          <span class="todo-item-icon"><FolderOpen :size="22" /></span>
+          <span class="todo-item-copy">
+            <span class="todo-item-label">待跟进项目</span>
+            <strong>{{ loading || !riskLoaded ? '—' : attentionProjects.length }}</strong>
+            <small :title="attentionSummary">{{ attentionSummary }}</small>
+          </span>
+          <ChevronRight :size="18" class="todo-chevron" />
+        </button>
+      </div>
+      <button class="todo-all" type="button" :disabled="loading" @click="todoVisible = true">
+        查看全部待办 <ChevronRight :size="17" />
+      </button>
+    </section>
+
+    <div class="workbench-overview">
+      <section class="followup-card" aria-labelledby="followup-title">
+        <div class="overview-heading">
+          <div><h2 id="followup-title">学生跟进</h2><p>先把学生遇到的困难和落后的任务跟进到位。</p></div>
+          <button v-if="atRisk.length" type="button" class="text-action" @click="openRiskDialog()">查看全部 {{ atRisk.length }} 项 <ChevronRight :size="16" /></button>
+        </div>
+        <div v-if="loading" class="followup-empty">正在同步学生进度...</div>
+        <div v-else-if="!riskLoaded" class="followup-empty"><span>学生跟进数据暂不可用</span><button type="button" class="text-action" @click="load">重新加载</button></div>
+        <div v-else-if="!atRisk.length" class="followup-empty"><CircleCheckBig :size="30" /><strong>暂无需要提醒的学生</strong><span>可以安排下一阶段教学，或去评审学生成果。</span></div>
+        <div v-else class="followup-list">
+          <div v-for="student in atRisk.slice(0, 3)" :key="student.projectId + ':' + student.userId" class="followup-row">
+            <span class="followup-avatar">{{ (student.studentName || '学')[0] }}</span>
+            <div class="followup-copy">
+              <strong>{{ student.studentName }}<span>进度 {{ student.progress || 0 }}%</span></strong>
+              <p>{{ student.projectTitle }}</p>
+              <small>{{ arr(student.reasons).join(' · ') || '需要关注学习进度' }}</small>
+            </div>
+            <button type="button" class="followup-remind" :aria-label="'提醒' + student.studentName + '推进' + student.projectTitle" @click="openRiskDialog(student)">写提醒 <ArrowRight :size="15" /></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="overview-card" aria-labelledby="overview-title">
+        <div class="overview-heading"><div><h2 id="overview-title">教学概览</h2><p>名下项目的整体教学情况</p></div><GraduationCap :size="24" /></div>
+        <div class="overview-metrics">
+          <div v-for="item in overviewMetrics" :key="item.label"><strong>{{ loading || !statsLoaded ? '—' : item.value }}</strong><span>{{ item.label }}</span></div>
+        </div>
+        <div class="overview-links">
+          <button type="button" @click="goProjects()"><FolderOpen :size="18" />管理项目<ChevronRight :size="16" /></button>
+          <button type="button" @click="router.push('/teacher/classes')"><UsersRound :size="18" />管理班级<ChevronRight :size="16" /></button>
+        </div>
+      </section>
     </div>
 
     <TeacherBriefCard :user-id="authStore.user?.id" @action="onBriefAction" />
 
-    <!-- 我的项目 -->
-    <div class="card">
-      <div class="card-head">
-        <h3>我的项目</h3>
-        <div class="head-actions">
-          <span class="hint">可以直接编辑自己项目的教学内容;学生提交的成果在「成果评审」里打分</span>
-          <el-button size="small" type="primary" plain @click="draftVisible = true"><Sparkles :size="14" style="margin-right:4px" />AI 起草项目</el-button>
-          <el-button size="small" @click="openEdit(null)">+ 新建项目</el-button>
-        </div>
+    <el-dialog v-model="todoVisible" title="全部待办" width="min(620px, 94vw)" top="8vh">
+      <div class="all-todos">
+        <button class="todo-list-entry" type="button" @click="todoVisible = false; openRiskDialog()"><AlertTriangle :size="20" /><span><b>关注风险学生</b><small>{{ riskLoaded ? riskStudentCount + ' 名学生，涉及 ' + atRisk.length + ' 条项目进度提醒' : '风险数据暂不可用' }}</small></span><ChevronRight :size="18" /></button>
+        <button class="todo-list-entry" type="button" @click="todoVisible = false; goSubmissions()"><FileCheck2 :size="20" /><span><b>评审学生成果</b><small>{{ statsLoaded ? stats.pendingSubmissions + ' 份成果待评审' : '评审数据暂不可用' }}</small></span><ChevronRight :size="18" /></button>
+        <button class="todo-list-entry" type="button" @click="todoVisible = false; goProjects('attention')"><FolderOpen :size="20" /><span><b>跟进需关注的项目</b><small>按项目查看上述学生的学习进度</small></span><ChevronRight :size="18" /></button>
       </div>
-      <el-empty v-if="projects.length === 0" description="暂无名下项目,请联系管理员在项目管理中指派讲师" />
-      <el-table v-else :data="projects" stripe>
-        <el-table-column label="项目" min-width="240">
-          <template #default="{ row }">
-            <div class="proj-cell">
-              <img v-if="row.coverUrl" :src="row.coverUrl" class="proj-thumb" alt="" />
-              <span v-else class="proj-thumb">{{ row.icon || '📦' }}</span>
-              <div>
-                <b>{{ row.title }}</b>
-                <div class="sub-text">{{ row.category }} · {{ row.difficulty }} · {{ row.duration }}
-                  <span class="badge" :class="row.status === 'PUBLISHED' ? 'badge-green' : 'badge-gray'" style="margin-left:6px">{{ row.status === 'PUBLISHED' ? '已发布' : '草稿' }}</span>
-                </div>
-              </div>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="enrolledCount" label="报名" width="70" />
-        <el-table-column label="完成率" width="80">
-          <template #default="{ row }">{{ row.enrolledCount > 0 ? row.completionRate + '%' : '–' }}</template>
-        </el-table-column>
-        <el-table-column label="大纲/考核" width="100">
-          <template #default="{ row }">{{ arr(row.syllabus).length }} 阶段 · {{ arr(row.assessments).length || '整体' }}</template>
-        </el-table-column>
-        <el-table-column label="资料附件" width="90">
-          <template #default="{ row }">
-            <span class="badge" :class="uploadedCount(row) > 0 ? 'badge-green' : 'badge-gray'">{{ uploadedCount(row) }} / {{ arr(row.resources).length }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="更新时间" width="110">
-          <template #default="{ row }">{{ (row.updatedAt || '').slice(0, 10) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="500" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" type="primary" @click="openEdit(row)">编辑项目</el-button>
-            <el-button size="small" @click="openResources(row)">资料附件</el-button>
-            <el-button size="small" @click="openStudents(row)">学生进度</el-button>
-            <el-button size="small" @click="openAnnounce(row)">发公告</el-button>
-            <el-button size="small" text @click="$router.push(`/app/projects/${row.id}`)">预览</el-button>
-            <el-button size="small" plain :loading="publishing === row.id" @click="publishToStore(row)">
-              {{ row.hubItemId ? '更新到商店' : '发布到商店' }}
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <!-- 编辑项目(与管理端同一套表单,讲师归属由服务端保留) -->
-    <ProjectEditDialog v-model="editVisible" :project="editing" mode="teacher" :skill-dimensions="skillDimensions"
-                       :save-fn="saveProject" @saved="load" />
-    <AiDraftDialog v-model="draftVisible" :skill-dimensions="skillDimensions" @drafted="onDrafted" />
-
-    <!-- 资源管理弹窗(快捷上传附件) -->
-    <el-dialog v-model="resVisible" :title="`资料附件 - ${current?.title || ''}`" width="720px" top="5vh">
-      <p class="res-tip">为每条资源上传附件后,学生端「学习资源」出现下载链接;原理图 / LAYOUT / 3D 图类型会同时显示在 BOM 页签作为设计文件。</p>
-      <div v-for="(r, i) in resRows" :key="i" class="res-edit-row">
-        <el-select v-model="r.type" class="res-type-sel">
-          <el-option v-for="t in ['文档', '视频', '代码', '手册', '工具', '课件', '原理图', 'LAYOUT', '3D图']" :key="t" :label="t" :value="t" />
-        </el-select>
-        <el-input v-model="r.name" placeholder="资源名称,如: 项目开发指南.pdf" class="res-name-input" />
-        <el-upload :show-file-list="false" :http-request="(opt) => doUploadRes(opt, r)" accept="*">
-          <el-button size="small" :type="r.url ? 'success' : 'primary'" plain :loading="r.uploading">
-            <template v-if="r.url"><Check :size="13" style="margin-right:4px" /> 已上传</template>
-            <template v-else><Upload :size="13" style="margin-right:4px" /> 上传附件</template>
-          </el-button>
-        </el-upload>
-        <el-button size="small" text type="danger" @click="resRows.splice(i, 1)">删除</el-button>
-      </div>
-      <el-button class="add-res-btn" plain @click="resRows.push({ type: '文档', name: '', url: '' })">+ 添加资源</el-button>
-      <template #footer>
-        <el-button @click="resVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="saveResources">保存资源列表</el-button>
-      </template>
     </el-dialog>
 
-    <!-- 项目公告 -->
-    <el-dialog v-model="announceVisible" :title="`发公告 - ${current?.title || ''}`" width="520px">
-      <p class="hint" style="margin:0 0 12px">发给该项目全部报名学生({{ current?.enrolledCount || 0 }} 人),每人收到一条站内通知。</p>
-      <el-form label-position="top">
-        <el-form-item label="标题" required><el-input v-model="announceForm.title" maxlength="100" placeholder="如: 本周五前完成原理图阶段" /></el-form-item>
-        <el-form-item label="正文"><el-input v-model="announceForm.content" type="textarea" :rows="4" maxlength="1000" placeholder="选填" /></el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="announceVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="sendAnnounce">发布</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 学生进度弹窗 -->
-    <el-dialog v-model="stuVisible" :title="`学生进度 - ${current?.title || ''}`" width="760px" top="5vh">
-      <el-empty v-if="students.length === 0" description="还没有学生报名该项目" />
-      <el-table v-else :data="students" stripe max-height="480">
-        <el-table-column prop="studentName" label="姓名" width="100" />
-        <el-table-column prop="studentNo" label="学号" width="120" />
-        <el-table-column prop="major" label="专业" width="130" />
-        <el-table-column label="进度" min-width="160">
-          <template #default="{ row }"><el-progress :percentage="row.progress" :stroke-width="8" /></template>
-        </el-table-column>
-        <el-table-column prop="currentTask" label="当前任务" min-width="140" show-overflow-tooltip />
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <span class="badge" :class="row.status === 'COMPLETED' ? 'badge-green' : 'badge-blue'">{{ row.status === 'COMPLETED' ? '已完成' : '进行中' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="deadline" label="截止" width="110" />
-      </el-table>
-      <p class="hint" style="margin-top:10px">进度由学生自己记录;学生提交成果并由你评审 ≥60 分后才会变为「已完成」。</p>
-    </el-dialog>
+    <TeacherRiskDialog v-model="riskVisible" :students="atRisk" :loaded="riskLoaded" :initial-student="selectedStudent" />
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { AlertTriangle, BookOpen, Check, ClipboardCheck, Sparkles, Upload, Users } from 'lucide-vue-next'
-import {
-  storePublish, teacherAnnounceProject, teacherAtRisk, teacherCreateProject, teacherProjectStudents, teacherProjects, teacherRemindStudent,
-  teacherSkillDimensions, teacherStats, teacherUpdateProject, teacherUpdateResources, uploadDocFile
-} from '../../api'
-import ProjectEditDialog from '../../components/ProjectEditDialog.vue'
-import AiDraftDialog from '../../components/AiDraftDialog.vue'
+import { AlertTriangle, ArrowRight, ChevronRight, CircleCheckBig, FileCheck2, FolderOpen, GraduationCap, UsersRound } from 'lucide-vue-next'
+import { teacherAtRisk, teacherProjects, teacherStats } from '../../api'
 import TeacherBriefCard from '../../components/TeacherBriefCard.vue'
+import TeacherRiskDialog from '../../components/TeacherRiskDialog.vue'
 import { useAuthStore } from '../../stores/auth'
 
+const emit = defineEmits(['workbench-stats'])
 const router = useRouter()
 const authStore = useAuthStore()
-const draftVisible = ref(false)
-const onDrafted = (draft) => {
-  editing.value = draft
-  editVisible.value = true
-}
-const onBriefAction = (a) => {
-  if (a.kind === 'grade') return router.push('/teacher/submissions')
-  if (a.kind === 'remind') { riskVisible.value = true; return }
-  const p = projects.value.find((x) => x.id === a.projectId)
-  if (a.kind === 'announce' && p) return openAnnounce(p)
-  if (p) return router.push(`/app/projects/${p.id}`)
-  router.push('/teacher/classes')
-}
-
 const stats = reactive({ projectCount: 0, studentTotal: 0, completedTotal: 0, pendingSubmissions: 0, resourceCount: 0 })
 const projects = ref([])
 const atRisk = ref([])
 const riskVisible = ref(false)
-const announceVisible = ref(false)
-const announceForm = reactive({ title: '', content: '' })
-const fmt = (t) => (t ? String(t).replace('T', ' ').slice(0, 16) : '无')
-
-const openAnnounce = (row) => {
-  current.value = row
-  Object.assign(announceForm, { title: '', content: '' })
-  announceVisible.value = true
-}
-const sendAnnounce = async () => {
-  if (!announceForm.title.trim()) { ElMessage.warning('请填写标题'); return }
-  saving.value = true
-  try {
-    const r = await teacherAnnounceProject(current.value.id, { ...announceForm })
-    ElMessage.success(`公告已发送给 ${r.notified} 名学生`)
-    announceVisible.value = false
-  } finally {
-    saving.value = false
-  }
-}
-const nudge = async (r) => {
-  let message = ''
-  try {
-    const res = await ElMessageBox.prompt(
-      `将以站内通知发给 ${r.studentName}(${r.reasons.join(';')})。可以修改提醒内容:`,
-      '提醒学生',
-      { confirmButtonText: '发送', cancelButtonText: '取消', inputType: 'textarea',
-        inputValue: `《${r.projectTitle}》${r.currentTask ? '当前任务「' + r.currentTask + '」' : ''}进度有些落后了,这周抽时间推进一下,有困难随时在讨论区问我或找 AI 导师。`,
-        inputValidator: (v) => !!(v && v.trim()) || '提醒内容不能为空' })
-    message = res.value
-  } catch (e) { return }
-  await teacherRemindStudent(r.projectId, r.userId, message)
-  ElMessage.success('已发送提醒')
-}
-const current = ref(null)
-const saving = ref(false)
-const publishing = ref(null)
-const editVisible = ref(false)
-const editing = ref(null)
-const skillDimensions = ref([])
-
-const arr = (v) => Array.isArray(v) ? v : []
-const uploadedCount = (row) => arr(row.resources).filter((r) => r.url).length
-
-const load = async () => {
-  Object.assign(stats, await teacherStats())
-  projects.value = await teacherProjects()
-  teacherAtRisk().then((list) => { atRisk.value = list }).catch(() => {})
-}
-
-const openEdit = (row) => {
-  editing.value = row
-  editVisible.value = true
-}
-const saveProject = (id, payload) => (id ? teacherUpdateProject(id, payload) : teacherCreateProject(payload))
-
-const publishToStore = async (row) => {
-  let changelog = ''
-  try {
-    const r = await ElMessageBox.prompt(
-      row.hubItemId ? `将「${row.title}」的当前内容作为新版本提交商店审核,请填写版本说明:` : `将「${row.title}」发布到项目商店,审核通过后其他院校可以安装使用。可填写版本说明:`,
-      row.hubItemId ? '更新到商店' : '发布到商店',
-      { confirmButtonText: '提交审核', cancelButtonText: '取消', inputPlaceholder: '例如:首次发布', inputValidator: () => true }
-    )
-    changelog = r.value || ''
-  } catch (e) { return }
-  publishing.value = row.id
-  try {
-    const item = await storePublish(row.id, { changelog })
-    ElMessage.success(item.newItem ? `已提交到项目商店(条目 #${item.id}),等待平台审核` : `已追加新版本 v${item.latestVersionNo},等待平台审核`)
-    await load()
-  } finally {
-    publishing.value = null
-  }
-}
-
-const resVisible = ref(false)
-const resRows = ref([])
-const stuVisible = ref(false)
-const students = ref([])
-
-const openResources = (row) => {
-  current.value = row
-  resRows.value = arr(row.resources).map((r) => ({ type: r.type || '文档', name: r.name || '', url: r.url || '', uploading: false }))
-  resVisible.value = true
-}
-
-const doUploadRes = async (opt, row) => {
-  if (opt.file.size > 30 * 1024 * 1024) { ElMessage.warning('附件不能超过 30MB'); return }
-  row.uploading = true
-  try {
-    const { url, name } = await uploadDocFile(opt.file)
-    row.url = url
-    if (!row.name) row.name = name
-    ElMessage.success(`附件上传成功: ${name}`)
-  } catch (e) { /* 已提示 */ } finally {
-    row.uploading = false
-  }
-}
-
-const saveResources = async () => {
-  const cleaned = resRows.value.filter((r) => r.name.trim()).map((r) => ({ type: r.type, name: r.name.trim(), url: r.url || '' }))
-  saving.value = true
-  try {
-    await teacherUpdateResources(current.value.id, JSON.stringify(cleaned))
-    ElMessage.success('资源列表已保存,学生端即时生效')
-    resVisible.value = false
-    await load()
-  } catch (e) { /* 已提示 */ } finally {
-    saving.value = false
-  }
-}
-
-const openStudents = async (row) => {
-  current.value = row
-  students.value = await teacherProjectStudents(row.id)
-  stuVisible.value = true
-}
-
-onMounted(async () => {
-  await load()
-  teacherSkillDimensions().then((list) => { skillDimensions.value = list }).catch(() => {})
+const selectedStudent = ref(null)
+const todoVisible = ref(false)
+const loading = ref(true)
+const loadFailed = ref(false)
+const riskLoaded = ref(false)
+const statsLoaded = ref(false)
+let loadVersion = 0
+const arr = value => Array.isArray(value) ? value : []
+const attentionProjects = computed(() => projects.value.filter(project => atRisk.value.some(student => String(student.projectId) === String(project.id))))
+const riskStudentCount = computed(() => new Set(atRisk.value.map((row) => row.userId)).size)
+// 项目关注项来自同一批风险学生，不再次累计到优先任务数。
+const totalTodo = computed(() => riskStudentCount.value + Number(stats.pendingSubmissions || 0))
+const riskSummary = computed(() => {
+  if (!riskLoaded.value) return '风险数据待更新'
+  const first = atRisk.value[0]
+  return first ? first.studentName + '进度 ' + (first.progress || 0) + '% · ' + (arr(first.reasons)[0] || '需要关注') : '当前没有需要提醒的学生'
 })
+const attentionSummary = computed(() => !riskLoaded.value ? '项目关注数据待更新' : attentionProjects.value.length ? attentionProjects.value.map((p) => p.title).slice(0, 2).join('、') : '暂无需要跟进的项目')
+
+
+const overviewMetrics = computed(() => [
+  { label: '负责项目', value: stats.projectCount },
+  { label: '报名人次', value: stats.studentTotal },
+  { label: '完成人次', value: stats.completedTotal },
+  { label: '学习资源', value: stats.resourceCount }
+])
+const openRiskDialog = (student = null) => { selectedStudent.value = student; riskVisible.value = true }
+const goSubmissions = () => router.push('/teacher/submissions')
+const goProjects = (filter = 'all') => router.push({ path: '/teacher/projects', query: filter === 'all' ? {} : { filter } })
+const handlePrimaryTodo = () => {
+  if (loadFailed.value) return load()
+  if (atRisk.value.length) return openRiskDialog()
+  if (Number(stats.pendingSubmissions || 0) > 0) return goSubmissions()
+  goProjects()
+}
+const onBriefAction = action => {
+  if (action.kind === 'grade') return goSubmissions()
+  if (action.kind === 'remind') return openRiskDialog()
+  const project = projects.value.find(row => String(row.id) === String(action.projectId))
+  if (!project) return goProjects()
+  const projectAction = action.kind === 'announce' ? 'announce' : action.kind === 'adjust' ? 'edit' : 'students'
+  router.push({ path: '/teacher/projects', query: { project: project.id, action: projectAction } })
+}
+const load = async () => {
+  const version = ++loadVersion
+  loading.value = true
+  const results = await Promise.allSettled([teacherStats(), teacherProjects(), teacherAtRisk()])
+  if (version !== loadVersion) return
+  const [statsResult, projectsResult, riskResult] = results
+  loadFailed.value = results.some(result => result.status === 'rejected')
+  statsLoaded.value = statsResult.status === 'fulfilled'
+  riskLoaded.value = riskResult.status === 'fulfilled'
+  if (statsLoaded.value) {
+    Object.assign(stats, statsResult.value)
+    emit('workbench-stats', statsResult.value)
+  }
+  if (riskLoaded.value) atRisk.value = arr(riskResult.value)
+  if (projectsResult.status === 'fulfilled') projects.value = arr(projectsResult.value)
+  loading.value = false
+}
+onMounted(load)
 </script>
 
 <style scoped>
-.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
-@media (max-width: 1000px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
-.clickable { cursor: pointer; }
-.clickable:hover { box-shadow: var(--shadow-lg); }
-.card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; }
-.head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.card-head h3 { margin: 0; font-size: 16px; }
-.hint { font-size: 12px; color: #9ca3af; }
-.muted { font-size: 12px; color: var(--text-secondary); }
-.grow { flex: 1; min-width: 0; }
-.risk-card { margin-bottom: 20px; border-left: 4px solid #f87171; }
-.risk-card h3 { display: flex; align-items: center; gap: 6px; }
-.risk-list { display: flex; flex-direction: column; gap: 8px; }
-.risk-item { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 10px; background: #fef2f2; font-size: 14px; }
-.risk-reasons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
-.risk-meta { font-size: 13px; text-align: right; white-space: nowrap; }
-.sub-text { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
-.proj-cell { display: flex; align-items: center; gap: 12px; }
-.proj-thumb { width: 56px; height: 40px; border-radius: 8px; object-fit: cover; background: #f3f4f6; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
-.res-tip { background: #eff6ff; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #1d4ed8; margin: 0 0 14px; }
-.res-edit-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-.res-type-sel { width: 100px; flex-shrink: 0; }
-.res-name-input { flex: 1; }
-.add-res-btn { width: 100%; border-style: dashed; }
+.workbench-page { max-width: 1600px; margin: 0 auto; }
+.load-error { margin-bottom: 15px; }
+.text-action { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; color: #3268df; background: transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.text-action:hover { color: #5437d6; }
+.todo-panel {
+  margin-bottom: 22px;
+  padding: 25px 25px 19px;
+  border: 1px solid #f1e2ea;
+  border-radius: 17px;
+  background: linear-gradient(112deg, #fff9fb 0%, #fff8fb 48%, #f3f6ff 100%);
+  box-shadow: 0 8px 22px rgba(70, 82, 135, .05);
+}
+.todo-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.todo-heading-main { display: flex; align-items: center; gap: 15px; }
+.todo-alert { width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; color: #fff; background: linear-gradient(135deg, #ff7370, #ef3e4f); box-shadow: 0 8px 14px rgba(239, 62, 79, .2); }
+.todo-title-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.todo-title-row h2 { margin: 0; color: #162655; font-size: 26px; font-weight: 800; letter-spacing: -.03em; }
+.todo-count { padding: 7px 13px; border-radius: 999px; color: #7f8aa7; background: rgba(255, 255, 255, .78); font-size: 12px; }
+.todo-count b { color: #ef4454; }
+.todo-heading-main p { margin: 7px 0 0; color: #9a9fb5; font-size: 12px; }
+.todo-primary { min-width: 160px; height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; border: 0; border-radius: 12px; color: #fff; background: linear-gradient(101deg, #3d78f6, #6c3eef); box-shadow: 0 10px 19px rgba(77, 75, 225, .23); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.todo-primary:hover { filter: brightness(1.04); transform: translateY(-1px); }
+.todo-primary:disabled, .todo-all:disabled { cursor: wait; opacity: .58; transform: none; }
+.todo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }
+.todo-item { min-width: 0; min-height: 114px; display: flex; align-items: center; gap: 13px; padding: 17px 16px; border: 1px solid rgba(229, 233, 242, .9); border-radius: 13px; text-align: left; background: rgba(255, 255, 255, .9); cursor: pointer; transition: transform .18s, box-shadow .18s, border-color .18s; }
+.todo-item:hover { transform: translateY(-2px); border-color: #cdd7ef; box-shadow: 0 8px 16px rgba(62, 76, 132, .1); }
+.todo-item-icon { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 14px; }
+.todo-danger .todo-item-icon { color: #f15358; background: #fff0f1; }
+.todo-slate .todo-item-icon { color: #60708e; background: #f1f3f7; }
+.todo-blue .todo-item-icon { color: #3972f3; background: #edf3ff; }
+.todo-item-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.todo-item-label { color: #687796; font-size: 13px; font-weight: 600; }
+.todo-item-copy strong { color: #172554; font-size: 24px; line-height: 1.1; }
+.todo-item-copy small { overflow: hidden; color: #9aa6bc; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.todo-chevron { flex-shrink: 0; margin-left: auto; color: #aab5ca; }
+.todo-all { margin: 15px 1px 0 auto; display: flex; align-items: center; gap: 3px; border: 0; color: #356cf0; background: transparent; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.todo-all:hover { color: #5536db; }
+.todo-clear .todo-alert { color: #fff; background: linear-gradient(135deg, #3bcf91, #1dab72); box-shadow: 0 8px 14px rgba(35, 183, 119, .19); }
+
+
+.all-todos { display: flex; flex-direction: column; gap: 9px; }
+.todo-list-entry { width: 100%; min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 11px 13px; border: 1px solid #e7ebf4; border-radius: 10px; color: #526381; background: #fbfcff; text-align: left; cursor: pointer; }
+.todo-list-entry:hover { border-color: #a8baf2; color: #3568db; background: #f6f8ff; }
+.todo-list-entry > span { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.todo-list-entry b { color: #263961; font-size: 13px; }
+.todo-list-entry small { overflow: hidden; color: #8793ac; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.todo-list-entry > svg:last-child { color: #9aa6bd; }
+
+.workbench-overview { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr); gap: 22px; margin-bottom: 22px; }
+.followup-card, .overview-card { min-width: 0; padding: 25px; border: 1px solid #e7ecf5; border-radius: 17px; background: #fff; }
+.overview-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.overview-heading h2 { margin: 0; color: #1e3058; font-size: 21px; }
+.overview-heading p { margin: 8px 0 0; color: #8490a6; font-size: 13px; line-height: 1.7; }
+.overview-heading > svg { color: #8297d5; }
+.overview-heading .text-action { flex-shrink: 0; padding-top: 6px; font-size: 13px; }
+.followup-row { display: flex; align-items: center; gap: 14px; padding: 18px 0; border-top: 1px solid #edf0f7; }
+.followup-avatar { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; color: #5d65cb; background: #eef0ff; font-size: 18px; font-weight: 600; }
+.followup-copy { flex: 1; min-width: 0; }
+.followup-copy strong { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: #273a60; font-size: 16px; }
+.followup-copy strong span { color: #a58084; font-size: 13px; font-weight: 400; white-space: nowrap; }
+.followup-copy p { margin: 7px 0 5px; color: #77859c; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.followup-copy small { color: #d96269; font-size: 13px; line-height: 1.6; }
+.followup-remind { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 8px; min-height: 40px; padding: 0 13px; border: 1px solid #dbe3f9; border-radius: 9px; color: #466bd4; background: #f6f8ff; font: inherit; font-size: 14px; cursor: pointer; }
+.followup-empty { display: flex; min-height: 184px; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: #8693a9; font-size: 14px; text-align: center; line-height: 1.7; }
+.followup-empty svg { color: #30b780; }
+.followup-empty strong { color: #435575; font-size: 16px; }
+.overview-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin: 25px 0; }
+.overview-metrics strong { display: block; color: #283c66; font-size: 27px; }
+.overview-metrics span { display: block; margin-top: 7px; color: #8a97ac; font-size: 13px; }
+.overview-links { display: flex; gap: 12px; padding-top: 18px; border-top: 1px solid #edf0f7; }
+.overview-links button { display: inline-flex; align-items: center; flex: 1; gap: 8px; padding: 10px 0; border: 0; color: #6178b4; background: transparent; font: inherit; font-size: 14px; white-space: nowrap; cursor: pointer; }
+.overview-links button > svg:last-child { margin-left: auto; }
+@media (max-width: 1100px) {
+  .todo-grid { grid-template-columns: 1fr; }
+  .todo-item { min-height: 90px; }
+  .workbench-overview { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .todo-panel, .followup-card, .overview-card { padding: 18px; }
+  .todo-heading { align-items: flex-start; flex-direction: column; }
+  .todo-primary { width: 100%; }
+  .todo-title-row h2 { font-size: 22px; }
+  .overview-heading { flex-wrap: wrap; }
+  .followup-row { flex-wrap: wrap; gap: 12px; }
+  .followup-remind { margin-left: 56px; }
+}
 </style>
