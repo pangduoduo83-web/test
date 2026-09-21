@@ -175,6 +175,7 @@ export const adminAiUsage = (days) => http.get('/admin/ai/usage', { params: { da
 export const adminGetAiSettings = () => http.get('/admin/ai-settings')
 export const adminUpdateAiSettings = (data) => http.put('/admin/ai-settings', data)
 export const adminTestAiSettings = () => http.post('/admin/ai-settings/test')
+export const adminTestAiService = (service, data) => http.post(`/admin/ai-settings/test/${service}`, data, { timeout: 150000 })
 
 // ---------- 站点设置(管理端) ----------
 export const adminGetSiteSettings = () => http.get('/admin/site-settings')

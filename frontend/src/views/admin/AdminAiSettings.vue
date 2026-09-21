@@ -39,7 +39,7 @@
           <span class="nav-item-copy"><b>{{ item.title }}</b><small>{{ item.desc }}</small></span>
           <ChevronRight :size="15" class="nav-chevron" />
         </button>
-        <div class="nav-help"><span class="nav-help-icon"><Info :size="15" /></span><div><b>配置提示</b><p>修改后请先保存。“测试主模型”仅检查已保存的主模型配置。</p></div></div>
+        <div class="nav-help"><span class="nav-help-icon"><Info :size="15" /></span><div><b>配置提示</b><p>各服务可独立测试当前填写的配置，无需先保存。密钥留空时使用本服务已保存的密钥。</p></div></div>
       </aside>
 
       <main class="settings-content">
@@ -95,6 +95,7 @@
               <div class="field"><label>模型名称</label><el-input v-model="form[service.key + 'Model']" :placeholder="service.key === 'speech' && form.speechProtocol === 'qwen' ? 'qwen3-asr-flash' : '填写服务商提供的模型名称'" /></div>
               <div class="field"><label>API Key</label><el-input v-model="form[service.key + 'ApiKey']" type="password" show-password :placeholder="settings[service.key + 'ApiKeySet'] ? '已配置，留空保持不变' : '填写密钥'" /></div>
             </div>
+            <AiServiceTestPanel :label="service.key === 'vision' ? '测试图片识别' : '测试语音转写'" :hint="service.key === 'vision' ? '发送内置测试图片，检查图片输入能力。' : '发送一段内置中文语音，检查转写能力。'" :loading="tests[service.key].loading" :result="tests[service.key].result" @test="testService(service.key)" />
           </div>
           <div class="callout muted-callout"><span class="callout-icon"><Info :size="16" /></span><div><b>独立配置</b><p>图片和语音服务的地址、密钥分别保存。只在启用并完成配置后，相关能力才会出现在成果评审流程中。</p></div></div>
         </template>
@@ -109,33 +110,33 @@
           <div v-for="service in parserServices" :key="service.key" class="card service-card">
             <div class="service-head"><div class="service-title"><span class="service-icon" :class="service.tone"><component :is="service.icon" :size="18" /></span><div><h3>{{ service.label }}</h3><p>{{ service.description }}</p></div></div><el-switch v-model="form[service.key + 'Enabled']" inline-prompt active-text="启用" inactive-text="停用" /></div>
             <div class="service-fields form-grid"><div class="field span-2"><label>服务地址</label><el-input v-model="form[service.key + 'BaseUrl']" :placeholder="service.placeholder" /></div><div class="field"><label>{{ service.key === 'mineruLocal' ? '解析层级' : '解析模型版本' }}</label><el-input v-model="form[service.key + 'Model']" :placeholder="service.key === 'mineruLocal' ? 'standard' : 'vlm'" /></div><div class="field"><label>Token</label><el-input v-model="form[service.key + 'ApiKey']" type="password" show-password :placeholder="settings[service.key + 'ApiKeySet'] ? '已配置，留空保持不变' : '填写 Token'" /></div></div>
+            <AiServiceTestPanel label="测试服务连接" :hint="service.key === 'mineruCloud' ? '验证 Token 并申请一次测试上传链接，不上传或解析文档。' : '检查服务连接与 ZIP 输出能力，不执行文档解析。'" :loading="tests[service.key].loading" :result="tests[service.key].result" @test="testService(service.key)" />
           </div>
         </template>
 
+        <AiServiceTestPanel v-if="activeSection === 'model' || activeSection === 'generation'" label="测试主模型" hint="发送一条简短测试消息，检查当前填写的主模型配置。" :loading="tests.main.loading" :result="tests.main.result" @test="testService('main')" />
         <div class="action-dock">
-          <div class="action-dock-copy"><span class="action-dot"></span><div><b>保存配置后立即生效</b><small>保存后可在模型服务商处查看调用状态</small></div></div>
-          <div class="actions-left"><el-button size="large" :loading="testing" @click="test"><Zap :size="15" />测试主模型</el-button><el-button size="large" type="primary" :loading="saving" @click="save"><Save :size="15" />保存配置</el-button></div>
+          <div class="action-dock-copy"><span class="action-dot"></span><div><b>保存配置后立即生效</b><small>测试不会保存配置；确认后点击保存</small></div></div>
+          <div class="actions-left"><el-button size="large" type="primary" :loading="saving" @click="save"><Save :size="15" />保存配置</el-button></div>
         </div>
-        <div v-if="activeSection !== 'model'" class="hint">“测试主模型”检查主模型连接；图片识别、语音转写和文档解析需要用相应材料验证。</div>
-        <div v-if="testResult" class="test-result" :class="testResult.ok ? 'ok' : 'fail'"><CircleCheckBig v-if="testResult.ok" :size="16" /><CircleX v-else :size="16" />{{ testResult.ok ? `主模型连接成功，往返 ${testResult.latencyMs} ms` : `主模型连接失败：${testResult.error}` }}</div>
       </main>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Bot, Check, ChevronDown, ChevronRight, CircleCheckBig, CircleX, Cloud, Cpu, FileText, Gauge, Images, Mic2,
-  Info, Plug, Save, Server, ShieldCheck, SlidersHorizontal, Sparkles, Zap
+  Bot, Check, ChevronDown, ChevronRight, CircleCheckBig, Cloud, Cpu, FileText, Gauge, Images, Mic2,
+  Info, Plug, Save, Server, ShieldCheck, SlidersHorizontal, Sparkles
 } from 'lucide-vue-next'
-import { adminGetAiSettings, adminTestAiSettings, adminUpdateAiSettings } from '../../api'
+import { adminGetAiSettings, adminTestAiService, adminUpdateAiSettings } from '../../api'
+import AiServiceTestPanel from '../../components/AiServiceTestPanel.vue'
 
 const settings = ref({})
 const saving = ref(false)
-const testing = ref(false)
-const testResult = ref(null)
+const tests = reactive(Object.fromEntries(['main', 'vision', 'speech', 'mineruCloud', 'mineruLocal'].map(key => [key, { loading: false, result: null, version: 0 }])))
 const activeSection = ref('model')
 
 const sectionItems = [
@@ -214,7 +215,7 @@ const save = async () => {
     })
     form.apiKey = ''
     mediaServices.forEach(s => { form[s.key + 'ApiKey'] = '' })
-    testResult.value = null
+    Object.values(tests).forEach(test => { test.result = null; test.version++ })
     ElMessage.success('配置已保存,立即生效')
   } finally {
     saving.value = false
@@ -228,13 +229,35 @@ const saveField = async (field) => {
   } catch (e) { /* 已提示 */ }
 }
 
-const test = async () => {
-  testing.value = true
-  testResult.value = null
+const testDraft = (service) => {
+  const prefix = service === 'main' ? '' : service
+  const field = (name) => prefix ? prefix + name[0].toUpperCase() + name.slice(1) : name
+  return {
+    baseUrl: form[field('baseUrl')].trim(), model: form[field('model')].trim(), apiKey: form[field('apiKey')].trim(),
+    ...(service === 'speech' ? { speechProtocol: form.speechProtocol } : {})
+  }
+}
+
+for (const service of Object.keys(tests)) {
+  watch(() => testDraft(service), () => {
+    tests[service].result = null
+    tests[service].version++
+  }, { flush: 'sync' })
+}
+
+const testService = async (service) => {
+  const state = tests[service]
+  if (state.loading) return
+  const version = state.version
+  state.loading = true
+  state.result = null
   try {
-    testResult.value = await adminTestAiSettings()
+    const result = await adminTestAiService(service, testDraft(service))
+    if (version === state.version) state.result = result
+  } catch (e) {
+    if (version === state.version) state.result = { ok: false, error: e.code === 'ECONNABORTED' ? '测试请求超时，请稍后重试' : '测试请求失败，请检查网络或登录状态后重试' }
   } finally {
-    testing.value = false
+    state.loading = false
   }
 }
 

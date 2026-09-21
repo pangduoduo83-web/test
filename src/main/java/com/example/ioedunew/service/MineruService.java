@@ -26,6 +26,26 @@ public class MineruService {
         return org.springframework.util.DigestUtils.md5DigestAsHex(("mineru-v1|"+configs.mineruMode()+"|"+cfg.enabled+"|"+cfg.baseUrl+"|"+cfg.model+"|"+cfg.apiKey).getBytes(StandardCharsets.UTF_8));
     }
     private AiConfigService.AiConfig config() {return configs.mediaConfig("selfhost".equals(configs.mineruMode())?"mineruLocal":"mineruCloud");}
+    /** Connection/auth probe only; no teaching document is uploaded or parsed. */
+    String testConnection(AiConfigService.AiConfig cfg, boolean cloud) throws Exception {
+        String base = cfg.baseUrl.replaceAll("/+$", "");
+        if (cloud) {
+            ObjectNode body = json.createObjectNode().put("model_version", cfg.model);
+            body.putArray("files").addObject().put("name", "ioedu-connection-test.pdf")
+                    .put("data_id", UUID.randomUUID().toString());
+            JsonNode data = cloudResponse(request(base, base + "/api/v4/file-urls/batch", "POST", body, cfg.apiKey)).path("data");
+            required(data, "batch_id");
+            if (!data.path("file_urls").path(0).isTextual() || data.path("file_urls").path(0).asText().isEmpty())
+                throw new IllegalStateException("MinerU未返回文件上传授权");
+            return "Token 与上传授权验证通过；未上传文件，未执行文档解析";
+        }
+        JsonNode health = request(base, base + "/v1/health", "GET", null, cfg.apiKey);
+        JsonNode formats = health.path("features").path("output_formats");
+        boolean zip = false;
+        for (JsonNode format : formats) if ("zip".equals(format.asText())) zip = true;
+        if (!zip) throw new com.example.ioedunew.common.BusinessException("服务未返回 MinerU V1 的 ZIP 输出能力，请检查服务版本和配置");
+        return "服务连接与 ZIP 输出能力验证通过；未执行文档解析";
+    }
     public void parse(Path file,ArrayNode segments,ArrayNode warnings,int index,ObjectNode state,Consumer<ObjectNode> checkpoint) throws Exception {
         AiConfigService.AiConfig cfg=config();
         boolean cloud=!"selfhost".equals(configs.mineruMode());

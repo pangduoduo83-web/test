@@ -34,7 +34,9 @@ public class ReviewModelService {
         catch (Exception e) { throw new IllegalStateException("图片识别调用失败，请检查模型能力、密钥和服务连接"); }
     }
     public String transcribe(Path audio) throws Exception {
-        AiConfigService.AiConfig cfg = ready("speech", "语音转文字");
+        return transcribe(audio, ready("speech", "语音转文字"));
+    }
+    String transcribe(Path audio, AiConfigService.AiConfig cfg) throws Exception {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(15000); factory.setReadTimeout(120000);
         RestTemplate http = new RestTemplate(factory);
@@ -50,7 +52,7 @@ public class ReviewModelService {
             JsonNode response = json.readTree(body);
             if (!response.path("text").isTextual()) throw new IllegalStateException();
             return response.path("text").asText();
-        } catch (Exception e) { throw new IllegalStateException("语音转文字调用失败，请检查模型、密钥和接口兼容性"); }
+        } catch (Exception e) { throw speechFailure("语音转文字调用失败", e); }
     }
 
     private String transcribeQwen(Path audio, AiConfigService.AiConfig cfg, RestTemplate http) throws Exception {
@@ -79,8 +81,14 @@ public class ReviewModelService {
             if (!text.isTextual() || "length".equals(choice.path("finish_reason").asText())) throw new IllegalStateException();
             return text.asText();
         } catch (Exception e) {
-            throw new IllegalStateException("Qwen 语音转文字调用失败，请检查百炼地域、模型、密钥和兼容接口地址");
+            throw speechFailure("Qwen 语音转文字调用失败", e);
         }
+    }
+    private static IllegalStateException speechFailure(String label, Exception error) {
+        String status = error instanceof org.springframework.web.client.RestClientResponseException
+                ? " HTTP " + ((org.springframework.web.client.RestClientResponseException) error).getRawStatusCode() : "";
+        // Keep useful status codes without returning provider response bodies or credentials.
+        return new IllegalStateException(label + status + "，请检查服务地域、模型、密钥和接口兼容性");
     }
     private AiConfigService.AiConfig ready(String kind, String label) {
         AiConfigService.AiConfig cfg = configs.mediaConfig(kind);
