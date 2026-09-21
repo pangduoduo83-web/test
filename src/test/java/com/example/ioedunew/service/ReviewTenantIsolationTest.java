@@ -23,10 +23,20 @@ class ReviewTenantIsolationTest {
         when(repository.save(any())).thenAnswer(c->{SystemSetting s=c.getArgument(0);databases.get(TenantContext.require()).put(s.getSettingKey(),s);return s;});
         AiConfigService service=new AiConfigService(repository,new SecretCrypto("test-master-only"));
         TenantContext.runAs("merchant-a",()-> {
+            assertEquals("openai", service.mediaConfig("speech").speechProtocol);
+            assertEquals("openai", service.view().get("speechProtocol"));
             Map<String,Object> fields=new HashMap<>();fields.put("mineruMode","cloud");
+            fields.put("speechProtocol","qwen");fields.put("speechApiKey","speech-a-secret");
             fields.put("mineruCloudApiKey","cloud-a-secret");fields.put("mineruLocalApiKey","local-a-secret");
             fields.put("mineruCloudEnabled",true);fields.put("mineruLocalEnabled",true);
             service.update(fields);
+            assertEquals("qwen", service.mediaConfig("speech").speechProtocol);
+            assertEquals("qwen", service.view().get("speechProtocol"));
+            assertFalse(service.view().toString().contains("speech-a-secret"));
+            assertTrue(databases.get("merchant-a").get("ai.speechApiKey").getSettingValue().startsWith("enc:v1:"));
+            assertThrows(com.example.ioedunew.common.BusinessException.class,
+                    () -> service.update(Collections.singletonMap("speechProtocol","invalid")));
+            assertEquals("qwen", service.mediaConfig("speech").speechProtocol);
             service.update(Collections.singletonMap("mineruMode","selfhost"));
             assertEquals("local-a-secret",service.mediaConfig("mineruLocal").apiKey);
             service.update(Collections.singletonMap("mineruMode","cloud"));
@@ -36,11 +46,17 @@ class ReviewTenantIsolationTest {
             assertTrue(databases.get("merchant-a").get("ai.mineruCloudApiKey").getSettingValue().startsWith("enc:v1:"));
         });
         TenantContext.runAs("merchant-b",()-> {
+            assertEquals("openai", service.mediaConfig("speech").speechProtocol);
+            assertNull(service.mediaConfig("speech").apiKey);
             assertNull(service.mediaConfig("mineruCloud").apiKey);
             assertFalse(service.mediaConfig("mineruLocal").enabled);
             service.update(Collections.singletonMap("mineruCloudApiKey","cloud-b-secret"));
         });
-        TenantContext.runAs("merchant-a",()->assertEquals("cloud-a-secret",service.mediaConfig("mineruCloud").apiKey));
+        TenantContext.runAs("merchant-a",()-> {
+            assertEquals("cloud-a-secret",service.mediaConfig("mineruCloud").apiKey);
+            assertEquals("qwen",service.mediaConfig("speech").speechProtocol);
+            assertEquals("speech-a-secret",service.mediaConfig("speech").apiKey);
+        });
         assertNull(TenantContext.get());
     }
 

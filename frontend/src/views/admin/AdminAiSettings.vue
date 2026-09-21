@@ -81,7 +81,20 @@
           <div class="section-heading"><div><span class="section-kicker">03 / 多媒体服务</span><h2>扩展识别能力</h2><p>为成果图片识别和视频语音转文字分别配置服务，主模型不可用时不会自动切换。</p></div><span class="section-side-note"><Images :size="15" /> {{ enabledMediaCount }} 项已启用</span></div>
           <div v-for="service in mediaServicesOnly" :key="service.key" class="card service-card">
             <div class="service-head"><div class="service-title"><span class="service-icon" :class="service.tone"><component :is="service.icon" :size="18" /></span><div><h3>{{ service.label }}</h3><p>{{ service.description }}</p></div></div><el-switch v-model="form[service.key + 'Enabled']" inline-prompt active-text="启用" inactive-text="停用" /></div>
-            <div class="service-fields form-grid"><div class="field span-2"><label>服务地址</label><el-input v-model="form[service.key + 'BaseUrl']" :placeholder="service.placeholder" /></div><div class="field"><label>模型名称</label><el-input v-model="form[service.key + 'Model']" placeholder="填写服务商提供的模型名称" /></div><div class="field"><label>API Key</label><el-input v-model="form[service.key + 'ApiKey']" type="password" show-password :placeholder="settings[service.key + 'ApiKeySet'] ? '已配置，留空保持不变' : '填写密钥'" /></div></div>
+            <div class="service-fields form-grid">
+              <div v-if="service.key === 'speech'" class="field span-2">
+                <label>接入方式</label>
+                <el-select v-model="form.speechProtocol" aria-label="语音接入方式">
+                  <el-option label="通用语音接口（OpenAI 兼容）" value="openai" />
+                  <el-option label="Qwen ASR（阿里云百炼）" value="qwen" />
+                </el-select>
+                <div v-if="form.speechProtocol === 'qwen'" class="hint">支持 qwen3-asr-flash 及其日期版本。服务地址填写百炼对应地域的兼容地址，以 /compatible-mode/v1 结尾；实时和 filetrans 型号不适用于此方式。</div>
+                <div v-else class="hint">使用服务商的 /audio/transcriptions 接口，服务地址通常以 /v1 结尾。</div>
+              </div>
+              <div class="field span-2"><label>服务地址</label><el-input v-model="form[service.key + 'BaseUrl']" :placeholder="service.key === 'speech' && form.speechProtocol === 'qwen' ? 'https://dashscope.aliyuncs.com/compatible-mode/v1' : service.placeholder" /></div>
+              <div class="field"><label>模型名称</label><el-input v-model="form[service.key + 'Model']" :placeholder="service.key === 'speech' && form.speechProtocol === 'qwen' ? 'qwen3-asr-flash' : '填写服务商提供的模型名称'" /></div>
+              <div class="field"><label>API Key</label><el-input v-model="form[service.key + 'ApiKey']" type="password" show-password :placeholder="settings[service.key + 'ApiKeySet'] ? '已配置，留空保持不变' : '填写密钥'" /></div>
+            </div>
           </div>
           <div class="callout muted-callout"><span class="callout-icon"><Info :size="16" /></span><div><b>独立配置</b><p>图片和语音服务的地址、密钥分别保存。只在启用并完成配置后，相关能力才会出现在成果评审流程中。</p></div></div>
         </template>
@@ -101,7 +114,7 @@
 
         <div class="action-dock">
           <div class="action-dock-copy"><span class="action-dot"></span><div><b>配置修改后立即生效</b><small>保存后可在模型服务商处查看调用状态</small></div></div>
-          <div class="actions-left"><el-button size="large" :loading="testing" @click="test"><Zap :size="15" />测试连接</el-button><el-button size="large" type="primary" :loading="saving" @click="save"><Save :size="15" />保存配置</el-button></div>
+          <div class="actions-left"><el-button size="large" :loading="testing" @click="test"><Zap :size="15" />测试主模型</el-button><el-button size="large" type="primary" :loading="saving" @click="save"><Save :size="15" />保存配置</el-button></div>
         </div>
         <div v-if="testResult" class="test-result" :class="testResult.ok ? 'ok' : 'fail'"><CircleCheckBig v-if="testResult.ok" :size="16" /><CircleX v-else :size="16" />{{ testResult.ok ? `连接成功，往返 ${testResult.latencyMs} ms` : testResult.error }}</div>
       </main>
@@ -133,13 +146,13 @@ const sectionItems = [
 
 const mediaServices = [
   { key: 'vision', label: '成果图片识别', description: '分析实物图片和视频抽样画面，使用支持图片输入的 OpenAI 兼容接口。', placeholder: 'https://服务商地址/v1', icon: Images, tone: 'purple' },
-  { key: 'speech', label: '视频语音转文字', description: '使用兼容 /audio/transcriptions 的服务返回文字，与图片识别独立配置。', placeholder: 'https://服务商地址/v1', icon: Mic2, tone: 'blue' },
+  { key: 'speech', label: '视频语音转文字', description: '支持 Qwen ASR 或通用语音识别服务，将视频讲解转成评审材料。', placeholder: 'https://服务商地址/v1', icon: Mic2, tone: 'blue' },
   { key: 'mineruCloud', label: 'MinerU 官方 API', description: '解析 PDF、Word 报告，支持表格与公式提取，版本填写 vlm 或 pipeline。', placeholder: 'https://mineru.net', icon: Cloud, tone: 'green' },
   { key: 'mineruLocal', label: '自部署 MinerU', description: '连接 MinerU 4.x V1 HTTP API，匿名内网服务可留空密钥。', placeholder: 'http://你的MinerU服务器:8000', icon: Server, tone: 'amber' }
 ]
 const form = reactive({
   enabled: true, baseUrl: '', model: '', apiKey: '', maxTokens: 2000, temperature: 0.4, connectTimeoutMs: 3000, readTimeoutMs: 20000,
-  dailyRunsPerUser: 50, mineruMode: 'cloud',
+  dailyRunsPerUser: 50, mineruMode: 'cloud', speechProtocol: 'openai',
   ...Object.fromEntries(mediaServices.flatMap(s => [[s.key + 'Enabled', false], [s.key + 'BaseUrl', s.key === 'mineruCloud' ? 'https://mineru.net' : ''], [s.key + 'Model', s.key === 'mineruCloud' ? 'vlm' : s.key === 'mineruLocal' ? 'standard' : ''], [s.key + 'ApiKey', '']]))
 })
 const mediaServicesOnly = computed(() => mediaServices.filter((service) => !service.key.startsWith('mineru')))
@@ -177,6 +190,7 @@ const load = async () => {
   const d = await adminGetAiSettings()
   settings.value = d
   form.mineruMode = d.mineruMode || 'cloud'
+  form.speechProtocol = d.speechProtocol || 'openai'
   for (const service of mediaServices) for (const field of ['Enabled', 'BaseUrl', 'Model']) {
     if (d[service.key + field] != null) form[service.key + field] = d[service.key + field]
   }
@@ -193,7 +207,7 @@ const save = async () => {
     settings.value = await adminUpdateAiSettings({
       enabled: form.enabled, baseUrl: form.baseUrl.trim(), model: form.model.trim(), apiKey: form.apiKey || undefined,
       maxTokens: form.maxTokens, temperature: form.temperature, connectTimeoutMs: form.connectTimeoutMs, readTimeoutMs: form.readTimeoutMs,
-      dailyRunsPerUser: form.dailyRunsPerUser ?? 0, mineruMode: form.mineruMode,
+      dailyRunsPerUser: form.dailyRunsPerUser ?? 0, mineruMode: form.mineruMode, speechProtocol: form.speechProtocol,
       ...Object.fromEntries(mediaServices.flatMap(s => ['Enabled', 'BaseUrl', 'Model', 'ApiKey'].map(field => [s.key + field, form[s.key + field]])))
     })
     form.apiKey = ''

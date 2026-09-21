@@ -16,7 +16,8 @@
 | --- | --- |
 | 评分模型 | 现有 OpenAI 兼容 `/chat/completions`；需要JSON输出。评分项较多时建议把输出上限设为6000–8000，并提高读取超时。 |
 | 图片识别 | 独立地址、模型、API Key；支持 `image_url` 数据URI输入的 Chat Completions。图片以压缩JPEG发送。 |
-| 语音转文字 | 独立地址、模型、API Key；兼容 `POST /audio/transcriptions`，multipart上传WAV，`response_format=json`，返回 `text`。 |
+| 语音转文字（通用） | 接入方式选「通用语音接口」，独立地址、模型、API Key；兼容 `POST /audio/transcriptions`，multipart上传WAV，`response_format=json`，返回 `text`。旧配置默认保留此方式。 |
+| 语音转文字（Qwen ASR） | 接入方式选「Qwen ASR（阿里云百炼）」，模型填写 `qwen3-asr-flash` 或其日期版本；向兼容地址的 `/chat/completions` 发送 Base64 WAV `input_audio`，读取 `choices[0].message.content`。 |
 | MinerU 官方 | 选择「官方 API」，填服务根地址 `https://mineru.net`、Token、`vlm` 或 `pipeline`，并启用对应配置。 |
 | 自部署 MinerU | 选择「自部署」，填服务根地址（不含 `/v1`）、API Key（匿名内网可空）和服务支持的tier，例如 `standard`。 |
 
@@ -27,6 +28,19 @@
 - 旧版自部署 `/file_parse` 不是此适配器的协议，部署前应核对版本，不能只换一个地址就假定兼容。
 - 不使用免登录轻量解析，也不在失败时退回PDFBox/POI抽文本；PDF和Word均交给所选MinerU。
 - 不自动切换服务。未启用、服务不兼容、超时或失败，会在材料状态中明确提示。
+
+### Qwen ASR 配置
+
+在「管理员 → AI 配置 → 多媒体服务 → 视频语音转文字」启用服务，选择 **Qwen ASR（阿里云百炼）**：
+
+- 服务地址：北京地域可填 `https://dashscope.aliyuncs.com/compatible-mode/v1`，也可使用百炼提供的业务空间专属兼容地址。其他地域填写对应地址，并使用相同地域的 API Key；不要填写到 `/chat/completions`。
+- 模型名称：`qwen3-asr-flash`，或支持的日期版本（例如 `qwen3-asr-flash-2026-02-10`）。`realtime` 和 `filetrans` 是不同协议，本适配器会在发送音频前明确拒绝。
+- API Key：在本商户配置中填写；留空保存会保留已有语音密钥。不会自动使用其他商户或主评分模型的密钥。
+- 保存后在一个含讲解的视频成果上点击「AI 分析成果材料」验证语音材料。页面底部的「测试主模型」只测试主评分模型，不代表 ASR 测试成功。
+
+视频仍按每 60 秒切为 16 kHz 单声道 WAV；Qwen 适配器限制每段原始音频不超过 7 MiB，为 Base64 编码后 10 MB 限制留出空间。转写请求使用非流式返回，缺少文字或被截断的结果不会作为成功材料；空字符串可表示无可识别语音。切换语音接入方式会使旧评审材料缓存失效，需重新评审；失败时不会切换到另一协议重发音频。
+
+此项配置使用现有商户设置表，无需增加数据库表或迁移。接口依据：[Qwen-ASR 官方 API](https://help.aliyun.com/zh/model-studio/qwen-asr-api-reference)。
 
 ## 文件与处理边界
 

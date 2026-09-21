@@ -99,6 +99,7 @@ public class AiConfigService {
             m.put(kind + "Enabled", media.enabled);
             m.put(kind + "ApiKeySet", !isBlank(media.apiKey));
             m.put(kind + "ApiKeyMasked", mask(media.apiKey));
+            if ("speech".equals(kind)) m.put("speechProtocol", media.speechProtocol);
         }
         return m;
     }
@@ -120,6 +121,12 @@ public class AiConfigService {
     public Map<String, Object> update(Map<String, Object> body) {
         if (body == null || body.isEmpty()) {
             throw new BusinessException("没有需要保存的配置");
+        }
+        if (body.containsKey("speechProtocol")) {
+            String protocol = String.valueOf(body.get("speechProtocol"));
+            if (!"openai".equals(protocol) && !"qwen".equals(protocol))
+                throw new BusinessException("语音接入方式必须为 openai 或 qwen");
+            put("ai.speechProtocol", protocol);
         }
         if (body.containsKey("enabled")) {
             put(KEY_ENABLED, String.valueOf(Boolean.TRUE.equals(body.get("enabled"))));
@@ -221,6 +228,7 @@ public class AiConfigService {
         cfg.baseUrl = db.getOrDefault("ai." + kind + "BaseUrl", "");
         cfg.model = db.getOrDefault("ai." + kind + "Model", "");
         cfg.apiKey = crypto.decrypt(db.get("ai." + kind + "ApiKey"));
+        if ("speech".equals(kind)) cfg.speechProtocol = db.getOrDefault("ai.speechProtocol", "openai");
         cfg.maxTokens = 1600; cfg.temperature = 0.1;
         cfg.connectTimeoutMs = 15000; cfg.readTimeoutMs = 120000;
         return cfg;
@@ -300,6 +308,8 @@ public class AiConfigService {
         public String apiKey;
         public String apiKeySource;
         public String model;
+        /** Only used by speech recognition; existing settings retain the transcription API. */
+        public String speechProtocol = "openai";
         public int maxTokens;
         public double temperature;
         public int connectTimeoutMs;
