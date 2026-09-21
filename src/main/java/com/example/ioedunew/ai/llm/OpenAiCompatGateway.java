@@ -191,7 +191,10 @@ public class OpenAiCompatGateway implements LlmGateway {
             body.put("tool_choice", "auto");
         }
 
-        URL url = new URL(cfg.baseUrl.replaceAll("/+$", "") + "/chat/completions");
+        String baseUrl = cfg.baseUrl.replaceAll("/+$", "");
+        // Older Qwen presets omitted /v1; both text and vision use this gateway.
+        if (baseUrl.endsWith("/compatible-mode")) baseUrl += "/v1";
+        URL url = new URL(baseUrl + "/chat/completions");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setConnectTimeout(cfg.connectTimeoutMs);

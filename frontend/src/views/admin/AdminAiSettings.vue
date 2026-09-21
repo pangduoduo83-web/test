@@ -39,7 +39,7 @@
           <span class="nav-item-copy"><b>{{ item.title }}</b><small>{{ item.desc }}</small></span>
           <ChevronRight :size="15" class="nav-chevron" />
         </button>
-        <div class="nav-help"><span class="nav-help-icon"><Info :size="15" /></span><div><b>配置提示</b><p>后台设置优先于环境变量，修改后可用“测试连接”确认。</p></div></div>
+        <div class="nav-help"><span class="nav-help-icon"><Info :size="15" /></span><div><b>配置提示</b><p>修改后请先保存。“测试主模型”仅检查已保存的主模型配置。</p></div></div>
       </aside>
 
       <main class="settings-content">
@@ -55,7 +55,7 @@
               </button>
             </div>
             <div class="form-grid">
-              <div class="field span-2"><label>接口地址 <b>*</b></label><el-input v-model="form.baseUrl" placeholder="https://api.deepseek.com" /><div class="hint">填写服务基础地址，不要包含 /chat/completions；通义千问使用 compatible-mode 地址。</div></div>
+              <div class="field span-2"><label>接口地址 <b>*</b></label><el-input v-model="form.baseUrl" placeholder="https://api.deepseek.com" /><div class="hint">填写服务基础地址，不要包含 /chat/completions；通义千问使用以 /compatible-mode/v1 结尾的地址。</div></div>
               <div class="field"><label>模型名称 <b>*</b></label><el-input v-model="form.model" placeholder="deepseek-chat"><template #suffix><el-dropdown trigger="click" @command="(m) => (form.model = m)"><span class="model-pick">常用模型 <ChevronDown :size="13" /></span><template #dropdown><el-dropdown-menu><el-dropdown-item v-for="m in modelSuggestions" :key="m" :command="m">{{ m }}</el-dropdown-item></el-dropdown-menu></template></el-dropdown></template></el-input></div>
               <div class="field"><label>API Key</label><el-input v-model="form.apiKey" type="password" show-password :placeholder="settings.apiKeySet ? `已配置 ${settings.apiKeyMasked}，留空保持不变` : '粘贴服务商密钥'" /><div class="hint">密钥只保存在服务端，前端只显示掩码。</div></div>
             </div>
@@ -113,10 +113,11 @@
         </template>
 
         <div class="action-dock">
-          <div class="action-dock-copy"><span class="action-dot"></span><div><b>配置修改后立即生效</b><small>保存后可在模型服务商处查看调用状态</small></div></div>
+          <div class="action-dock-copy"><span class="action-dot"></span><div><b>保存配置后立即生效</b><small>保存后可在模型服务商处查看调用状态</small></div></div>
           <div class="actions-left"><el-button size="large" :loading="testing" @click="test"><Zap :size="15" />测试主模型</el-button><el-button size="large" type="primary" :loading="saving" @click="save"><Save :size="15" />保存配置</el-button></div>
         </div>
-        <div v-if="testResult" class="test-result" :class="testResult.ok ? 'ok' : 'fail'"><CircleCheckBig v-if="testResult.ok" :size="16" /><CircleX v-else :size="16" />{{ testResult.ok ? `连接成功，往返 ${testResult.latencyMs} ms` : testResult.error }}</div>
+        <div v-if="activeSection !== 'model'" class="hint">“测试主模型”检查主模型连接；图片识别、语音转写和文档解析需要用相应材料验证。</div>
+        <div v-if="testResult" class="test-result" :class="testResult.ok ? 'ok' : 'fail'"><CircleCheckBig v-if="testResult.ok" :size="16" /><CircleX v-else :size="16" />{{ testResult.ok ? `主模型连接成功，往返 ${testResult.latencyMs} ms` : `主模型连接失败：${testResult.error}` }}</div>
       </main>
     </div>
   </div>
@@ -160,10 +161,11 @@ const parserServices = computed(() => mediaServices.filter((service) => service.
 
 const providers = [
   { key: 'deepseek', name: 'DeepSeek', desc: '性价比高，默认推荐', icon: Cpu, bg: 'linear-gradient(135deg,#4f46e5,#7c3aed)', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', models: ['deepseek-chat', 'deepseek-reasoner'] },
-  { key: 'qwen', name: '通义千问', desc: '阿里云 DashScope 兼容模式', icon: Cloud, bg: 'linear-gradient(135deg,#f97316,#ef4444)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode', model: 'qwen-plus', models: ['qwen-plus', 'qwen-turbo', 'qwen-max'] },
+  { key: 'qwen', name: '通义千问', desc: '阿里云 DashScope 兼容模式', icon: Cloud, bg: 'linear-gradient(135deg,#f97316,#ef4444)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', models: ['qwen-plus', 'qwen-turbo', 'qwen-max'] },
   { key: 'custom', name: '自定义', desc: '任意 OpenAI 兼容服务', icon: SlidersHorizontal, bg: 'linear-gradient(135deg,#64748b,#334155)', models: ['gpt-4o-mini', 'glm-4-flash', 'moonshot-v1-8k'] }
 ]
-const providerKey = computed(() => providers.find((p) => p.baseUrl && form.baseUrl && form.baseUrl.replace(/\/$/, '') === p.baseUrl)?.key || (form.baseUrl ? 'custom' : ''))
+const providerBase = (value) => value.replace(/\/+$/, '').replace(/\/compatible-mode$/, '/compatible-mode/v1')
+const providerKey = computed(() => providers.find((p) => p.baseUrl && form.baseUrl && providerBase(form.baseUrl) === providerBase(p.baseUrl))?.key || (form.baseUrl ? 'custom' : ''))
 const modelSuggestions = computed(() => providers.find((p) => p.key === providerKey.value)?.models || providers[2].models)
 
 const statusKind = computed(() => !form.enabled ? 'off' : settings.value.apiKeySet ? 'on' : 'warn')
