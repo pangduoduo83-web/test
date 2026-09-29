@@ -6,7 +6,11 @@ import com.example.ioedunew.entity.LearningActivity;
 import com.example.ioedunew.entity.User;
 import com.example.ioedunew.repository.BorrowRequestRepository;
 import com.example.ioedunew.repository.EnrollmentRepository;
+import com.example.ioedunew.repository.ProjectRepository;
+import com.example.ioedunew.repository.SubmissionRepository;
 import com.example.ioedunew.repository.UserRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -32,17 +36,26 @@ public class DashboardService {
     private final UserRepository userRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final BorrowRequestRepository borrowRepository;
+    private final ProjectRepository projectRepository;
+    private final SubmissionRepository submissionRepository;
+    private final ObjectMapper objectMapper;
     private final SkillService skillService;
     private final LearningActivityService activityService;
 
     public DashboardService(UserRepository userRepository,
                             EnrollmentRepository enrollmentRepository,
                             BorrowRequestRepository borrowRepository,
+                            ProjectRepository projectRepository,
+                            SubmissionRepository submissionRepository,
+                            ObjectMapper objectMapper,
                             SkillService skillService,
                             LearningActivityService activityService) {
         this.userRepository = userRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.borrowRepository = borrowRepository;
+        this.projectRepository = projectRepository;
+        this.submissionRepository = submissionRepository;
+        this.objectMapper = objectMapper;
         this.skillService = skillService;
         this.activityService = activityService;
     }
@@ -79,6 +92,7 @@ public class DashboardService {
         result.put("completedProjects", completedCount);
         result.put("skillAvg", skillAvg);
         result.put("ongoingProjects", ongoing);
+        result.put("completedProjectHistory", completedHistory(userId));
         result.put("achievements", achievements);
         result.put("weekTrend", activityService.dailyCounts(userId, 7, null));
         result.put("monthTrend", activityService.dailyCounts(userId, 30, null));
@@ -86,6 +100,61 @@ public class DashboardService {
         result.put("monthTaskTrend", activityService.dailyCounts(userId, 30, TASK_TYPES));
         result.put("recentActivities", recent(userId));
         return result;
+    }
+
+    private List<Map<String, Object>> completedHistory(Long userId) {
+        List<Map<String, Object>> history = new ArrayList<>();
+        for (Enrollment enrollment : enrollmentRepository.findByUserIdOrderByEnrolledAtDesc(userId)) {
+            if (!"COMPLETED".equals(enrollment.getStatus())) continue;
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("enrollmentId", enrollment.getId());
+            item.put("projectId", enrollment.getProjectId());
+            item.put("projectTitle", enrollment.getProjectTitle());
+            item.put("completedAt", enrollment.getEnrolledAt());
+            item.put("score", null);
+            item.put("feedback", "");
+            projectRepository.findById(enrollment.getProjectId()).ifPresent(project -> {
+                item.put("category", project.getCategory());
+                item.put("coverUrl", project.getCoverUrl());
+                List<com.example.ioedunew.entity.Submission> submissions = submissionRepository
+                        .findByUserIdAndProjectIdOrderBySubmittedAtDesc(userId, project.getId());
+                List<com.example.ioedunew.entity.Submission> graded = new ArrayList<>();
+                for (com.example.ioedunew.entity.Submission submission : submissions) {
+                    if ("GRADED".equals(submission.getStatus()) && submission.getScore() != null) graded.add(submission);
+                }
+                Integer score = scoreFor(project, graded);
+                if (score != null) {
+                    item.put("score", score);
+                    item.put("feedback", graded.get(0).getFeedback() == null ? "" : graded.get(0).getFeedback());
+                    item.put("completedAt", graded.get(0).getGradedAt() == null ? enrollment.getEnrolledAt() : graded.get(0).getGradedAt());
+                }
+            });
+            history.add(item);
+        }
+        return history;
+    }
+
+    /** 按项目考核项取每项最新评分，再按权重计算综合分。 */
+    private Integer scoreFor(com.example.ioedunew.entity.Project project,
+                             List<com.example.ioedunew.entity.Submission> graded) {
+        if (graded.isEmpty()) return null;
+        try {
+            JsonNode node = objectMapper.readTree(project.getAssessments() == null ? "[]" : project.getAssessments());
+            if (node.isArray() && node.size() > 0) {
+                double total = 0;
+                for (JsonNode assessment : node) {
+                    String name = assessment.path("name").asText("");
+                    com.example.ioedunew.entity.Submission latest = null;
+                    for (com.example.ioedunew.entity.Submission submission : graded) {
+                        if (name.equals(submission.getAssessmentName())) { latest = submission; break; }
+                    }
+                    if (latest == null) return null;
+                    total += latest.getScore() * assessment.path("weight").asDouble(0) / 100.0;
+                }
+                return (int) Math.round(total);
+            }
+        } catch (Exception ignored) { /* 旧数据或非标准 JSON 按最新单项处理 */ }
+        return graded.get(0).getScore();
     }
 
     private List<Map<String, Object>> recent(Long userId) {

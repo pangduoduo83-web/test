@@ -17,6 +17,8 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
 
     List<Submission> findByUserIdAndProjectIdOrderBySubmittedAtDesc(Long userId, Long projectId);
 
+    List<Submission> findByUserIdOrderBySubmittedAtDesc(Long userId);
+
     List<Submission> findByStatusOrderBySubmittedAtDesc(String status);
 
     List<Submission> findAllByOrderBySubmittedAtDesc();

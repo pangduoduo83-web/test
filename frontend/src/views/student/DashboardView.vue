@@ -116,6 +116,30 @@
         </div>
       </div>
     </div>
+
+    <!-- 已完成项目历史与复盘 -->
+    <div class="card history-card">
+      <div class="card-head">
+        <h3>项目历史</h3>
+        <span class="history-count">已完成 {{ data.completedProjectHistory?.length || 0 }} 个</span>
+      </div>
+      <el-empty v-if="!data.completedProjectHistory?.length" description="完成项目并通过评审后，会在这里留下记录" />
+      <div v-else class="history-list">
+        <div v-for="p in data.completedProjectHistory" :key="p.enrollmentId" class="history-item">
+          <div class="history-cover"><img v-if="p.coverUrl" :src="p.coverUrl" alt="" /><span v-else>✓</span></div>
+          <div class="history-main">
+            <div class="history-title">{{ p.projectTitle }}</div>
+            <div class="history-meta">{{ p.category || '实践项目' }} · 完成于 {{ fmtTime(p.completedAt) || '暂无时间' }}</div>
+            <div v-if="p.feedback" class="history-feedback">{{ p.feedback }}</div>
+          </div>
+          <div class="history-score" :class="{ pass: Number(p.score) >= 60 }">
+            <b>{{ p.score == null ? '待评' : p.score }}</b><span v-if="p.score != null">分</span>
+          </div>
+          <el-button size="small" type="primary" plain
+                     @click="$router.push({ path: '/app/ai', query: { task: 'recommend', historyProject: p.projectTitle, historyPrompt: `我刚完成项目“${p.projectTitle}”，得分${p.score == null ? '暂无' : p.score}分${p.feedback ? `，教师评语：${p.feedback}` : ''}。请分析我可能的薄弱点，并从系统已有项目中推荐下一步学习内容。` } })">AI复盘与推荐</el-button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -290,6 +314,22 @@ window.addEventListener('resize', () => chart && chart.resize())
   transition: width .3s;
 }
 .ongoing-pct { font-size: 13px; color: #111827; width: 38px; text-align: right; }
+
+/* 项目历史 */
+.history-count { font-size: 12px; color: var(--text-secondary); }
+.history-list { display: flex; flex-direction: column; }
+.history-item { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.history-item:last-child { border-bottom: none; }
+.history-cover { width: 54px; height: 42px; border-radius: 8px; background: #ecfdf5; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; overflow: hidden; }
+.history-cover img { width: 100%; height: 100%; object-fit: cover; }
+.history-main { min-width: 0; flex: 1; }
+.history-title { font-size: 14px; font-weight: 600; color: #1f2937; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-meta { margin-top: 4px; font-size: 12px; color: var(--text-secondary); }
+.history-feedback { margin-top: 4px; color: #6b7280; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-score { min-width: 52px; text-align: center; color: #64748b; font-size: 12px; }
+.history-score b { font-size: 20px; color: #64748b; }
+.history-score.pass b { color: #16a34a; }
+@media (max-width: 700px) { .history-item { align-items: flex-start; flex-wrap: wrap; } .history-item .el-button { margin-left: 68px; } }
 
 /* 成就 */
 .achievements { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

@@ -564,6 +564,12 @@ onMounted(async () => {
   }
   const t = route.query.task
   if (t && (TASKS.some((x) => x.key === t) || t === 'custom' || t === 'skills')) active.value = t
+  const historyPrompt = String(route.query.historyPrompt || '').trim()
+  if (historyPrompt) {
+    active.value = 'recommend'
+    rec.goal = historyPrompt.slice(0, 200)
+    rec.note = `项目历史复盘：${String(route.query.historyProject || '').trim()}`
+  }
   await reloadSkills()
   if (route.query.skill && customSkills.value.some((s) => s.key === route.query.skill)) {
     customKey.value = route.query.skill

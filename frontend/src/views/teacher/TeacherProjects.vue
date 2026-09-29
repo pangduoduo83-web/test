@@ -97,7 +97,7 @@
       </div>
     </section>
 
-    <ProjectEditDialog v-model="editVisible" :project="editing" mode="teacher" :skill-dimensions="skillDimensions"
+    <ProjectEditDialog v-model="editVisible" :project="editing" mode="teacher" compact :skill-dimensions="skillDimensions"
                        :save-fn="saveProject" :reference-answer-fn="teacherProjectReferenceAnswer"
                        :save-reference-answer-fn="teacherUpdateReferenceAnswer" @saved="load" />
     <AiDraftDialog v-model="draftVisible" :skill-dimensions="skillDimensions" @drafted="onDrafted" />
@@ -157,18 +157,27 @@
       <template #footer-note>提交后等待平台审核</template>
     </TeacherComposeDialog>
 
-    <el-dialog v-model="stuVisible" :title="'学生进度 - ' + (current?.title || '')" width="min(800px, 94vw)" top="5vh">
+    <el-dialog v-model="stuVisible" :title="'学生进度 - ' + (current?.title || '')" width="min(1120px, 96vw)" top="3vh" class="student-progress-dialog">
       <div class="student-dialog-content" v-loading="studentsLoading">
       <el-alert v-if="studentsFailed" title="学生进度未能加载，请关闭后重试。" type="error" :closable="false" />
       <el-empty v-else-if="!studentsLoading && students.length === 0" description="还没有学生报名该项目" />
-      <el-table v-else :data="students" stripe max-height="480">
+      <el-table v-else :data="students" stripe row-key="enrollmentId" max-height="min(62vh, 620px)">
+        <el-table-column type="expand" width="46">
+          <template #default="{ row }">
+            <div class="student-progress-detail">
+              <div><span>当前任务</span><strong>{{ row.currentTask || '尚未记录' }}</strong></div>
+              <div><span>报名时间</span><strong>{{ formatDate(row.enrolledAt) }}</strong></div>
+              <div><span>截止时间</span><strong>{{ row.deadline || '未设置' }}</strong></div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="studentName" label="姓名" width="100" />
         <el-table-column prop="studentNo" label="学号" width="120" />
         <el-table-column prop="major" label="专业" width="130" />
-        <el-table-column label="进度" min-width="160">
+        <el-table-column label="进度" min-width="190">
           <template #default="{ row }"><el-progress :percentage="studentProgress(row)" :stroke-width="8" /></template>
         </el-table-column>
-        <el-table-column prop="currentTask" label="当前任务" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="currentTask" label="当前任务" min-width="240" show-overflow-tooltip />
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <span class="badge" :class="row.status === 'COMPLETED' ? 'badge-green' : 'badge-blue'">{{ row.status === 'COMPLETED' ? '已完成' : '进行中' }}</span>
@@ -503,6 +512,11 @@ onMounted(() => {
 
 .student-dialog-content { min-height: 80px; }
 .dialog-tip { margin: 0 0 15px; color: #76839b; font-size: 13px; line-height: 1.7; }
+.student-progress-detail { display: flex; flex-wrap: wrap; gap: 14px 28px; padding: 2px 14px 8px 54px; color: #76839b; font-size: 13px; }
+.student-progress-detail div { display: flex; gap: 8px; min-width: 220px; }
+.student-progress-detail strong { color: #334155; font-weight: 500; }
+:deep(.student-progress-dialog .el-dialog__body) { padding: 12px 20px 18px; }
+:deep(.student-progress-dialog .el-dialog__header) { padding-bottom: 12px; }
 .compose-context { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 24px; padding: 18px; border: 1px solid #e6ebf7; border-radius: 12px; background: #f7f9ff; }
 .recipient-avatar { display: inline-grid; flex-shrink: 0; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: #5265d8; background: #e9edff; font-size: 20px; font-weight: 600; }
 .compose-context-copy { min-width: 0; flex: 1; overflow-wrap: anywhere; }

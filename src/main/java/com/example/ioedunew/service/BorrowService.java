@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * 借阅服务:借阅申请状态机与库存控制中心。
  *
  * 状态流转与库存副作用(禁止在服务外直接改动这两者):
- * - apply:校验库存后创建 PENDING,不占库存;
+ * - apply:校验库存后按设备开关创建 PENDING 或自动 APPROVED;
  * - approve:PENDING → APPROVED,扣减 availableCount、累加 borrowCount、通知申请人、经验 +5;
  * - reject:PENDING → REJECTED,记录原因并通知;
  * - cancel:申请人本人将 PENDING → CANCELLED;
@@ -79,7 +79,23 @@ public class BorrowService {
         br.setStartDate(req.getStartDate());
         br.setDurationDays(req.getDurationDays());
         br.setRemark(req.getRemark());
+        boolean approvalRequired = !Boolean.FALSE.equals(eq.getApprovalRequired());
+        if (!approvalRequired) {
+            eq.setAvailableCount(eq.getAvailableCount() - req.getQuantity());
+            eq.setBorrowCount(eq.getBorrowCount() + req.getQuantity());
+            equipmentRepository.save(eq);
+            br.setStatus("APPROVED");
+            br.setApproverName("系统自动批准");
+            br.setApprovedAt(LocalDateTime.now());
+        }
         borrowRepository.save(br);
+        if (!approvalRequired) {
+            notificationService.create(userId, "borrow", "设备借阅已自动通过",
+                    "《" + eq.getName() + "》无需人工审核,请到 " + eq.getLocation() + " 领取,借用期 "
+                            + br.getDurationDays() + " 天。");
+            user.setExp(user.getExp() + 5);
+            userRepository.save(user);
+        }
         activityService.record(userId, com.example.ioedunew.entity.LearningActivity.BORROW, br.getId(),
                 "申请借阅「" + eq.getName() + "」× " + req.getQuantity());
         return br;

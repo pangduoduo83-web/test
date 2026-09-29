@@ -21,6 +21,13 @@
         </el-table-column>
         <el-table-column prop="rating" label="评分" width="70" />
         <el-table-column prop="borrowCount" label="借出次数" width="90" />
+        <el-table-column label="借阅审核" width="110">
+          <template #default="{ row }">
+            <span class="badge" :class="row.approvalRequired === false ? 'badge-blue' : 'badge-yellow'">
+              {{ row.approvalRequired === false ? '自动通过' : '需审核' }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <span class="badge" :class="row.status === 'AVAILABLE' ? 'badge-green' : 'badge-yellow'">
@@ -64,6 +71,10 @@
               <el-option label="可借阅" value="AVAILABLE" />
               <el-option label="维护中" value="MAINTENANCE" />
             </el-select>
+          </el-form-item>
+          <el-form-item label="借阅审核">
+            <el-switch v-model="form.approvalRequired" active-text="需要审核" inactive-text="自动通过" />
+            <div class="field-hint">关闭后学生提交借阅申请会立即通过并扣减库存。</div>
           </el-form-item>
         </div>
         <el-form-item label="设备图片">
@@ -149,6 +160,7 @@ const emptyForm = {
   id: null, name: '', model: '', category: '开发板', location: '', icon: '🔧', imageUrl: '',
   manufacturer: '', totalCount: 1, availableCount: 1, price: 0, rating: 5.0,
   status: 'AVAILABLE', description: '',
+  approvalRequired: true,
   specsText: '', tagsText: '', docsText: '', projectsText: ''
 }
 const form = reactive({ ...emptyForm })
@@ -174,6 +186,7 @@ const openEdit = (row) => {
       location: row.location, icon: row.icon, imageUrl: row.imageUrl || '', manufacturer: row.manufacturer,
       totalCount: row.totalCount, availableCount: row.availableCount,
       price: row.price, rating: row.rating, status: row.status, description: row.description,
+      approvalRequired: row.approvalRequired !== false,
       specsText: joinArr(row.specs), tagsText: joinArr(row.tags),
       projectsText: joinArr(row.suitableProjects)
     })
@@ -194,6 +207,7 @@ const save = async () => {
       icon: form.icon, imageUrl: form.imageUrl || null, manufacturer: form.manufacturer, totalCount: form.totalCount,
       availableCount: form.availableCount, price: form.price, rating: form.rating,
       status: form.status, description: form.description,
+      approvalRequired: form.approvalRequired,
       specs: JSON.stringify(splitText(form.specsText)),
       tags: JSON.stringify(splitText(form.tagsText)),
       docs: JSON.stringify(docRows.value
@@ -234,4 +248,5 @@ onMounted(() => {
 .doc-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .doc-row .grow { flex: 1; }
 .doc-hint { font-size: 12px; color: #9ca3af; margin-left: 10px; }
+.field-hint { margin-left: 10px; color: #9ca3af; font-size: 12px; }
 </style>

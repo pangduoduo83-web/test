@@ -50,7 +50,7 @@ public class AiReviewService {
         input.put("skillRequirements", project == null ? "" : project.getSkillRequirements());
         input.put("submissionRequirements", project == null ? "" : project.getSubmissionRequirements());
         // This value is teacher-only. It is supplied as a reference standard, never as student evidence.
-        input.put("referenceAnswer", project == null ? "" : project.getReferenceAnswer());
+        input.put("referenceAnswer", referenceAnswerFor(project, submission.getAssessmentName()));
         input.put("assessmentName", submission.getAssessmentName());
         if(project!=null) for(JsonNode item:objectMapper.readTree(project.getAssessments()==null ? "[]" : project.getAssessments())) {
             if(item.path("name").asText().equals(submission.getAssessmentName())) input.set("assessment",item);
@@ -90,6 +90,23 @@ public class AiReviewService {
         result.put("pendingChecks",strList(root.path("pendingChecks")));
         result.put("note","AI建议仅供参考，最终成绩和技能证据由教师确认。视频为抽样分析；证据链接定位到实际提取的页或时间段。较长材料按段提供节选，完整内容请查看原件。");
         return result;
+    }
+
+    /** 兼容旧版整项目答案，同时读取教师按考核项保存的私有标准答案。 */
+    private String referenceAnswerFor(Project project, String assessmentName) {
+        if (project == null || project.getReferenceAnswer() == null) return "";
+        String raw = project.getReferenceAnswer();
+        try {
+            JsonNode parsed = objectMapper.readTree(raw);
+            if (parsed != null && parsed.isObject() && parsed.path("items").isObject()) {
+                String item = parsed.path("items").path(assessmentName == null ? "" : assessmentName).asText("").trim();
+                if (!item.isEmpty()) return item;
+                return parsed.path("overall").asText("");
+            }
+        } catch (Exception ignored) {
+            // 纯文本是早期版本格式，直接作为整体标准答案使用。
+        }
+        return raw;
     }
 
     static Map<String,Object> validateCriteria(JsonNode root,ArrayNode rubric,Map<String,JsonNode> locations) {

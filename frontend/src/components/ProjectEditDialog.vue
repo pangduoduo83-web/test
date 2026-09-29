@@ -1,35 +1,49 @@
 <template>
   <!-- 项目编辑弹窗:管理端与教师端共用。mode=teacher 时不显示讲师指派(归属由服务端保留) -->
-  <el-dialog :model-value="modelValue" :title="form.id ? '编辑项目' : '新增项目'" width="860px" top="4vh"
-             destroy-on-close @update:model-value="(v) => $emit('update:modelValue', v)" @open="reset">
+  <el-dialog :model-value="modelValue" :title="form.id ? '编辑项目' : '新增项目'"
+             :width="compact ? 'min(760px, calc(100vw - 32px))' : '860px'"
+             :class="compact ? 'project-edit-dialog--compact' : 'project-edit-dialog--full'"
+             top="4vh" destroy-on-close @update:model-value="(v) => $emit('update:modelValue', v)" @open="reset">
     <el-tabs v-model="editTab">
       <el-tab-pane label="基础信息" name="basic">
         <el-form :model="form" label-width="90px">
           <el-form-item label="标题" required><el-input v-model="form.title" /></el-form-item>
-          <el-form-item label="封面图">
-            <ImageUploader v-model="form.coverUrl" />
-          </el-form-item>
           <el-form-item label="简介">
             <el-input v-model="form.summary" type="textarea" :rows="2" maxlength="300" show-word-limit
                       placeholder="列表卡片上展示的一句话介绍,建议 80 字以内" />
           </el-form-item>
-          <el-form-item label="详细描述">
-            <RichEditor v-model="form.description" />
-            <div class="field-tip">会完整显示在前台项目详情页,支持换行、图片和视频</div>
-          </el-form-item>
-          <div class="form-2col">
+          <div class="form-2col compact-core-fields">
             <el-form-item label="难度">
               <el-select v-model="form.difficulty">
                 <el-option v-for="d in ['入门', '进阶', '挑战']" :key="d" :label="d" :value="d" />
               </el-select>
             </el-form-item>
             <el-form-item label="周期"><el-input v-model="form.duration" placeholder="如: 2周" /></el-form-item>
-            <el-form-item label="团队规模"><el-input v-model="form.teamSize" placeholder="如: 1-2人" /></el-form-item>
             <el-form-item label="分类">
               <el-select v-model="form.category" filterable allow-create default-first-option>
                 <el-option v-for="c in categoryOptions" :key="c" :label="c" :value="c" />
               </el-select>
             </el-form-item>
+          </div>
+
+          <p v-if="compact" class="compact-intro">填写项目名称即可保存，其他内容可以创建后再补充。</p>
+
+          <el-collapse v-model="basicMoreOpen" class="optional-collapse"
+                       :class="compact ? 'optional-collapse--compact' : 'optional-collapse--full'">
+            <el-collapse-item name="more">
+              <template #title>
+                <span>完善更多信息</span>
+                <span class="optional-title">可选，创建后也能编辑</span>
+              </template>
+              <el-form-item label="封面图">
+                <ImageUploader v-model="form.coverUrl" />
+              </el-form-item>
+              <el-form-item label="详细描述">
+                <RichEditor v-model="form.description" />
+                <div class="field-tip">会完整显示在前台项目详情页,支持换行、图片和视频</div>
+              </el-form-item>
+              <div class="form-2col">
+            <el-form-item label="团队规模"><el-input v-model="form.teamSize" placeholder="如: 1-2人" /></el-form-item>
             <el-form-item label="图标"><el-input v-model="form.icon" placeholder="emoji 图标,如: 🔌" /></el-form-item>
             <el-form-item v-if="mode === 'admin'" label="指派讲师">
               <el-select v-model="form.mentorId" placeholder="选择讲师" clearable>
@@ -48,29 +62,36 @@
                 <el-option label="草稿" value="DRAFT" />
               </el-select>
             </el-form-item>
-          </div>
-          <el-form-item label="标签"><el-input v-model="form.tagsText" placeholder="逗号分隔" /></el-form-item>
-          <el-form-item label="项目特性"><el-input v-model="form.featuresText" placeholder="逗号分隔" /></el-form-item>
-          <el-form-item label="学习目标"><el-input v-model="form.goalsText" type="textarea" :rows="2" placeholder="逗号分隔" /></el-form-item>
-          <el-form-item label="前置要求"><el-input v-model="form.prereqText" type="textarea" :rows="2" placeholder="逗号分隔" /></el-form-item>
-          <el-form-item label="所需设备">
-            <el-select v-model="form.equipNames" multiple filterable allow-create default-first-option
-                       placeholder="从设备库选择,也可输入自定义名称" style="width:100%">
-              <el-option v-for="name in equipmentOptions" :key="name" :label="name" :value="name" />
-            </el-select>
-          </el-form-item>
+              </div>
+              <el-form-item label="标签"><el-input v-model="form.tagsText" placeholder="逗号分隔" /></el-form-item>
+              <el-form-item label="项目特性"><el-input v-model="form.featuresText" placeholder="逗号分隔" /></el-form-item>
+              <el-form-item label="学习目标"><el-input v-model="form.goalsText" type="textarea" :rows="2" placeholder="逗号分隔" /></el-form-item>
+              <el-form-item label="前置要求"><el-input v-model="form.prereqText" type="textarea" :rows="2" placeholder="逗号分隔" /></el-form-item>
+              <el-form-item label="所需设备">
+                <el-select v-model="form.equipNames" multiple filterable allow-create default-first-option
+                           placeholder="从设备库选择,也可输入自定义名称" style="width:100%">
+                  <el-option v-for="name in equipmentOptions" :key="name" :label="name" :value="name" />
+                </el-select>
+              </el-form-item>
+            </el-collapse-item>
+          </el-collapse>
         </el-form>
       </el-tab-pane>
 
-      <el-tab-pane label="高级内容" name="advanced">
+      <el-tab-pane :label="compact ? '高级内容（可选）' : '高级内容'" name="advanced">
         <p class="json-tip">完善教学安排、成果要求与评分标准，学生可在项目详情中查看，AI 评审也会参考这些内容。</p>
-
-        <div class="adv-section">
+        <el-tabs v-model="advancedTab" class="advanced-tabs" type="card">
+          <el-tab-pane label="考核与评分" name="assessment">
+          <div class="adv-section">
           <h4>成果提交要求与默认评分细则</h4>
           <el-input v-model="form.submissionRequirements" type="textarea" :rows="3" maxlength="4000" placeholder="例如：提交电路照片、运行演示视频、实验报告；说明必须展示的功能。" />
-          <ReviewRubricEditor v-model="reviewRubric" />
+          <el-collapse v-if="!assessRows.length" class="fallback-rubric-collapse">
+            <el-collapse-item title="通用评分标准（可选）" name="rubric">
+              <ReviewRubricEditor v-model="reviewRubric" />
+            </el-collapse-item>
+          </el-collapse>
         </div>
-        <div class="adv-section reference-answer-section">
+        <div v-if="!assessRows.length" class="adv-section reference-answer-section">
           <h4>教师标准答案 / 参考实现（选填）</h4>
           <el-input v-model="form.referenceAnswer" type="textarea" :rows="6" maxlength="20000"
                     show-word-limit placeholder="可填写关键结果、参考实现、代码要点、预期现象或评分时应核对的答案。留空则 AI 只按评分细则和提交材料判断。" />
@@ -81,7 +102,7 @@
             <h4>成果考核项
               <span class="weight-sum" :class="{ ok: assessWeightSum === 100 }">权重合计 {{ assessWeightSum }}/100</span>
             </h4>
-            <el-button size="small" plain @click="assessRows.push({ name: '', weight: 0, desc: '', rubric: [] })">+ 添加考核项</el-button>
+            <el-button size="small" plain @click="assessRows.push({ name: '', weight: 0, desc: '', referenceAnswer: '', rubric: [] })">+ 添加考核项</el-button>
           </div>
           <p class="json-tip" style="margin-top:0">
             设置后学生按考核项分阶段提交成果,每项单独评分,全部评完自动按权重计算综合分(≥60 判定项目完成);留空则为整体单一成果。
@@ -94,11 +115,15 @@
             <el-input v-model="a.desc" placeholder="要求说明(选填)" class="grow" />
             <el-button size="small" text type="danger" @click="assessRows.splice(i, 1)">删除</el-button>
           </div>
+          <el-input v-model="a.referenceAnswer" type="textarea" :rows="3" maxlength="6000"
+                    show-word-limit class="assessment-answer" placeholder="该考核项的标准答案 / 参考结果（选填），只供教师和 AI 评审使用" />
           <ReviewRubricEditor v-model="a.rubric" fallback="项目默认评分标准" />
           </div>
           <p v-if="!assessRows.length" class="empty-hint">未设置考核项,学生提交整体单一成果</p>
         </div>
+          </el-tab-pane>
 
+          <el-tab-pane label="教学安排" name="teaching">
         <div class="adv-section">
           <div class="adv-head">
             <h4>技能要求</h4>
@@ -135,7 +160,9 @@
           </div>
           <p v-if="!syllabusRows.length" class="empty-hint">暂无教学大纲,点击右上角添加</p>
         </div>
+          </el-tab-pane>
 
+          <el-tab-pane label="项目资源" name="resources">
         <div class="adv-section">
           <div class="adv-head">
             <h4>BOM 清单</h4>
@@ -179,6 +206,8 @@
           </div>
           <p v-if="!resourceRows.length" class="empty-hint">暂无学习资源,点击右上角添加</p>
         </div>
+          </el-tab-pane>
+        </el-tabs>
       </el-tab-pane>
     </el-tabs>
 
@@ -204,6 +233,8 @@ const props = defineProps({
   project: { type: Object, default: null },
   /** admin | teacher */
   mode: { type: String, default: 'admin' },
+  /** 教师端新增项目使用轻量首屏；编辑已有项目仍可展开完整字段 */
+  compact: { type: Boolean, default: false },
   /** 可指派的讲师(admin 模式) */
   teachers: { type: Array, default: () => [] },
   /** 技能维度 [{name, enabled}] */
@@ -217,6 +248,8 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'saved'])
 
 const editTab = ref('basic')
+const advancedTab = ref('assessment')
+const basicMoreOpen = ref(['more'])
 const saving = ref(false)
 const categoryOptions = computed(() => site.projectCategories || [])
 const equipmentOptions = ref([])
@@ -254,7 +287,9 @@ const reset = () => {
   const row = props.project
   Object.assign(form, emptyForm)
   editTab.value = 'basic'
-  assessRows.value = arr(row?.assessments).map((a) => ({ name: a.name || '', weight: num(a.weight), desc: a.desc || '', rubric: arr(a.rubric).map(r => ({ ...r })) }))
+  advancedTab.value = 'assessment'
+  basicMoreOpen.value = props.compact && !row ? [] : ['more']
+  assessRows.value = arr(row?.assessments).map((a) => ({ name: a.name || '', weight: num(a.weight), desc: a.desc || '', referenceAnswer: a.referenceAnswer || '', rubric: arr(a.rubric).map(r => ({ ...r })) }))
   reviewRubric.value = arr(row?.reviewRubric).map(r => ({ ...r }))
   form.submissionRequirements = row?.submissionRequirements || ''
   form.referenceAnswer = ''
@@ -277,7 +312,11 @@ const reset = () => {
   if (row && props.referenceAnswerFn) {
     props.referenceAnswerFn(row.id).then((result) => {
       // Only apply the response while this project is still open; closing/reopening can replace the row.
-      if (form.id === row.id) form.referenceAnswer = result?.referenceAnswer || ''
+      if (form.id === row.id) {
+        const parsed = parseReferenceAnswers(result?.referenceAnswer || '')
+        form.referenceAnswer = parsed.overall
+        assessRows.value.forEach((a) => { a.referenceAnswer = parsed.items[a.name] || a.referenceAnswer || '' })
+      }
     }).catch(() => {})
   }
 }
@@ -335,6 +374,28 @@ const buildResources = () => resourceRows.value.filter((r) => (r.name || '').tri
 const buildAssessments = () => assessRows.value.filter((a) => (a.name || '').trim())
   .map((a) => ({ name: a.name.trim(), weight: num(a.weight), desc: (a.desc || '').trim(), rubric: a.rubric || [] }))
 
+const parseReferenceAnswers = (raw) => {
+  if (!raw) return { overall: '', items: {} }
+  try {
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && parsed.items && typeof parsed.items === 'object') {
+      return { overall: String(parsed.overall || ''), items: parsed.items }
+    }
+  } catch (_) { /* 兼容旧版纯文本答案 */ }
+  return { overall: raw, items: {} }
+}
+const buildReferenceAnswerPayload = () => {
+  const items = {}
+  assessRows.value.forEach((a) => {
+    const name = (a.name || '').trim()
+    const answer = (a.referenceAnswer || '').trim()
+    if (name && answer) items[name] = answer
+  })
+  return Object.keys(items).length
+    ? JSON.stringify({ version: 1, overall: (form.referenceAnswer || '').trim(), items })
+    : (form.referenceAnswer || '').trim()
+}
+
 const save = async () => {
   if (!form.title.trim()) { ElMessage.warning('请填写项目标题'); return }
   const assessments = buildAssessments()
@@ -343,7 +404,8 @@ const save = async () => {
     editTab.value = 'advanced'
     return
   }
-  for (const rubric of [reviewRubric.value, ...assessments.map(a => a.rubric)]) {
+  const rubricsToValidate = assessments.length ? assessments.map(a => a.rubric) : [reviewRubric.value]
+  for (const rubric of rubricsToValidate) {
     if (rubric.length && (rubric.some(r => !r.name.trim()) || new Set(rubric.map(r => r.name.trim())).size !== rubric.length || rubric.reduce((sum, r) => sum + Number(r.points), 0) !== 100)) {
       ElMessage.warning('评分细则名称不能留空或重复，分值合计必须为100'); return
     }
@@ -377,7 +439,7 @@ const save = async () => {
     const saved = await props.saveFn(form.id, payload)
     const projectId = form.id || saved?.id
     if (projectId && props.saveReferenceAnswerFn) {
-      await props.saveReferenceAnswerFn(projectId, form.referenceAnswer)
+      await props.saveReferenceAnswerFn(projectId, buildReferenceAnswerPayload())
     }
     ElMessage.success('保存成功')
     emit('update:modelValue', false)
@@ -396,6 +458,16 @@ onMounted(() => {
 <style scoped>
 .field-tip { margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
 .form-2col { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.compact-core-fields { margin-bottom: 4px; }
+.compact-intro { margin: 2px 0 12px 90px; font-size: 12px; color: var(--text-secondary); }
+.optional-collapse { margin: 4px 0 8px 90px; border-top: 1px solid var(--el-border-color-lighter); border-bottom: 0; }
+.optional-title { margin-left: 8px; font-size: 12px; color: var(--text-secondary); font-weight: 400; }
+.optional-collapse--compact :deep(.el-collapse-item__header) { height: 38px; color: var(--el-color-primary); font-size: 13px; }
+.optional-collapse--compact :deep(.el-collapse-item__content) { padding: 16px 12px 2px; }
+.optional-collapse--full { margin-left: 0; border-top: 0; }
+.optional-collapse--full :deep(.el-collapse-item__header) { display: none; }
+.optional-collapse--full :deep(.el-collapse-item__wrap) { border-bottom: 0; }
+.optional-collapse--full :deep(.el-collapse-item__content) { padding-bottom: 0; }
 :deep(.el-select) { width: 100%; }
 .json-tip { font-size: 12px; color: #1d4ed8; background: #eff6ff; padding: 8px 12px; border-radius: 8px; }
 .adv-section { margin-bottom: 20px; }
@@ -414,4 +486,11 @@ onMounted(() => {
 .option-muted { margin-left: 6px; font-size: 12px; color: #9ca3af; }
 .syllabus-item { padding: 10px 12px; background: #f9fafb; border-radius: 8px; margin-bottom: 10px; }
 .empty-hint { font-size: 12px; color: #9ca3af; margin: 0; }
+:deep(.project-edit-dialog--compact) { max-height: 92vh; margin-top: 4vh; margin-bottom: 4vh; }
+:deep(.project-edit-dialog--compact .el-dialog__body) { max-height: calc(92vh - 150px); overflow-y: auto; padding-top: 8px; }
+:deep(.project-edit-dialog--compact .el-dialog__footer) { padding-top: 10px; }
+@media (max-width: 680px) {
+  .form-2col { grid-template-columns: 1fr; }
+  .compact-intro, .optional-collapse { margin-left: 0; }
+}
 </style>

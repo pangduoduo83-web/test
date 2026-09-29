@@ -123,8 +123,10 @@ public class AdminService {
                     .orElseThrow(() -> new BusinessException(404, "设备不存在"));
             input.setCreatedAt(existing.getCreatedAt());
             input.setBorrowCount(existing.getBorrowCount());
+            if (input.getApprovalRequired() == null) input.setApprovalRequired(existing.getApprovalRequired());
         } else {
             input.setBorrowCount(0);
+            if (input.getApprovalRequired() == null) input.setApprovalRequired(true);
         }
         if (input.getAvailableCount() == null || input.getAvailableCount() > input.getTotalCount()) {
             input.setAvailableCount(input.getTotalCount());

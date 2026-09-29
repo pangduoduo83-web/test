@@ -59,6 +59,10 @@ public class Equipment {
     @Column(nullable = false)
     private Integer borrowCount = 0;
 
+    /** 借阅是否需要管理员审核；默认开启以兼容已有设备。 */
+    @Column(nullable = false)
+    private Boolean approvalRequired = true;
+
     /** 参考价值(元) */
     private Double price;
 
