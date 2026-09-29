@@ -24,6 +24,7 @@ class DirectUploadTest {
     TenantQuotaService quota=mock(TenantQuotaService.class);
     StorageQuotaLock lock=mock(StorageQuotaLock.class);
     AuthUser student=new AuthUser(7L,"STUDENT","merchant-a");
+    AuthUser teacher=new AuthUser(8L,"TEACHER","merchant-a");
     DirectUploadService service;
     final String id="0123456789abcdef0123456789abcdef";
 
@@ -65,6 +66,8 @@ class DirectUploadTest {
         assertThrows(BusinessException.class,()->service.initiate(student,"submission","a.exe",1));
         assertThrows(BusinessException.class,()->service.initiate(student,"submission","a.mp4",104857601));
         assertThrows(BusinessException.class,()->service.initiate(student,"image","a.png",0));
+        assertThrows(BusinessException.class,()->service.initiate(teacher,"file","course.mp4",524288001L));
+        assertEquals("server",service.initiate(teacher,"file","course.mp4",524288000L).get("mode"));
         verifyNoInteractions(uploads,files,assets,quota);
     }
 

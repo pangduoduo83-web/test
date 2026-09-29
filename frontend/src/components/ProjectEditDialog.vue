@@ -416,7 +416,7 @@ const reset = () => {
 }
 
 const doUploadRes = async (opt, row) => {
-  if (opt.file.size > 30 * 1024 * 1024) { ElMessage.warning('附件不能超过 30MB'); return }
+  if (opt.file.size > 500 * 1024 * 1024) { ElMessage.warning('附件不能超过 500MB'); return }
   row.uploading = true
   try {
     const { url, name } = await uploadDocFile(opt.file)

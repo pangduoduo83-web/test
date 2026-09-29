@@ -27,6 +27,6 @@ public class DirectUploadController {
     @Data public static class Request {
         @NotBlank @Size(max=16) private String kind;
         @NotBlank @Size(max=255) private String name;
-        @Min(1) @Max(104857600) private long size;
+        @Min(1) @Max(524288000) private long size;
     }
 }

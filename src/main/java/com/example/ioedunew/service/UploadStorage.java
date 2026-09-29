@@ -130,7 +130,7 @@ public class UploadStorage {
 
     private void saveLocked(String relative, InputStream input, long size) throws IOException {
         requireRelative(relative);
-        if (size <= 0 || size > 100L * 1024 * 1024) throw new BusinessException("文件须为1字节至100MB");
+        if (size <= 0 || size > 500L * 1024 * 1024) throw new BusinessException("文件须为1字节至500MB");
         synchronized (lock()) {
             quota.checkStorageQuota(size);
             if (exists(relative)) throw new BusinessException("文件已存在，请重新上传");

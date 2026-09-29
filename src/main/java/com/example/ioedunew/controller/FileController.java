@@ -40,7 +40,7 @@ public class FileController {
     private static final List<String> DOC_EXT = Arrays.asList(
             "png", "jpg", "jpeg", "gif", "webp", "svg",
             "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt", "csv", "md",
-            "zip", "rar", "7z", "mp4", "mp3");
+            "zip", "rar", "7z", "mp4", "mp3", "mov", "webm", "mkv");
 
     private final UploadStorage storage;
     private final com.example.ioedunew.repository.SubmissionAssetRepository assets;
@@ -68,7 +68,7 @@ public class FileController {
         if (!user.isTeacher() && !user.isAdmin()) {
             throw new BusinessException(403, "仅教师或管理员可上传教学资料");
         }
-        if (file.getSize() > 30L * 1024 * 1024) throw new BusinessException("教学资料不能超过30MB");
+        if (file.getSize() > 500L * 1024 * 1024) throw new BusinessException("教学资料不能超过500MB");
         return ApiResponse.ok(saveFile(file, DOC_EXT, "不支持的文件类型,允许:" + String.join("/", DOC_EXT)));
     }
 

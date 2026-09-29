@@ -50,8 +50,8 @@ const editorConfig = {
     },
     uploadVideo: {
       async customUpload(file, insertFn) {
-        if (file.size > 30 * 1024 * 1024) {
-          ElMessage.warning('视频不能超过 30MB,建议压缩后上传')
+        if (file.size > 500 * 1024 * 1024) {
+          ElMessage.warning('视频不能超过 500MB,建议压缩后上传')
           return
         }
         try {

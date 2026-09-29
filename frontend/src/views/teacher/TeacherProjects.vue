@@ -386,7 +386,7 @@ const openResources = (row) => {
   resVisible.value = true
 }
 const doUploadRes = async (opt, row) => {
-  if (opt.file.size > 30 * 1024 * 1024) { ElMessage.warning('附件不能超过 30MB'); return }
+  if (opt.file.size > 500 * 1024 * 1024) { ElMessage.warning('附件不能超过 500MB'); return }
   row.uploading = true
   try {
     const result = await uploadDocFile(opt.file)

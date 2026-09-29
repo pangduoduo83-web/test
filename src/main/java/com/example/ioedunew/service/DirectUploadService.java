@@ -96,7 +96,7 @@ public class DirectUploadService {
         if ("image".equals(kind)) allowed=Arrays.asList("png","jpg","jpeg","gif","webp","svg");
         else if ("file".equals(kind)) {
             if (!user.isTeacher() && !user.isAdmin()) throw new BusinessException(403,"仅教师或管理员可上传教学资料");
-            allowed=Arrays.asList("png","jpg","jpeg","gif","webp","svg","pdf","doc","docx","ppt","pptx","xls","xlsx","txt","csv","md","zip","rar","7z","mp4","mp3");
+            allowed=Arrays.asList("png","jpg","jpeg","gif","webp","svg","pdf","doc","docx","ppt","pptx","xls","xlsx","txt","csv","md","zip","rar","7z","mp4","mp3","mov","webm","mkv");
         } else if ("submission".equals(kind)) allowed=Arrays.asList(
                 "png","jpg","jpeg","webp","gif","pdf","doc","docx","mp4","mov","webm",
                 "zip","rar","7z","c","h","cc","cpp","cxx","java","py","js","jsx","ts","tsx",
@@ -106,7 +106,7 @@ public class DirectUploadService {
         if (name==null || name.isEmpty() || name.length()>255 || name.indexOf('\0')>=0) throw new BusinessException("文件名须为1至255个字符");
         String ext=name.substring(name.lastIndexOf('.')+1).toLowerCase(Locale.ROOT);
         if (!allowed.contains(ext)) throw new BusinessException("不支持的文件类型");
-        int mb="submission".equals(kind)?100:30;
+        int mb = "file".equals(kind) ? 500 : ("submission".equals(kind) ? 100 : 30);
         if (size<=0 || size>mb*1024L*1024) throw new BusinessException("文件须为1字节至"+mb+"MB");
         return ext;
     }
