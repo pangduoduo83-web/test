@@ -4,7 +4,7 @@ name: ioedu-gitee-auto-deploy
 
 sources:
   ioedu_repo:
-    type: gitee
+    type: git
     name: IOEDU-New
     endpoint: https://gitee.com/wjc1238765/future-learning-platform.git
     branch: main
@@ -20,7 +20,9 @@ stages:
     jobs:
       package_job:
         name: 打包源码
-        runsOn: public/cn-beijing
+        runsOn:
+          group: public/cn-hangzhou
+          container: build-steps-public-registry.cn-beijing.cr.aliyuncs.com/build-steps/alinux3:latest
         steps:
           package_step:
             step: Command
@@ -33,9 +35,9 @@ stages:
             step: ArtifactUpload
             name: 上传发布包
             with:
-              uploadType: flowPublic
+              type: flowPublic
               artifact: default
-              filePath:
+              path:
                 - package.tgz
 
   deploy_stage:
