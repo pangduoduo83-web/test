@@ -1,6 +1,7 @@
 package com.example.ioedunew.service;
 
 import com.example.ioedunew.common.BusinessException;
+import com.example.ioedunew.common.HtmlSanitizer;
 import com.example.ioedunew.entity.Enrollment;
 import com.example.ioedunew.entity.Project;
 import com.example.ioedunew.entity.User;
@@ -10,6 +11,7 @@ import com.example.ioedunew.repository.SubmissionRepository;
 import com.example.ioedunew.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -151,7 +153,7 @@ public class TeacherService {
     @Transactional
     public Map<String, Object> updateReferenceAnswer(Long userId, boolean admin, Long projectId, String referenceAnswer) {
         Project p = ownedProject(userId, admin, projectId);
-        String value = referenceAnswer == null ? "" : referenceAnswer.trim();
+        String value = sanitizeReferenceAnswer(referenceAnswer);
         if (value.length() > 20000) {
             throw new BusinessException("参考答案不能超过20000字");
         }
@@ -161,6 +163,37 @@ public class TeacherService {
         Map<String, Object> result = new HashMap<>();
         result.put("referenceAnswer", value);
         return result;
+    }
+
+    /**
+     * 参考答案允许以 HTML 富文本保存。项目整体答案和分阶段答案目前共用一个
+     * 私有 JSON 字段,因此需要逐项清洗 JSON 中的 HTML,不能直接对 JSON 字符串
+     * 调用清洗器,否则会破坏 JSON 结构。
+     */
+    private String sanitizeReferenceAnswer(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.isEmpty()) {
+            return "";
+        }
+        try {
+            JsonNode node = objectMapper.readTree(value);
+            if (node != null && node.isObject() && node.path("items").isObject()) {
+                ObjectNode object = (ObjectNode) node;
+                if (object.has("overall")) {
+                    object.put("overall", HtmlSanitizer.clean(object.path("overall").asText("")));
+                }
+                ObjectNode items = (ObjectNode) object.path("items");
+                java.util.Iterator<java.util.Map.Entry<String, JsonNode>> fields = items.fields();
+                while (fields.hasNext()) {
+                    java.util.Map.Entry<String, JsonNode> field = fields.next();
+                    items.put(field.getKey(), HtmlSanitizer.clean(field.getValue().asText("")));
+                }
+                return objectMapper.writeValueAsString(object);
+            }
+        } catch (Exception ignored) {
+            // 兼容旧版本保存的纯文本/HTML答案,下面按单个答案处理。
+        }
+        return HtmlSanitizer.clean(value);
     }
 
     /** 项目报名学生与进度(附学生姓名/学号) */

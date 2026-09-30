@@ -102,6 +102,15 @@ class DirectUploadTest {
         verify(oss,never()).open(anyString(),any(),any());
     }
 
+    @Test void missingOssUserMetadataReturnsConflictInsteadOfServerError() {
+        grant();
+        ObjectMetadata meta=new ObjectMetadata(); meta.setContentLength(3);
+        when(oss.metadata(anyString())).thenReturn(meta);
+        BusinessException error=assertThrows(BusinessException.class,()->service.complete(student,id));
+        assertEquals(409,error.getCode());
+        verify(oss,never()).promote(anyString(),anyString(),anyString(),anyString());
+    }
+
     @Test void unknownOwnerExpiredGrantAndMismatchedBytesCannotPublishAnAttachment() {
         assertEquals(404,assertThrows(BusinessException.class,()->service.complete(student,id)).getCode());
         DirectUpload grant=grant(); grant.setExpiresAt(LocalDateTime.now().minusSeconds(1));

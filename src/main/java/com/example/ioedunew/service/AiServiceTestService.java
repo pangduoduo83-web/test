@@ -22,12 +22,19 @@ public class AiServiceTestService {
     private static final Pattern HTTP_STATUS = Pattern.compile("HTTP (\\d{3})\\b");
     private final AiConfigService configs;
     private final LlmGateway gateway;
+    private final AiClient aiClient;
     private final ReviewModelService media;
     private final MineruService mineru;
 
     public AiServiceTestService(AiConfigService configs, LlmGateway gateway,
                                 ReviewModelService media, MineruService mineru) {
-        this.configs = configs; this.gateway = gateway; this.media = media; this.mineru = mineru;
+        this(configs, gateway, media, mineru, new AiClient(configs, gateway));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AiServiceTestService(AiConfigService configs, LlmGateway gateway,
+                                ReviewModelService media, MineruService mineru, AiClient aiClient) {
+        this.configs = configs; this.gateway = gateway; this.aiClient = aiClient; this.media = media; this.mineru = mineru;
     }
 
     public Map<String, Object> test(String service, Map<String, Object> draft) {
@@ -59,7 +66,7 @@ public class AiServiceTestService {
                     message.getImageUrls().add("data:image/jpeg;base64," + Base64.getEncoder().encodeToString(testImage()));
                 }
                 request.getMessages().add(message);
-                reply = gateway.chat(cfg, request).getContent();
+                reply = aiClient.chatWithConfig("probe:" + service, cfg, request).getContent();
                 summary = "vision".equals(service) ? "图片接口已返回测试图片的识别结果" : "主模型已返回测试回复";
             }
             if (!service.startsWith("mineru") && (reply == null || reply.trim().isEmpty()))

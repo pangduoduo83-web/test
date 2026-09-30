@@ -68,7 +68,9 @@ public class DirectUploadService {
             validate(user, grant.getKind(), grant.getName(), grant.getSizeBytes());
             ObjectMetadata meta=oss.metadata(grant.getStagingKey());
             if (meta == null) throw new BusinessException(409,"文件尚未上传完成，请稍后重试确认");
-            if (meta.getContentLength()!=grant.getSizeBytes() || !id.equals(meta.getUserMetadata().get("upload-id")))
+            Map<String, String> userMetadata = meta.getUserMetadata();
+            String uploadId = userMetadata == null ? null : userMetadata.get("upload-id");
+            if (meta.getContentLength()!=grant.getSizeBytes() || !id.equals(uploadId))
                 throw new BusinessException(409,"上传文件校验失败，请重新上传");
             // Copy to an unexposed final key: even replaying a valid POST cannot overwrite an accepted attachment.
             oss.promote(grant.getStagingKey(), key, meta.getETag(), UploadStorage.contentType(relative));

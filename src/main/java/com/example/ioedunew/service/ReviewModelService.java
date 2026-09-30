@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
@@ -20,8 +21,15 @@ public class ReviewModelService {
     private final AiConfigService configs;
     private final LlmGateway gateway;
     private final ObjectMapper json;
+    private final AiClient aiClient;
+
+    @Autowired
+    public ReviewModelService(AiConfigService configs, LlmGateway gateway, ObjectMapper json, AiClient aiClient) {
+        this.configs=configs; this.gateway=gateway; this.json=json; this.aiClient=aiClient;
+    }
+
     public ReviewModelService(AiConfigService configs, LlmGateway gateway, ObjectMapper json) {
-        this.configs=configs; this.gateway=gateway; this.json=json;
+        this(configs, gateway, json, new AiClient(configs, gateway));
     }
     public String describe(byte[] jpeg) throws Exception {
         AiConfigService.AiConfig cfg = ready("vision", "图片识别");
@@ -30,15 +38,19 @@ public class ReviewModelService {
         ChatMessage image = ChatMessage.user("提取这张图片的可核实内容；看不清的部分明确说明。");
         image.getImageUrls().add("data:image/jpeg;base64," + Base64.getEncoder().encodeToString(jpeg));
         request.getMessages().add(image); request.setMaxTokens(1600);
-        try { return gateway.chat(cfg, request).getContent(); }
-        catch (Exception e) { throw new IllegalStateException("图片识别调用失败，请检查模型能力、密钥和服务连接"); }
+        return aiClient.chatWithConfig("vision", cfg, request).getContent();
     }
     public String transcribe(Path audio) throws Exception {
         return transcribe(audio, ready("speech", "语音转文字"));
     }
     String transcribe(Path audio, AiConfigService.AiConfig cfg) throws Exception {
+        return aiClient.execute("speech", cfg, current -> transcribeWithConfig(audio, current));
+    }
+
+    private String transcribeWithConfig(Path audio, AiConfigService.AiConfig cfg) throws Exception {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(15000); factory.setReadTimeout(120000);
+        factory.setConnectTimeout(cfg.connectTimeoutMs > 0 ? cfg.connectTimeoutMs : 15000);
+        factory.setReadTimeout(cfg.readTimeoutMs > 0 ? cfg.readTimeoutMs : 120000);
         RestTemplate http = new RestTemplate(factory);
         if ("qwen".equals(cfg.speechProtocol)) return transcribeQwen(audio, cfg, http);
         if (!"openai".equals(cfg.speechProtocol)) throw new IllegalStateException("不支持的语音接入方式，请重新保存语音配置");
@@ -92,7 +104,8 @@ public class ReviewModelService {
     }
     private AiConfigService.AiConfig ready(String kind, String label) {
         AiConfigService.AiConfig cfg = configs.mediaConfig(kind);
-        if (!cfg.isReady() || cfg.baseUrl.isEmpty() || cfg.model.isEmpty()) throw new IllegalStateException("尚未启用或配置" + label + "模型");
+        if (cfg == null || !cfg.isReady() || cfg.baseUrl == null || cfg.baseUrl.trim().isEmpty()
+                || cfg.model == null || cfg.model.trim().isEmpty()) throw new IllegalStateException("尚未启用或配置" + label + "模型");
         return cfg;
     }
     public String fingerprint() {

@@ -29,12 +29,15 @@
         <span v-if="aiResult" class="ai-review-tip">建议 {{ aiResult.suggestedScore }} 分</span>
       </div>
       <div v-if="reviewJob && reviewJob.status !== 'IDLE'" class="ai-review-box">
-        <div class="review-status-heading"><span class="status-dot" :class="{ running: aiReviewing, failed: reviewJob.status === 'FAILED' }"></span><b>{{ reviewJob.message }}</b></div>
-        <el-progress v-if="aiReviewing" :percentage="reviewJob.progress || 0" />
-        <div v-if="aiReviewing" class="muted">可以关闭页面，后台会继续处理；重新打开即可查看进度。</div>
+        <div class="review-status-heading"><span class="status-dot" :class="{ running: aiReviewing, failed: reviewJob.status === 'FAILED' }"></span><b>{{ reviewStatus.label }}</b><span class="review-status-time" v-if="aiReviewing">已等待 {{ reviewElapsedText }}</span></div>
+        <div class="review-status-message">{{ reviewJob.message || reviewStatus.detail }}</div>
+        <el-progress v-if="aiReviewing" :percentage="reviewJob.progress || 0" :status="reviewJob.progress >= 100 ? 'success' : undefined" />
+        <div v-if="aiReviewing" class="muted">{{ reviewStatus.detail }}可以关闭页面，后台会继续处理；重新打开即可查看进度。</div>
+        <div v-if="reviewTimedOut" class="review-timeout"><span>前端已暂停刷新，后台任务可能仍在处理。</span><el-button text type="primary" size="small" @click="resumePolling">继续检查</el-button></div>
+        <div v-if="pollFailed" class="review-timeout"><span>进度暂时获取失败，后台任务未必已失败。</span><el-button text type="primary" size="small" @click="resumePolling">重试查询</el-button></div>
         <el-alert v-if="reviewJob.stale" title="材料、评分标准或模型配置已变更，请重新评审。" type="warning" :closable="false" />
         <div v-for="material in reviewJob.materials || []" :key="material.id" class="material-status">
-          <div class="material-status-head"><b>{{ material.name || '等待解析' }}</b><span class="badge" :class="material.status === 'DONE' ? 'badge-green' : material.status === 'FAILED' ? 'badge-red' : 'badge-yellow'">{{ { DONE: '分析完成', PARTIAL: '部分分析', FAILED: '未能分析', PARSING: '解析中' }[material.status] || '等待解析' }}</span><el-button v-if="['FAILED', 'PARTIAL'].includes(material.status)" text size="small" :disabled="aiReviewing" @click="runAiReview(true, material.url)">重试</el-button></div>
+          <div class="material-status-head"><b>{{ material.name || '等待解析' }}</b><span class="badge" :class="material.status === 'DONE' ? 'badge-green' : material.status === 'FAILED' ? 'badge-red' : 'badge-yellow'">{{ { DONE: '分析完成', PARTIAL: '部分分析', FAILED: '未能分析', PARSING: '解析中', QUEUED: '等待处理' }[material.status] || '等待解析' }}</span><el-button v-if="['FAILED', 'PARTIAL'].includes(material.status)" text size="small" :disabled="aiReviewing" @click="runAiReview(true, material.url)">重试</el-button></div>
           <div v-for="(warning, i) in material.warnings" :key="i" class="ai-review-line bad">{{ warning }}</div>
         </div>
       </div>
@@ -113,8 +116,15 @@ const aiReviewing = ref(false)
 const aiResult = ref(null)
 const reviewJob = ref(null)
 let pollTimer
+let elapsedTimer
+let deadlineTimer
 let generation = 0
 const evidenceRows = ref([])
+const reviewStartedAt = ref(0)
+const reviewElapsed = ref(0)
+const reviewTimedOut = ref(false)
+const pollFailed = ref(false)
+const MAX_REVIEW_WAIT_MS = 15 * 60 * 1000
 
 const arr = (v) => {
   if (Array.isArray(v)) return v
@@ -124,7 +134,29 @@ const requirements = computed(() => arr(props.project?.skillRequirements).filter
 const fmt = (v) => (v || '').replace('T', ' ').slice(0, 16)
 const isImage = (url) => /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url || '')
 
-const stopPolling = () => { generation++; clearTimeout(pollTimer); aiReviewing.value = false }
+const reviewStatus = computed(() => {
+  const status = reviewJob.value?.status
+  return {
+    QUEUED: { label: '已排队', detail: '任务已提交，正在等待评审工作线程。' },
+    PARSING: { label: '正在解析材料', detail: '正在读取附件、提取文字或图片信息。' },
+    REVIEWING: { label: '模型分析中', detail: '材料已准备好，模型正在按评分细则生成建议。' },
+    DONE: { label: '分析完成', detail: '请核对 AI 建议后再提交最终评分。' },
+    FAILED: { label: '分析失败', detail: '可以检查模型配置或附件后重新评审。' }
+  }[status] || { label: '等待处理', detail: '任务即将开始。' }
+})
+const reviewElapsedText = computed(() => {
+  const seconds = reviewElapsed.value
+  if (seconds < 60) return `${seconds} 秒`
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes} 分 ${seconds % 60} 秒`
+})
+
+const clearReviewTimers = () => {
+  clearTimeout(pollTimer)
+  clearInterval(elapsedTimer)
+  clearTimeout(deadlineTimer)
+}
+const stopPolling = () => { generation++; clearReviewTimers(); aiReviewing.value = false }
 const active = state => ['QUEUED', 'PARSING', 'REVIEWING'].includes(state)
 const sourceLink = source => {
   if (!/^\/uploads\/\d{6}\/[\w-]+\.[a-z0-9]+$/i.test(source.url || '')) return undefined
@@ -140,29 +172,87 @@ const applySuggestion = () => {
 const receive = (job, token, id) => {
   if (token !== generation || !props.modelValue || props.submission?.id !== id) return
   reviewJob.value = job
+  pollFailed.value = false
   aiReviewing.value = active(job.status)
   if (job.result) aiResult.value = job.result
-  if (aiReviewing.value) pollTimer = setTimeout(() => poll(token, id), 2500)
+  if (aiReviewing.value) {
+    pollTimer = setTimeout(() => poll(token, id), 2500)
+  } else {
+    clearReviewTimers()
+  }
 }
 const poll = async (token, id) => {
   try { receive(await props.aiStatusFn(id), token, id) }
-  catch { if (token === generation) { aiReviewing.value = false; reviewJob.value = { ...reviewJob.value, message: '进度获取失败，可重新打开查看；后台任务继续运行。' } } }
+  catch {
+    if (token === generation) {
+      aiReviewing.value = false
+      pollFailed.value = true
+      clearReviewTimers()
+      reviewJob.value = { ...reviewJob.value, message: '进度获取失败，可稍后重试查询；后台任务可能仍在运行。' }
+    }
+  }
+}
+const beginPolling = (id) => {
+  clearReviewTimers()
+  const token = generation
+  reviewStartedAt.value = Date.now()
+  reviewElapsed.value = 0
+  reviewTimedOut.value = false
+  pollFailed.value = false
+  aiReviewing.value = true
+  elapsedTimer = setInterval(() => { reviewElapsed.value = Math.floor((Date.now() - reviewStartedAt.value) / 1000) }, 1000)
+  deadlineTimer = setTimeout(() => {
+    if (token !== generation) return
+    generation++
+    aiReviewing.value = false
+    reviewTimedOut.value = true
+    clearTimeout(pollTimer)
+    clearInterval(elapsedTimer)
+  }, MAX_REVIEW_WAIT_MS)
+  poll(token, id)
+}
+const resumePolling = () => {
+  if (!props.submission?.id || !reviewJob.value) return
+  beginPolling(props.submission.id)
 }
 const reset = () => {
   stopPolling()
   gradeForm.score = 80; gradeForm.feedback = ''
   aiResult.value = null; reviewJob.value = null; evidenceRows.value = []
-  if (props.submission) poll(generation, props.submission.id)
+  reviewTimedOut.value = false
+  pollFailed.value = false
+  if (props.submission) beginPolling(props.submission.id)
 }
 const runAiReview = async (force = false, retryAttachment) => {
   stopPolling()
   const token = generation, id = props.submission.id
+  reviewTimedOut.value = false
+  pollFailed.value = false
+  reviewStartedAt.value = Date.now()
+  reviewElapsed.value = 0
   aiReviewing.value = true
+  reviewJob.value = { ...reviewJob.value, status: 'QUEUED', message: '正在提交评审任务…' }
+  elapsedTimer = setInterval(() => { reviewElapsed.value = Math.floor((Date.now() - reviewStartedAt.value) / 1000) }, 1000)
+  deadlineTimer = setTimeout(() => {
+    if (token !== generation) return
+    generation++
+    aiReviewing.value = false
+    reviewTimedOut.value = true
+    clearTimeout(pollTimer)
+    clearInterval(elapsedTimer)
+  }, MAX_REVIEW_WAIT_MS)
   try {
     const job = await props.aiReviewFn(id, { force, retryAttachment })
     if (token === generation && !job.result) aiResult.value = null
     receive(job, token, id)
-  } catch { if (token === generation) aiReviewing.value = false }
+  } catch {
+    if (token === generation) {
+      aiReviewing.value = false
+      pollFailed.value = true
+      clearReviewTimers()
+      reviewJob.value = { ...reviewJob.value, status: 'FAILED', message: '评审任务未能启动，请检查 AI 配置后重试。' }
+    }
+  }
 }
 watch(() => props.modelValue, visible => { if (!visible) stopPolling() })
 watch(() => props.submission?.id, () => { if (props.modelValue) reset() })
@@ -213,6 +303,9 @@ const submitGrade = async () => {
 :global(.review-dialog .el-dialog__body) { overflow-y: auto; min-height: 0; overscroll-behavior: contain; padding-right: 4px; }
 :global(.review-dialog .el-dialog__footer) { flex-shrink: 0; padding-top: 16px; border-top: 1px solid #e5e7eb; margin-top: 12px; }
 .review-status-heading { display: flex; align-items: center; gap: 9px; }.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }.status-dot.running { background: var(--brand-blue); box-shadow: 0 0 0 4px #dbeafe; }.status-dot.failed { background: #ef4444; }
+.review-status-time { margin-left: auto; color: #64748b; font-size: 12px; font-weight: 400; }
+.review-status-message { color: #4b5563; font-size: 12px; line-height: 1.6; }
+.review-timeout { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; border-radius: 8px; color: #92400e; background: #fffbeb; font-size: 12px; }
 .material-status { background: rgba(255,255,255,.8); border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px !important; }.material-status-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }.material-status-head>b { flex: 1; min-width: 120px; overflow-wrap: anywhere; }.material-status .ai-review-line { margin-top: 6px; font-size: 12px; line-height: 1.6; }
 .result-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #6b21a8; }.result-heading>span { display: flex; gap: 7px; align-items: center; font-weight: 600; }.result-heading>b { font-size: 28px; font-variant-numeric: tabular-nums; }.result-heading small { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
 .criterion-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }.criterion-head>span:last-child { margin-left: auto; color: var(--brand-blue); font-weight: 600; font-size: 16px; }.criterion-head small { color: var(--text-secondary); font-weight: 400; font-size: 12px; }.criterion-reason { margin-top: 9px; color: #4b5563; }.criterion details { border-radius: 8px; background: #fff; padding: 8px 10px; }.criterion summary { font-size: 12px; }.grade-section-title { display: flex; align-items: center; gap: 8px; font-weight: 600; margin: 22px 0 16px; }.grade-section-title span { font-size: 12px; color: var(--text-secondary); font-weight: 400; margin-left: auto; }

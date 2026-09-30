@@ -50,7 +50,10 @@ public class ReviewJobService {
             String fingerprint=fingerprint(submission,project);
             if(previous!=null && running(previous) && !expired(previous)) return previous;
             if(previous!=null && "DONE".equals(previous.getStatus()) && fingerprint.equals(previous.getFingerprint()) && !force && retryAttachment==null) return previous;
-            if(!configs.effective().isReady()) throw new BusinessException("请先在AI设置中配置并启用评分模型");
+            AiConfigService.AiConfig ai = configs.effective();
+            if(ai == null || !ai.isReady() || ai.baseUrl == null || ai.baseUrl.trim().isEmpty()
+                    || ai.model == null || ai.model.trim().isEmpty())
+                throw new BusinessException("请先在AI设置中配置并启用评分模型");
             ArrayNode files=materials.list(submission);
             if(retryAttachment!=null) {
                 boolean found=false;for(JsonNode file:files) if(retryAttachment.equals(file.path("url").asText())) found=true;
@@ -127,7 +130,8 @@ public class ReviewJobService {
             Map<String,Object> result=reviews.evaluate(submission,project,done);
             update(id,"DONE",100,"评审完成，请教师核对",done.toString(),json.writeValueAsString(result));
         } catch(Exception e) {
-            String message=e instanceof BusinessException?e.getMessage():"评审未完成，请检查AI配置后重试";
+            String message=(e instanceof BusinessException || e instanceof AiClient.AiUnavailableException)
+                    ? e.getMessage() : "评审未完成，请检查AI配置后重试";
             update(id,"FAILED",0,message,done.toString(),null);
         } finally {activeTasks.remove(key);}
     }

@@ -216,7 +216,8 @@ public class SubmissionMaterialService {
     }
     private static String time(double seconds) {return String.format(Locale.ROOT,"%02d:%02d",(int)seconds/60,(int)seconds%60);}
     private static String friendly(Exception e) {
-        if(e instanceof IllegalStateException || e instanceof BusinessException) return e.getMessage();
+        if(e instanceof IllegalStateException || e instanceof BusinessException
+                || e instanceof AiClient.AiUnavailableException) return e.getMessage();
         return "解析失败，请确认文件未损坏、未加密，或转换格式后提交";
     }
 }

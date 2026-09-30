@@ -21,7 +21,7 @@
       <div class="tr-head">
         <div class="tr-title-group">
           <span class="tr-star">✨</span>
-          <span class="tr-title">{{ running ? '正在生成结果…' : (resultTitle || (title ? `AI 为你推荐的${title.replace('推荐', '')}` : 'AI 推荐结果')) }}</span>
+          <span class="tr-title">{{ running ? 'AI 正在处理' : (resultTitle || (title ? `AI 为你推荐的${title.replace('推荐', '')}` : 'AI 推荐结果')) }}</span>
         </div>
         <div class="tr-actions">
           <button v-if="showRefresh" class="btn-refresh" :disabled="running" @click="$emit('refresh')">
@@ -36,8 +36,9 @@
           <div class="spinner"></div>
           <div>
             <div class="sl-title">{{ hints[hintIdx % hints.length] }}</div>
-            <div class="sl-sub">AI 正在调用平台数据与模型分析，通常需 10~30 秒</div>
+            <div class="sl-sub">已等待 {{ elapsed }} 秒 · 通常需 10~30 秒，复杂任务可能更久</div>
           </div>
+          <button class="stop-wait" type="button" @click="stopWaiting">停止等待</button>
         </div>
         <div class="skeleton">
           <div class="sk w60"></div>
@@ -133,6 +134,11 @@ const lastInputSummary = computed(() => {
 })
 
 let hintTimer = null
+let elapsedTimer = null
+let timeoutTimer = null
+let runToken = 0
+let requestController = null
+const MAX_WAIT_MS = 150000
 const summarizeTrace = (tools) => {
   const m = new Map()
   for (const t of tools || []) {
@@ -146,13 +152,30 @@ const summarizeTrace = (tools) => {
 }
 
 const execute = async (body) => {
+  const token = ++runToken
+  requestController?.abort()
+  requestController = new AbortController()
   running.value = true
   error.value = ''
+  elapsed.value = 0
   hintIdx.value = 0
   hintTimer = setInterval(() => { hintIdx.value++ }, 4000)
+  elapsedTimer = setInterval(() => { elapsed.value++ }, 1000)
+  timeoutTimer = setTimeout(() => {
+    if (token !== runToken) return
+    runToken++
+    clearInterval(hintTimer)
+    clearInterval(elapsedTimer)
+    clearTimeout(timeoutTimer)
+    requestController?.abort()
+    requestController = null
+    running.value = false
+    error.value = '模型响应时间较长，已停止等待。后台请求可能仍在处理，请稍后查看最近任务，或直接重试。'
+  }, MAX_WAIT_MS)
   const t0 = Date.now()
   try {
-    const r = await aiChat(body)
+    const r = await aiChat(body, { signal: requestController.signal })
+    if (token !== runToken) return
     elapsed.value = Math.round((Date.now() - t0) / 1000)
     trace.value = summarizeTrace(r.tools)
     conversationId.value = r.conversationId || conversationId.value
@@ -164,11 +187,28 @@ const execute = async (body) => {
     }
     emit('done', { conversationId: conversationId.value, result: result.value, raw: raw.value })
   } catch (e) {
+    if (token !== runToken) return
     error.value = e?.response?.data?.message || e?.message || 'AI 暂不可用'
   } finally {
+    if (token !== runToken) return
     clearInterval(hintTimer)
+    clearInterval(elapsedTimer)
+    clearTimeout(timeoutTimer)
+    requestController = null
     running.value = false
   }
+}
+
+const stopWaiting = () => {
+  if (!running.value) return
+  runToken++
+  clearInterval(hintTimer)
+  clearInterval(elapsedTimer)
+  clearTimeout(timeoutTimer)
+  requestController?.abort()
+  requestController = null
+  running.value = false
+  error.value = '已停止等待。后台请求可能仍在处理，请稍后查看最近任务，或点击“再试一次”。'
 }
 /** 新任务:重置会话,用表单输入运行;title 用作历史记录标题 */
 const run = (input, title) => {
@@ -193,7 +233,14 @@ const applyInitial = (init) => {
 }
 onMounted(() => applyInitial(props.initial))
 watch(() => props.initial, (v) => applyInitial(v))
-onBeforeUnmount(() => clearInterval(hintTimer))
+onBeforeUnmount(() => {
+  runToken++
+  clearInterval(hintTimer)
+  clearInterval(elapsedTimer)
+  clearTimeout(timeoutTimer)
+  requestController?.abort()
+  requestController = null
+})
 defineExpose({ run, ask })
 </script>
 
@@ -347,6 +394,18 @@ defineExpose({ run, ask })
   background: #f8fafc;
   border-radius: 10px;
 }
+.stop-wait {
+  flex-shrink: 0;
+  margin-left: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 6px 9px;
+  color: #475569;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.stop-wait:hover { border-color: #94a3b8; background: #f8fafc; }
 
 .spinner {
   width: 28px;

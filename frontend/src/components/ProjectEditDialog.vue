@@ -129,8 +129,8 @@
                 <div v-show="isAssessExpanded(i)" class="assess-card-body">
                   <div class="assess-field-block">
                     <div class="field-title">教师参考标准 / 参考答案（选填，仅教师与 AI 评审可见）</div>
-                    <el-input v-model="a.referenceAnswer" type="textarea" :rows="3" maxlength="6000" show-word-limit
-                              placeholder="可填写该考核项的标准测试结果、关键参数、参考波形或代码审查要点" />
+                    <RichEditor v-model="a.referenceAnswer" class="assessment-answer-editor" />
+                    <div class="field-tip">可以填写文字、列表、表格并插入图片；留空表示该考核项不设置标准答案。</div>
                   </div>
                   <div class="assess-field-block">
                     <ReviewRubricEditor v-model="a.rubric" fallback="项目默认评分标准" />
@@ -149,9 +149,8 @@
             <div class="section-head">
               <h4 class="section-title">教师标准答案 / 参考实现（选填）</h4>
             </div>
-            <el-input v-model="form.referenceAnswer" type="textarea" :rows="4" maxlength="20000" show-word-limit
-                      placeholder="可填写关键结果、参考实现、代码要点或评分时应核对的答案。留空则 AI 只按评分细则和提交材料判断。" />
-            <div class="field-tip">仅教师和 AI 评审可见，不会展示给学生；AI 会将其作为参考标准。</div>
+            <RichEditor v-model="form.referenceAnswer" class="assessment-answer-editor" />
+            <div class="field-tip">可以填写文字、列表、表格并插入图片；仅教师和 AI 评审可见，不会展示给学生。留空则不设置项目级标准答案。</div>
             <div style="margin-top: 14px">
               <ReviewRubricEditor v-model="reviewRubric" fallback="系统通用评分标准" />
             </div>
@@ -465,6 +464,8 @@ const buildBom = () => bomRows.value.filter((b) => (b.name || '').trim())
   .map((b) => ({ ref: (b.ref || '').trim(), name: b.name.trim(), qty: num(b.qty, 1), footprint: (b.footprint || '').trim(), price: num(b.price) }))
 const buildResources = () => resourceRows.value.filter((r) => (r.name || '').trim())
   .map((r) => ({ type: r.type || '文档', name: r.name.trim(), url: r.url || '' }))
+// 参考答案属于教师私有内容,通过 buildReferenceAnswerPayload 单独保存;
+// 不放进公开的 assessments JSON,避免学生在项目详情接口中看到标准答案。
 const buildAssessments = () => assessRows.value.filter((a) => (a.name || '').trim())
   .map((a) => ({ name: a.name.trim(), weight: num(a.weight), desc: (a.desc || '').trim(), rubric: a.rubric || [] }))
 
@@ -600,6 +601,8 @@ onMounted(() => {
 .assess-card-body { padding: 14px 16px; border-top: 1px solid #e2e8f0; background: #fff; }
 .assess-field-block { margin-bottom: 12px; }
 .assess-field-block:last-child { margin-bottom: 0; }
+.assessment-answer-editor :deep(.re-body) { height: 220px; }
+.assessment-answer-editor :deep(.w-e-text-container) { min-height: 160px; }
 .body-label { font-size: 13px; font-weight: 500; color: #334155; margin-bottom: 6px; }
 .empty-hint-card { padding: 20px; text-align: center; color: #94a3b8; font-size: 13px; border: 1px dashed #cbd5e1; border-radius: 8px; }
 
