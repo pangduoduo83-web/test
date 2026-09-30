@@ -3,7 +3,7 @@
     <div class="card">
       <div class="toolbar">
         <div class="filters">
-          <el-input v-model="filters.keyword" placeholder="姓名 / 邮箱 / 手机号 / 学号 / 专业" clearable
+          <el-input v-model="filters.keyword" placeholder="姓名 / 邮箱 / 手机号 / 学号 / 教师工号 / 专业" clearable
                     style="width:260px" @keyup.enter="load" @clear="load" />
           <el-select v-model="filters.role" placeholder="全部角色" clearable style="width:140px" @change="load">
             <el-option label="学生" value="STUDENT" />
@@ -19,8 +19,8 @@
         </div>
         <div class="toolbar-right">
           <el-button plain @click="downloadUserTemplate">下载导入模板</el-button>
-          <el-upload :show-file-list="false" accept=".csv" :http-request="importUsersCsv">
-            <el-button plain type="primary" :loading="importing">批量导入</el-button>
+          <el-upload :show-file-list="false" accept=".csv,.txt" :disabled="reading || importing" :http-request="importUsersCsv">
+            <el-button plain type="primary" :loading="reading || importing">批量导入</el-button>
           </el-upload>
           <el-button type="primary" @click="openEdit()">+ 新增用户</el-button>
         </div>
@@ -43,6 +43,9 @@
         </el-table-column>
         <el-table-column prop="studentNo" label="学号" width="120">
           <template #default="{ row }">{{ row.studentNo || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="teacherNo" label="教师工号" width="120">
+          <template #default="{ row }">{{ row.teacherNo || '-' }}</template>
         </el-table-column>
         <el-table-column prop="major" label="专业" min-width="120">
           <template #default="{ row }">{{ row.major || '-' }}</template>
@@ -83,6 +86,33 @@
       </div>
     </div>
 
+    <el-dialog v-model="importVisible" title="批量导入用户" width="min(1000px, 95vw)"
+               :close-on-click-modal="false" :close-on-press-escape="!importing" :show-close="!importing"
+               @closed="clearImport">
+      <el-alert type="info" :closable="false" title="仅创建当前分站的用户，不会覆盖已有账号。支持 UTF-8 CSV，每次最多 500 人、1 MB。">
+        必填姓名、邮箱、初始密码和角色；学号、教师工号请在 Excel 中设为文本以保留前导零。
+        旧版七列表格也可使用，教师所在行的学号会作为工号导入。请先核对预览。
+      </el-alert>
+      <p v-if="!importFinished">共 {{ importRows.length }} 行，{{ invalidRows }} 行校验失败。请修正所有错误后重新选择文件。</p>
+      <p v-else>已创建 {{ importRows.filter(r => r.status === '成功').length }} 人；其余行请查看结果。成功账号不会自动回滚。</p>
+      <el-progress v-if="importing || importFinished" :percentage="importProgress" />
+      <el-table :data="importRows" max-height="430" stripe>
+        <el-table-column prop="line" label="文件行" width="75" />
+        <el-table-column prop="data.name" label="姓名" width="100" />
+        <el-table-column prop="data.email" label="邮箱" min-width="180" />
+        <el-table-column label="角色" width="105"><template #default="{ row }">{{ row.data.role ? roleText(row.data.role) : '无效' }}</template></el-table-column>
+        <el-table-column label="学号 / 工号" min-width="130"><template #default="{ row }">{{ row.data.studentNo || row.data.teacherNo || '未填写' }}</template></el-table-column>
+        <el-table-column prop="status" label="状态" width="95" />
+        <el-table-column prop="reason" label="原因" min-width="240" />
+      </el-table>
+      <template #footer>
+        <el-button v-if="importRows.some(r => r.reason)" @click="downloadImportReport">下载问题明细</el-button>
+        <el-button :disabled="importing" @click="importVisible = false">关闭</el-button>
+        <el-button v-if="!importFinished" type="primary" :loading="importing"
+                   :disabled="invalidRows > 0 || !importRows.length" @click="runImport">确认创建 {{ importRows.length }} 个账号</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="editVisible" :title="form.id ? '编辑用户' : '新增用户'" width="680px">
       <el-form :model="form" label-width="86px">
         <div class="form-2col">
@@ -95,6 +125,7 @@
             <el-input v-model="form.phone" placeholder="选填,可用于登录" />
           </el-form-item>
           <el-form-item label="学号"><el-input v-model="form.studentNo" /></el-form-item>
+          <el-form-item label="教师工号"><el-input v-model="form.teacherNo" placeholder="教师账号可用工号登录" /></el-form-item>
           <el-form-item label="专业"><el-input v-model="form.major" /></el-form-item>
           <el-form-item label="年级"><el-input v-model="form.grade" /></el-form-item>
           <el-form-item label="角色">
@@ -127,62 +158,73 @@ import {
 } from '../../api'
 import ImageUploader from '../../components/ImageUploader.vue'
 import { useAuthStore } from '../../stores/auth'
+import { downloadCsv } from '../../utils/csv'
+import { prepareUserImport, decodeUserCsv } from '../../utils/userImport.mjs'
 
 // ---------- 用户 CSV 批量导入 ----------
 const importing = ref(false)
+const reading = ref(false)
+const importVisible = ref(false)
+const importFinished = ref(false)
+const importProgress = ref(0)
+const importRows = ref([])
+const invalidRows = computed(() => importRows.value.filter((r) => r.errors?.length).length)
 
 const downloadUserTemplate = () => {
-  const csv = '\ufeff姓名,邮箱,初始密码,角色(STUDENT/TEACHER/ADMIN),学号,专业,年级\r\n'
-    + '李小明,lixm@stu.ioedu.cn,123456,STUDENT,2026101,电子信息工程,大一\r\n'
-    + '王老师,wanglaoshi@ioedu.cn,123456,TEACHER,,,'
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = '用户导入模板.csv'
-  a.click()
-  URL.revokeObjectURL(a.href)
+  const headers = ['姓名', '邮箱', '初始密码', '角色(STUDENT/TEACHER/ADMIN/LAB_ADMIN)', '学号', '教师工号', '专业', '年级', '手机号']
+  downloadCsv('用户导入模板.csv', headers, [
+    ['李小明', 'lixm@stu.ioedu.cn', '123456', 'STUDENT', '2026101', '', '电子信息工程', '大一', ''],
+    ['王老师', 'wanglaoshi@ioedu.cn', '123456', 'TEACHER', '', 'T1001', '电子信息工程', '教师', '']
+  ])
 }
 
-const importUsersCsv = (opt) => {
-  const reader = new FileReader()
-  reader.onload = async () => {
-    const lines = String(reader.result).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-    const rows = []
-    for (const line of lines) {
-      const c = line.split(/[,，\t]/).map((v) => v.trim().replace(/^"|"$/g, ''))
-      if (/姓名|name/i.test(c[0]) || !c[0] || !(c[1] || '').includes('@')) continue
-      rows.push({
-        name: c[0], email: c[1], password: c[2] || '123456',
-        role: ['STUDENT', 'TEACHER', 'ADMIN', 'LAB_ADMIN'].includes((c[3] || '').toUpperCase()) ? c[3].toUpperCase() : 'STUDENT',
-        studentNo: c[4] || undefined, major: c[5] || undefined, grade: c[6] || undefined
-      })
-    }
-    if (!rows.length) {
-      ElMessage.warning('未解析到有效行,请使用「下载导入模板」的格式(UTF-8 编码)')
-      return
-    }
-    importing.value = true
-    let ok = 0
-    const failed = []
-    for (const row of rows) {
-      try {
-        await adminCreateUser(row)
-        ok++
-      } catch (e) {
-        failed.push(row.email)
-      }
-    }
-    importing.value = false
-    await load()
-    if (failed.length) {
-      ElMessageBox.alert(`成功 ${ok} 人,失败 ${failed.length} 人(多为邮箱已存在):\n${failed.join('、')}`, '导入结果')
-    } else {
-      ElMessage.success(`批量导入完成,共创建 ${ok} 个账号`)
-    }
+const clearImport = () => {
+  if (!importing.value) {
+    importRows.value = []
+    importFinished.value = false
+    importProgress.value = 0
   }
-  reader.readAsText(opt.file, 'utf-8')
 }
 
+const importUsersCsv = async (opt) => {
+  reading.value = true
+  try {
+    const text = decodeUserCsv(await opt.file.arrayBuffer())
+    const users = await adminListUsers({})
+    importRows.value = prepareUserImport(text, users)
+    importFinished.value = false
+    importVisible.value = true
+  } catch (e) {
+    ElMessage.error(e.message || 'CSV 文件解析失败')
+  } finally {
+    reading.value = false
+  }
+}
+
+const runImport = async () => {
+  importing.value = true
+  importProgress.value = 0
+  for (let i = 0; i < importRows.value.length; i++) {
+    const row = importRows.value[i]
+    try {
+      await adminCreateUser(row.data, { silentError: true })
+      row.status = '成功'
+      row.reason = ''
+    } catch (e) {
+      row.status = '失败'
+      row.reason = e.message || '服务器拒绝创建'
+    }
+    importProgress.value = Math.round(((i + 1) / importRows.value.length) * 100)
+  }
+  importing.value = false
+  importFinished.value = true
+  await load()
+}
+
+const downloadImportReport = () => {
+  downloadCsv('用户导入结果.csv', ['文件行', '姓名', '邮箱', '状态', '原因'], importRows.value.map((r) =>
+    [r.line, r.data.name, r.data.email, r.status, r.reason || '']))
+}
 const authStore = useAuthStore()
 const items = ref([])
 const filters = reactive({ keyword: '', role: '', enabled: null })
@@ -191,7 +233,7 @@ const saving = ref(false)
 const page = ref(1)
 const pageSize = 10
 const emptyForm = {
-  id: null, name: '', email: '', phone: '', password: '', studentNo: '', major: '', grade: '',
+  id: null, name: '', email: '', phone: '', password: '', studentNo: '', teacherNo: '', major: '', grade: '',
   avatarUrl: '', role: 'STUDENT', enabled: true
 }
 const form = reactive({ ...emptyForm })
@@ -217,6 +259,7 @@ const openEdit = (row = null) => {
     Object.assign(form, {
       id: row.id, name: row.name, email: row.email, phone: row.phone || '',
       studentNo: row.studentNo || '',
+      teacherNo: row.teacherNo || '',
       major: row.major || '', grade: row.grade || '', avatarUrl: row.avatarUrl || '',
       role: row.role, enabled: !!row.enabled
     })
@@ -241,7 +284,7 @@ const save = async () => {
   try {
     const payload = {
       name: form.name, email: form.email, phone: form.phone,
-      studentNo: form.studentNo, major: form.major,
+      studentNo: form.studentNo, teacherNo: form.teacherNo, major: form.major,
       grade: form.grade, avatarUrl: form.avatarUrl, role: form.role, enabled: form.enabled
     }
     if (form.id) await adminUpdateUser(form.id, payload)

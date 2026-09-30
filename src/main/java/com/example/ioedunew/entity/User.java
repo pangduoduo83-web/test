@@ -41,6 +41,10 @@ public class User {
     @Column(length = 30)
     private String studentNo;
 
+    /** 教师工号,教师账号可使用工号登录。历史教师工号会从 student_no 迁移过来。 */
+    @Column(length = 30)
+    private String teacherNo;
+
     @Column(length = 50)
     private String major;
 

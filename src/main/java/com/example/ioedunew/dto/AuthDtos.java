@@ -16,19 +16,24 @@ public class AuthDtos {
     @Data
     public static class RegisterRequest {
         @NotBlank(message = "姓名不能为空")
+        @Size(max = 50, message = "姓名最多 50 字")
         private String name;
 
         @NotBlank(message = "学号不能为空")
+        @Size(max = 30, message = "学号最多 30 位")
         private String studentNo;
 
         @NotBlank(message = "专业不能为空")
+        @Size(max = 50, message = "专业最多 50 字")
         private String major;
 
         @NotBlank(message = "年级不能为空")
+        @Size(max = 20, message = "年级最多 20 字")
         private String grade;
 
         @NotBlank(message = "邮箱不能为空")
         @Email(message = "邮箱格式不正确")
+        @Size(max = 100, message = "邮箱最多 100 位")
         private String email;
 
         /** 选填,填写后可用手机号登录 */
@@ -41,8 +46,9 @@ public class AuthDtos {
 
     @Data
     public static class LoginRequest {
-        /** 兼容历史字段名:内容可为邮箱或手机号 */
-        @NotBlank(message = "请输入邮箱或手机号")
+        /** 兼容 Web 和小程序历史字段名:邮箱、手机号、学号或教师工号。 */
+        @NotBlank(message = "请输入邮箱、手机号、学号或教师工号")
+        @Size(max = 100, message = "登录账号最多 100 位")
         private String email;
 
         @NotBlank(message = "密码不能为空")

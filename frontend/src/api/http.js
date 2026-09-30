@@ -17,7 +17,7 @@ http.interceptors.response.use(
     const body = resp.data
     if (body && typeof body === 'object' && 'code' in body) {
       if (body.code === 0) return body.data
-      ElMessage.error(body.message || '请求失败')
+      if (!resp.config.silentError) ElMessage.error(body.message || '请求失败')
       const error = new Error(body.message)
       error.status = Number(body.code)
       return Promise.reject(error)
@@ -31,9 +31,10 @@ http.interceptors.response.use(
       clearAuth()
       if (router.currentRoute.value.path !== '/auth') router.push('/auth')
       ElMessage.warning(message || '登录已过期,请重新登录')
-    } else {
+    } else if (!err.config?.silentError) {
       ElMessage.error(message || '网络请求失败')
     }
+    if (message) err.message = message
     return Promise.reject(err)
   }
 )

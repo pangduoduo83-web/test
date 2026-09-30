@@ -186,7 +186,8 @@ public class AdminService {
         return userRepository.findAll().stream()
                 .filter(u -> kw.isEmpty() || contains(u.getName(), kw) || contains(u.getEmail(), kw)
                         || contains(u.getPhone(), kw)
-                        || contains(u.getStudentNo(), kw) || contains(u.getMajor(), kw))
+                        || contains(u.getStudentNo(), kw) || contains(u.getTeacherNo(), kw)
+                        || contains(u.getMajor(), kw))
                 .filter(u -> role == null || role.trim().isEmpty() || "ALL".equalsIgnoreCase(role)
                         || role.equalsIgnoreCase(u.getRole()))
                 .filter(u -> enabled == null || enabled.equals(u.getEnabled()))
@@ -210,16 +211,25 @@ public class AdminService {
         if (phone != null && userRepository.existsByPhone(phone)) {
             throw new BusinessException("该手机号已被使用");
         }
+        String role = normalizeRole(req.getRole());
+        String studentNo = LoginIdentifiers.number(req.getStudentNo(), "学号");
+        String teacherNo = LoginIdentifiers.number(req.getTeacherNo(), "教师工号");
+        ensureIdentifierAvailable(studentNo, null, "学号");
+        ensureIdentifierAvailable(teacherNo, null, "教师工号");
+        ensureIdentifierAvailable(email, null, "邮箱");
+        ensureIdentifierAvailable(phone, null, "手机号");
+        LoginIdentifiers.password(req.getPassword());
         User user = new User();
         user.setName(requireText(req.getName(), "姓名"));
         user.setEmail(email);
         user.setPhone(phone);
         user.setPasswordHash(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()));
-        user.setStudentNo(cleanNullable(req.getStudentNo()));
+        user.setStudentNo(studentNo);
+        user.setTeacherNo(teacherNo);
         user.setMajor(cleanNullable(req.getMajor()));
         user.setGrade(cleanNullable(req.getGrade()));
         user.setAvatarUrl(cleanNullable(req.getAvatarUrl()));
-        user.setRole(normalizeRole(req.getRole()));
+        user.setRole(role);
         user.setEnabled(req.getEnabled() == null || req.getEnabled());
         userRepository.save(user);
 
@@ -240,6 +250,7 @@ public class AdminService {
                 throw new BusinessException("该邮箱已被使用");
             }
             user.setEmail(email);
+            ensureIdentifierAvailable(email, id, "邮箱");
         }
         if (req.getPhone() != null) {
             String phone = AuthService.normalizePhone(req.getPhone());
@@ -250,9 +261,17 @@ public class AdminService {
                 }
             }
             user.setPhone(phone);
+            ensureIdentifierAvailable(phone, id, "手机号");
         }
         if (req.getStudentNo() != null) {
-            user.setStudentNo(cleanNullable(req.getStudentNo()));
+            String studentNo = LoginIdentifiers.number(req.getStudentNo(), "学号");
+            ensureIdentifierAvailable(studentNo, id, "学号");
+            user.setStudentNo(studentNo);
+        }
+        if (req.getTeacherNo() != null) {
+            String teacherNo = LoginIdentifiers.number(req.getTeacherNo(), "教师工号");
+            ensureIdentifierAvailable(teacherNo, id, "教师工号");
+            user.setTeacherNo(teacherNo);
         }
         if (req.getMajor() != null) {
             user.setMajor(cleanNullable(req.getMajor()));
@@ -280,7 +299,10 @@ public class AdminService {
     @Transactional
     public void resetPassword(Long id, String password) {
         User user = requireUser(id);
+        LoginIdentifiers.password(password);
         user.setPasswordHash(BCrypt.hashpw(password, BCrypt.gensalt()));
+        user.setFailedLogins(0);
+        user.setLockedUntil(null);
         userRepository.save(user);
     }
 
@@ -467,6 +489,10 @@ public class AdminService {
 
     private String cleanNullable(String value) {
         return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    private void ensureIdentifierAvailable(String value, Long selfId, String label) {
+        LoginIdentifiers.available(userRepository, value, selfId, label);
     }
 
     // ---------- 讨论管理 ----------

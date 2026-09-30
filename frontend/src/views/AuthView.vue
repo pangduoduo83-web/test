@@ -73,8 +73,8 @@
             </div>
           </template>
 
-          <el-form-item :label="isLogin ? '账号' : '邮箱'">
-            <el-input v-model="form.email" :placeholder="isLogin ? '请输入邮箱或手机号' : '请输入学校邮箱'">
+          <el-form-item :label="isLogin ? '登录账号' : '邮箱'">
+            <el-input v-model="form.email" :placeholder="isLogin ? '邮箱 / 手机号 / 学号 / 教师工号' : '请输入学校邮箱'">
               <template #prefix><Mail :size="16" /></template>
             </el-input>
           </el-form-item>

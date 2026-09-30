@@ -123,7 +123,7 @@ export const adminUpdateEnrollment = (id, data) => http.put(`/admin/enrollments/
 export const adminDeleteEnrollment = (id) => http.delete(`/admin/enrollments/${id}`)
 export const adminListUsers = (params) => http.get('/admin/users', { params })
 export const adminGetUser = (id) => http.get(`/admin/users/${id}`)
-export const adminCreateUser = (data) => http.post('/admin/users', data)
+export const adminCreateUser = (data, options = {}) => http.post('/admin/users', data, options)
 export const adminUpdateUser = (id, data) => http.put(`/admin/users/${id}`, data)
 export const adminResetUserPassword = (id, password) =>
   http.post(`/admin/users/${id}/reset-password`, { password })

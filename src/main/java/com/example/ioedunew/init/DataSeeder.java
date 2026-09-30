@@ -156,7 +156,7 @@ public class DataSeeder {
             teacher.setEmail(t[1]);
             teacher.setPasswordHash(BCrypt.hashpw("123456", BCrypt.gensalt()));
             teacher.setRole("TEACHER");
-            teacher.setStudentNo(t[2]);
+            teacher.setTeacherNo(t[2]);
             teacher.setMajor("电子信息工程");
             teacher.setGrade("教师");
             userRepository.save(teacher);

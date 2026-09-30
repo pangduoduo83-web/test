@@ -18,37 +18,57 @@ public class AdminDtos {
     @Data
     public static class UserCreateRequest {
         @NotBlank(message = "姓名不能为空")
+        @Size(max = 50, message = "字段长度超过上限 50")
         private String name;
 
         @NotBlank(message = "邮箱不能为空")
         @Email(message = "邮箱格式不正确")
+        @Size(max = 100, message = "字段长度超过上限 100")
         private String email;
 
         @NotBlank(message = "密码不能为空")
         @Size(min = 6, max = 72, message = "密码长度须为 6-72 位")
         private String password;
 
+        @Size(max = 20, message = "字段长度超过上限 20")
         private String phone;
+        @Size(max = 30, message = "字段长度超过上限 30")
         private String studentNo;
+        @Size(max = 30, message = "字段长度超过上限 30")
+        private String teacherNo;
+        @Size(max = 50, message = "字段长度超过上限 50")
         private String major;
+        @Size(max = 20, message = "字段长度超过上限 20")
         private String grade;
+        @Size(max = 255, message = "字段长度超过上限 255")
         private String avatarUrl;
+        @Size(max = 20, message = "字段长度超过上限 20")
         private String role;
         private Boolean enabled;
     }
 
     @Data
     public static class UserUpdateRequest {
+        @Size(max = 50, message = "字段长度超过上限 50")
         private String name;
 
         @Email(message = "邮箱格式不正确")
+        @Size(max = 100, message = "字段长度超过上限 100")
         private String email;
 
+        @Size(max = 20, message = "字段长度超过上限 20")
         private String phone;
+        @Size(max = 30, message = "字段长度超过上限 30")
         private String studentNo;
+        @Size(max = 30, message = "字段长度超过上限 30")
+        private String teacherNo;
+        @Size(max = 50, message = "字段长度超过上限 50")
         private String major;
+        @Size(max = 20, message = "字段长度超过上限 20")
         private String grade;
+        @Size(max = 255, message = "字段长度超过上限 255")
         private String avatarUrl;
+        @Size(max = 20, message = "字段长度超过上限 20")
         private String role;
         private Boolean enabled;
     }
@@ -82,6 +102,7 @@ public class AdminDtos {
     @Data
     public static class NotificationCreateRequest {
         private Long userId;
+        @Size(max = 20, message = "字段长度超过上限 20")
         private String role;
 
         @NotBlank(message = "通知标题不能为空")

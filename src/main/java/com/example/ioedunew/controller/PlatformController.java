@@ -151,6 +151,7 @@ public class PlatformController {
             m.put("email", u.getEmail());
             m.put("role", u.getRole());
             m.put("studentNo", u.getStudentNo());
+            m.put("teacherNo", u.getTeacherNo());
             m.put("major", u.getMajor());
             m.put("enabled", u.getEnabled());
             m.put("tenant", t.getCode());

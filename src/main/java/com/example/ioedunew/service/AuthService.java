@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -115,19 +116,19 @@ public class AuthService {
             throw new BusinessException("平台已关闭自助注册,请联系管理员开通账号");
         }
         quotaService.checkUserQuota(userRepository.count());
-        if (userRepository.existsByEmail(req.getEmail())) {
-            throw new BusinessException("该邮箱已注册");
-        }
+        String email = req.getEmail().trim().toLowerCase(Locale.ROOT);
+        LoginIdentifiers.available(userRepository, email, null, "邮箱");
         String phone = normalizePhone(req.getPhone());
-        if (phone != null && userRepository.existsByPhone(phone)) {
-            throw new BusinessException("该手机号已注册");
-        }
+        LoginIdentifiers.available(userRepository, phone, null, "手机号");
+        String studentNo = LoginIdentifiers.number(req.getStudentNo(), "学号");
+        LoginIdentifiers.available(userRepository, studentNo, null, "学号");
+        LoginIdentifiers.password(req.getPassword());
         User user = new User();
-        user.setName(req.getName());
-        user.setEmail(req.getEmail());
+        user.setName(req.getName().trim());
+        user.setEmail(email);
         user.setPhone(phone);
         user.setPasswordHash(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()));
-        user.setStudentNo(req.getStudentNo());
+        user.setStudentNo(studentNo);
         user.setMajor(req.getMajor());
         user.setGrade(req.getGrade());
         user.setRole("STUDENT");
@@ -145,12 +146,8 @@ public class AuthService {
 
     /** 故意不加 @Transactional:失败计数要在抛出"密码错误"之后仍然落库,不能被回滚 */
     public AuthDtos.AuthResponse login(AuthDtos.LoginRequest req) {
-        // 同一输入框兼容邮箱与手机号:含 @ 视为邮箱,否则按手机号查找
-        String account = req.getEmail().trim();
-        User user = (account.contains("@")
-                ? userRepository.findByEmail(account)
-                : userRepository.findByPhone(account))
-                .orElseThrow(() -> new BusinessException("账号或密码错误"));
+        // 同一输入框兼容邮箱、手机号、学生学号和教师工号。
+        User user = findLoginUser(req.getEmail());
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(java.time.LocalDateTime.now())) {
             long minutes = Math.max(1, java.time.Duration.between(java.time.LocalDateTime.now(), user.getLockedUntil()).toMinutes());
             throw new BusinessException(423, "密码连续错误次数过多,账号已锁定,请 " + minutes + " 分钟后再试");
@@ -176,6 +173,25 @@ public class AuthService {
             userRepository.save(user);
         }
         return new AuthDtos.AuthResponse(jwtUtil.createToken(user.getId(), user.getRole()), user);
+    }
+
+    private User findLoginUser(String rawAccount) {
+        String account = normalizeIdentifier(rawAccount);
+        List<User> matches = userRepository.findByLoginAccount(account);
+        if (matches.isEmpty()) {
+            throw new BusinessException("账号或密码错误");
+        }
+        if (matches.size() > 1) {
+            throw new BusinessException(409, "该学号或工号存在重复,请使用邮箱登录并联系管理员核对编号");
+        }
+        return matches.get(0);
+    }
+
+    private String normalizeIdentifier(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new BusinessException("请输入邮箱、手机号、学号或工号");
+        }
+        return value.trim();
     }
 
     /**
@@ -231,6 +247,7 @@ public class AuthService {
                 if (samePhone != null && !samePhone.getId().equals(userId)) {
                     throw new BusinessException("该手机号已被其他账号使用");
                 }
+                LoginIdentifiers.available(userRepository, phone, userId, "手机号");
             }
             user.setPhone(phone);
         }
@@ -244,6 +261,7 @@ public class AuthService {
         if (!BCrypt.checkpw(req.getOldPassword(), user.getPasswordHash())) {
             throw new BusinessException("原密码不正确");
         }
+        LoginIdentifiers.password(req.getNewPassword());
         user.setPasswordHash(BCrypt.hashpw(req.getNewPassword(), BCrypt.gensalt()));
         userRepository.save(user);
     }
