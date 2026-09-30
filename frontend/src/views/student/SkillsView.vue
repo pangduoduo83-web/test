@@ -215,8 +215,10 @@
       </template>
       <!-- 出题中 -->
       <div v-else-if="quiz.step === 'loading'" class="quiz-loading">
-        <div class="spinner"></div>
-        <div><b>AI 正在为「{{ quiz.skillName }}」出题…</b><div class="muted">按你当前 {{ quiz.currentScore }} 分的水平配置难度,约 10 秒</div></div>
+        <AiLoadingStatus
+          :phases="[`正在为「${quiz.skillName}」理解测评目标…`, '正在按当前能力配置题目难度…', '正在组织测评题目与选项…']"
+          :hint="`当前能力 ${quiz.currentScore} 分，通常需要约 10 秒`"
+        />
       </div>
       <!-- 答题 -->
       <template v-else-if="quiz.step === 'answer'">
@@ -282,6 +284,7 @@ import {
   Search, SlidersHorizontal, Sparkles, Target, Wrench, X, Zap
 } from 'lucide-vue-next'
 import { fetchAiPlan, fetchSkills, generateAiPlan, skillQuizStart, skillQuizSubmit } from '../../api'
+import AiLoadingStatus from '../../components/ai/AiLoadingStatus.vue'
 
 const router = useRouter()
 const data = reactive({ skills: [], overall: 0, evidenceTotal: 0, suggestions: [], history: [], events: [] })

@@ -164,7 +164,8 @@ public class ProjectService {
     }
 
     /**
-     * 学生自报学习进度(0~100)。进度只是学习位置,不会把项目判定为完成:
+     * 学生更新学习进度(0~100)。无教学大纲的旧项目允许自报百分比;
+     * 有教学大纲的项目必须提交已完成阶段,百分比由阶段数自动折算。进度不会把项目判定为完成:
      * 到 100 时提醒提交成果,评审通过(SubmissionService)才算完成并发放经验。
      */
     @Transactional
@@ -186,16 +187,29 @@ public class ProjectService {
         int before = e.getProgress() == null ? 0 : e.getProgress();
         int clamped = Math.max(0, Math.min(100, progress));
         String nextTask = currentTask == null ? "" : currentTask.trim();
-        if (completedPhases != null) {
-            List<String> titles = syllabusTitles(projectId);
-            if (titles.isEmpty()) {
-                throw new BusinessException("该项目没有教学大纲,请直接填写进度百分比");
+        List<String> titles = syllabusTitles(projectId);
+        if (!titles.isEmpty()) {
+            // 有教学大纲时,进度只能由已完成的阶段任务折算,禁止直接覆盖百分比。
+            if (completedPhases == null) {
+                throw new BusinessException("该项目有教学大纲,请完成阶段任务后更新进度");
             }
             java.util.TreeSet<Integer> done = new java.util.TreeSet<>();
             for (Integer n : completedPhases) {
-                if (n != null && n >= 1 && n <= titles.size()) {
-                    done.add(n);
+                if (n == null) {
+                    continue;
                 }
+                if (n < 1 || n > titles.size()) {
+                    throw new BusinessException("阶段序号无效,请按教学大纲阶段更新进度");
+                }
+                done.add(n);
+            }
+            // 阶段必须按顺序完成,不能跳过前置阶段直接推进后续阶段。
+            int expected = 1;
+            for (Integer n : done) {
+                if (n != expected) {
+                    throw new BusinessException("请先完成前置阶段任务,再推进后续阶段");
+                }
+                expected++;
             }
             e.setCompletedPhases(done.toString());
             clamped = (int) Math.round(done.size() * 100.0 / titles.size());
@@ -207,6 +221,8 @@ public class ProjectService {
                     }
                 }
             }
+        } else if (completedPhases != null) {
+            throw new BusinessException("该项目没有教学大纲,请直接填写进度百分比");
         }
         e.setProgress(clamped);
         if (!nextTask.isEmpty()) {

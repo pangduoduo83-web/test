@@ -13,6 +13,7 @@
     </div>
 
     <div v-if="loading && !brief" class="ai-loading">
+      <AiLoadingStatus :phases="['正在汇总项目与提交数据…', '正在检查班级进度与风险…', '正在整理本周教学建议…']" hint="分析完成后会显示在这里" />
       <span /><span /><span />
     </div>
     <template v-else-if="brief">
@@ -66,6 +67,7 @@
 import { onMounted, ref } from 'vue'
 import { ChevronRight, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { runJsonSkillCached } from '../api/aiJson'
+import AiLoadingStatus from './ai/AiLoadingStatus.vue'
 
 const props = defineProps({ userId: { type: [Number, String], required: true } })
 defineEmits(['action'])

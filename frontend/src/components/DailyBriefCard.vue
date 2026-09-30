@@ -10,7 +10,7 @@
       <el-button size="small" text :loading="loading" @click="load(true)"><RefreshCw :size="13" style="margin-right:4px" />换一批</el-button>
     </div>
 
-    <div v-if="loading && !brief" class="skeleton"><div class="sk w80"></div><div class="sk"></div><div class="sk w60"></div></div>
+    <div v-if="loading && !brief" class="skeleton"><AiLoadingStatus :phases="['正在读取你的学习进度…', '正在检查截止日期与技能画像…', '正在整理今天的行动建议…']" hint="完成后会自动显示今日待办" /><div class="sk w80"></div><div class="sk"></div><div class="sk w60"></div></div>
 
     <template v-else-if="brief">
       <div class="headline">{{ brief.headline }}</div>
@@ -46,6 +46,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { RefreshCw } from 'lucide-vue-next'
 import { runJsonSkillCached } from '../api/aiJson'
+import AiLoadingStatus from './ai/AiLoadingStatus.vue'
 
 const props = defineProps({
   userId: { type: [Number, String], required: true },

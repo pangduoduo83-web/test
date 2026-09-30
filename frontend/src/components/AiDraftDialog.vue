@@ -22,6 +22,12 @@
         </el-form-item>
       </el-form>
       <div class="muted">会参考本站的项目分类({{ categories.length }} 个)、技能维度({{ dims.length }} 个)和设备库({{ equipment.length }} 件),让草稿贴合你们实验室的条件。</div>
+      <AiLoadingStatus
+        v-if="loading"
+        label="正在生成项目草稿"
+        :phases="['正在理解项目方向…', '正在匹配技能与设备…', '正在组织教学大纲…', '正在整理可编辑草稿…']"
+        hint="复杂项目通常需要 20~40 秒"
+      />
     </template>
 
     <template v-else>
@@ -60,6 +66,7 @@ import { ElMessage } from 'element-plus'
 import { fetchEquipment } from '../api'
 import { runJsonSkill } from '../api/aiJson'
 import { loadSiteConfig, siteConfig as site } from '../utils/siteConfig'
+import AiLoadingStatus from './ai/AiLoadingStatus.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

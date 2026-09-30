@@ -29,7 +29,7 @@ public class MiscDtos {
 
         private String currentTask;
 
-        /** 已完成的大纲阶段序号(从 1 开始);传了则进度按阶段计算,忽略 progress */
+        /** 已完成的大纲阶段序号(从 1 开始);有大纲时必填,进度按阶段计算并忽略 progress */
         private java.util.List<Integer> completedPhases;
     }
 

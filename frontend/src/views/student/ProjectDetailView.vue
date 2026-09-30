@@ -123,7 +123,9 @@
       <!-- 有教学大纲:按阶段打勾,进度自动折算 -->
       <div v-if="detail.enrollment.status !== 'COMPLETED' && phases.length" class="phase-list">
         <label v-for="(ph, i) in phases" :key="i" class="phase-item" :class="{ done: donePhases.has(i + 1), next: nextPhase === i + 1 }">
-          <el-checkbox :model-value="donePhases.has(i + 1)" :disabled="savingProgress" @change="(v) => togglePhase(i + 1, v)" />
+          <el-checkbox :model-value="donePhases.has(i + 1)"
+                       :disabled="savingProgress || phaseLocked(i + 1)"
+                       @change="(v) => togglePhase(i + 1, v)" />
           <div class="phase-text">
             <div class="phase-title"><span class="phase-no">{{ ph.phase || `第 ${i + 1} 阶段` }}</span>{{ ph.title }}<small v-if="ph.hours"> · {{ ph.hours }} 学时</small></div>
             <div v-if="nextPhase === i + 1 && ph.content" class="phase-content">{{ ph.content }}</div>
@@ -132,7 +134,7 @@
         </label>
         <div class="pg-edit">
           <el-button size="small" text @click="openTutor"><Bot :size="13" style="margin-right:4px" /> 让 AI 导师带我做当前阶段</el-button>
-          <span class="pg-meta">全部阶段打勾后,请在下方「项目成果」提交,评审通过才算完成</span>
+          <span class="pg-meta">请按顺序完成阶段任务,进度会自动折算;全部完成后在下方「项目成果」提交,评审通过才算完成</span>
         </div>
       </div>
 
@@ -487,7 +489,13 @@ const nextPhase = computed(() => {
   for (let i = 1; i <= phases.value.length; i++) if (!donePhases.value.has(i)) return i
   return null
 })
+// 有大纲时只能推进当前阶段,未到达的后续阶段不可直接勾选。
+const phaseLocked = (no) => !donePhases.value.has(no) && nextPhase.value !== no
 const togglePhase = async (no, checked) => {
+  if (checked && nextPhase.value !== no) {
+    ElMessage.warning('请先完成前置阶段任务')
+    return
+  }
   const set = new Set(donePhases.value)
   if (checked) set.add(no); else set.delete(no)
   savingProgress.value = true
