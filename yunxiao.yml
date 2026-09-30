@@ -1,7 +1,5 @@
 # 云效 Flow Pipeline-as-code 模板
-# 使用前在云效控制台替换:
-#   <GITEE_SERVICE_CONNECTION_ID>  Gitee OAuth/服务连接 ID
-#   <CLOUD_EFFECT_MACHINE_GROUP_ID> 生产服务器主机组 ID
+# Gitee 代码服务连接与生产主机组 ID 已绑定。
 name: ioedu-gitee-auto-deploy
 
 sources:
@@ -14,7 +12,7 @@ sources:
       - push
     certificate:
       type: serviceConnection
-      serviceConnection: <GITEE_SERVICE_CONNECTION_ID>
+      serviceConnection: ua6tuxp9rtnx9rpm
 
 stages:
   package_stage:
@@ -48,7 +46,7 @@ stages:
         component: VMDeploy
         with:
           artifact: $[stages.package_stage.package_job.upload_step.artifacts.default]
-          machineGroup: <CLOUD_EFFECT_MACHINE_GROUP_ID>
+          machineGroup: PUoWmLwlHDAOJwst
           artifactDownloadPath: /home/admin/ioedu-flow/package.tgz
           executeUser: root
           run: |
