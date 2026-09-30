@@ -21,7 +21,8 @@ const router = createRouter({
         { path: 'borrowing', name: 'borrowing', component: () => import('../views/student/BorrowingView.vue') },
         { path: 'skills', name: 'skills', component: () => import('../views/student/SkillsView.vue') },
         { path: 'classes', name: 'my-classes', component: () => import('../views/student/MyClassesView.vue') },
-        { path: 'ai', name: 'ai-assistant', component: () => import('../views/student/AiWorkbenchView.vue') }
+        { path: 'ai', name: 'ai-assistant', component: () => import('../views/student/AiWorkbenchView.vue') },
+        { path: 'feedback', name: 'feedback', component: () => import('../views/student/FeedbackView.vue') }
       ]
     },
     {
@@ -57,6 +58,7 @@ const router = createRouter({
         { path: 'submissions', name: 'admin-submissions', component: () => import('../views/admin/AdminSubmissions.vue') },
         { path: 'notifications', name: 'admin-notifications', component: () => import('../views/admin/AdminNotifications.vue') },
         { path: 'discussions', name: 'admin-discussions', component: () => import('../views/admin/AdminDiscussions.vue') },
+        { path: 'feedbacks', name: 'admin-feedbacks', component: () => import('../views/admin/AdminFeedbacks.vue') },
         { path: 'skill-dimensions', name: 'admin-skill-dimensions', component: () => import('../views/admin/AdminSkillDimensions.vue') },
         { path: 'ai-settings', name: 'admin-ai-settings', component: () => import('../views/admin/AdminAiSettings.vue') },
         { path: 'site-settings', name: 'admin-site-settings', component: () => import('../views/admin/AdminSiteSettings.vue') },
@@ -80,6 +82,7 @@ const router = createRouter({
         { path: 'home', name: 'platform-home', component: () => import('../views/platform/PlatformHome.vue') },
         { path: 'items', name: 'platform-items', component: () => import('../views/platform/PlatformItems.vue') },
         { path: 'sites', name: 'platform-sites', component: () => import('../views/platform/PlatformSites.vue') },
+        { path: 'feedbacks', name: 'platform-feedbacks', component: () => import('../views/platform/PlatformFeedbacks.vue') },
         { path: 'tenants', redirect: '/platform/sites' }
       ]
     }

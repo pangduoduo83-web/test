@@ -21,7 +21,8 @@ public class DirectUploadController {
         return ApiResponse.ok(service.initiate(user,body.getKind(),body.getName(),body.getSize()));
     }
     @PostMapping("/{id}/complete")
-    public ApiResponse<Map<String,String>> complete(@RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user, @PathVariable String id) {
+    public ApiResponse<Map<String,String>> complete(@RequestAttribute(AuthUser.REQUEST_ATTR) AuthUser user,
+            @PathVariable(value = "id") String id) {
         return ApiResponse.ok(service.complete(user,id));
     }
     @Data public static class Request {

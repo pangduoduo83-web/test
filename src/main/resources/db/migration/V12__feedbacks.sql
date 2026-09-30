@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `feedbacks` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL,
+  `user_name` varchar(50) NOT NULL,
+  `user_role` varchar(20) NOT NULL,
+  `category` varchar(20) NOT NULL,
+  `title` varchar(120) NOT NULL,
+  `content` longtext NOT NULL,
+  `attachments` longtext,
+  `page_url` varchar(300) DEFAULT NULL,
+  `status` varchar(20) NOT NULL,
+  `admin_reply` longtext,
+  `admin_id` bigint DEFAULT NULL,
+  `admin_name` varchar(50) DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `updated_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_feedbacks_user_created` (`user_id`,`created_at`),
+  KEY `idx_feedbacks_status_created` (`status`,`created_at`),
+  KEY `idx_feedbacks_category_created` (`category`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -23,6 +23,9 @@
         <router-link to="/platform/sites" class="pf-nav-item" :class="{ active: $route.path.startsWith('/platform/sites') }">
           <Building2 :size="17" />客户站点
         </router-link>
+        <router-link to="/platform/feedbacks" class="pf-nav-item" :class="{ active: $route.path.startsWith('/platform/feedbacks') }">
+          <MessageSquarePlus :size="17" />问题反馈
+        </router-link>
         <div class="pf-nav-group">展示</div>
         <a href="/platform/screen" target="_blank" class="pf-nav-item">
           <MonitorPlay :size="17" />平台总览大屏 ↗
@@ -66,7 +69,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Building2, KeyRound, LayoutDashboard, LogOut, MonitorPlay, PackageCheck, Store } from 'lucide-vue-next'
+import { Building2, KeyRound, LayoutDashboard, LogOut, MessageSquarePlus, MonitorPlay, PackageCheck, Store } from 'lucide-vue-next'
 import { clearHubAuth, getHubAdminName, hubChangePassword, hubStats } from '../../api/hub'
 import '../../styles/platform.css'
 
@@ -78,7 +81,8 @@ const adminName = getHubAdminName()
 const pages = {
   '/platform/home': { title: '总览', desc: '审核队列、客户站点与商店运转情况' },
   '/platform/items': { title: '条目审核与分享', desc: '审核客户发布的项目、控制可见范围与定向分享' },
-  '/platform/sites': { title: '客户站点', desc: '开通新客户站点、启停与注销、维护商店接入密钥' }
+  '/platform/sites': { title: '客户站点', desc: '开通新客户站点、启停与注销、维护商店接入密钥' },
+  '/platform/feedbacks': { title: '问题反馈中心', desc: '集中查看所有客户站点的学生、教师和管理员反馈' }
 }
 const current = computed(() => Object.entries(pages).find(([p]) => route.path.startsWith(p))?.[1] || { title: '平台控制台', desc: '' })
 

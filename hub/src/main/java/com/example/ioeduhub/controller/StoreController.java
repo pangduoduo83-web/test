@@ -6,6 +6,7 @@ import com.example.ioeduhub.entity.HubAsset;
 import com.example.ioeduhub.entity.HubTenant;
 import com.example.ioeduhub.service.AssetService;
 import com.example.ioeduhub.service.StoreService;
+import com.example.ioeduhub.service.FeedbackService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,10 +31,12 @@ public class StoreController {
 
     private final StoreService storeService;
     private final AssetService assetService;
+    private final FeedbackService feedbackService;
 
-    public StoreController(StoreService storeService, AssetService assetService) {
+    public StoreController(StoreService storeService, AssetService assetService, FeedbackService feedbackService) {
         this.storeService = storeService;
         this.assetService = assetService;
+        this.feedbackService = feedbackService;
     }
 
     @GetMapping("/me")
@@ -87,6 +90,19 @@ public class StoreController {
         m.put("sha256", asset.getSha256());
         m.put("size", asset.getSize());
         return ApiResponse.ok(m);
+    }
+
+    @PostMapping("/feedbacks")
+    public ApiResponse<com.example.ioeduhub.entity.HubFeedback> createFeedback(
+            @RequestAttribute(HubAuthFilter.ATTR_TENANT) HubTenant tenant, @RequestBody JsonNode body) {
+        return ApiResponse.ok(feedbackService.create(tenant, body));
+    }
+
+    @GetMapping("/feedbacks/mine")
+    public ApiResponse<List<com.example.ioeduhub.entity.HubFeedback>> feedbacks(
+            @RequestAttribute(HubAuthFilter.ATTR_TENANT) HubTenant tenant,
+            @RequestParam(required = false) Long userId) {
+        return ApiResponse.ok(feedbackService.mine(tenant, userId));
     }
 
     /** 操作人姓名经 URL 编码传输(HTTP 头不能直接放中文) */

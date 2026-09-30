@@ -62,6 +62,8 @@ export const hubItemInstalls = (id) => hub.get(`/hub-admin/items/${id}/installs`
 export const hubVisibility = (id, visibility) => hub.put(`/hub-admin/items/${id}/visibility`, { visibility })
 export const hubGrants = (id, tenantIds) => hub.put(`/hub-admin/items/${id}/grants`, { tenantIds })
 export const hubTenants = () => hub.get('/hub-admin/tenants')
+export const hubFeedbacks = (params) => hub.get('/hub-admin/feedbacks', { params })
+export const hubUpdateFeedback = (id, data) => hub.put(`/hub-admin/feedbacks/${id}`, data)
 // 客户站点(联动多租户主系统:开通 = 建站 + 商店登记 + 写入密钥)
 export const hubSitesConfig = () => hub.get('/hub-admin/sites/config')
 export const hubSites = () => hub.get('/hub-admin/sites')

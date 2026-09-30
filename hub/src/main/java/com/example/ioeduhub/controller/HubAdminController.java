@@ -5,6 +5,7 @@ import com.example.ioeduhub.common.BusinessException;
 import com.example.ioeduhub.config.HubAuthFilter;
 import com.example.ioeduhub.service.HubAdminService;
 import com.example.ioeduhub.service.SiteService;
+import com.example.ioeduhub.service.FeedbackService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,10 +29,12 @@ public class HubAdminController {
 
     private final HubAdminService adminService;
     private final SiteService siteService;
+    private final FeedbackService feedbackService;
 
-    public HubAdminController(HubAdminService adminService, SiteService siteService) {
+    public HubAdminController(HubAdminService adminService, SiteService siteService, FeedbackService feedbackService) {
         this.adminService = adminService;
         this.siteService = siteService;
+        this.feedbackService = feedbackService;
     }
 
     @PostMapping("/login")
@@ -176,6 +179,22 @@ public class HubAdminController {
     @GetMapping("/tenants")
     public ApiResponse<List<Map<String, Object>>> tenants() {
         return ApiResponse.ok(adminService.tenants());
+    }
+
+    @GetMapping("/feedbacks")
+    public ApiResponse<List<com.example.ioeduhub.entity.HubFeedback>> feedbacks(
+            @RequestParam(required = false) String tenantCode,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(feedbackService.list(tenantCode, status, category, keyword));
+    }
+
+    @PutMapping("/feedbacks/{id}")
+    public ApiResponse<com.example.ioeduhub.entity.HubFeedback> updateFeedback(
+            @RequestAttribute(HubAuthFilter.ATTR_ADMIN) String admin,
+            @PathVariable Long id, @RequestBody JsonNode body) {
+        return ApiResponse.ok(feedbackService.update(id, admin, body));
     }
 
     /** body: { code, name } → 返回含 apiKey(仅此一次) */

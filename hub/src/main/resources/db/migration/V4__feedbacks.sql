@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `hub_feedbacks` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_code` varchar(32) NOT NULL,
+  `tenant_name` varchar(100) NOT NULL,
+  `user_id` bigint DEFAULT NULL,
+  `user_name` varchar(50) NOT NULL,
+  `user_role` varchar(20) NOT NULL,
+  `category` varchar(20) NOT NULL,
+  `title` varchar(120) NOT NULL,
+  `content` longtext NOT NULL,
+  `attachments` longtext,
+  `page_url` varchar(300) DEFAULT NULL,
+  `status` varchar(20) NOT NULL,
+  `admin_reply` longtext,
+  `admin_name` varchar(50) DEFAULT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `updated_at` datetime(6) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_hub_feedbacks_tenant_created` (`tenant_code`,`created_at`),
+  KEY `idx_hub_feedbacks_status_created` (`status`,`created_at`),
+  KEY `idx_hub_feedbacks_category_created` (`category`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -33,6 +33,10 @@
           <span>成果评审</span>
           <span v-if="pending > 0" class="menu-badge">{{ pending }}</span>
         </router-link>
+        <router-link to="/app/feedback" class="teacher-menu-item" aria-label="问题反馈">
+          <span class="tmi-icon"><MessageSquarePlus :size="18" /></span>
+          <span>问题反馈</span>
+        </router-link>
       </nav>
 
       <div class="teacher-foot">
@@ -90,7 +94,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Bell, BookOpen, ChevronDown, ClipboardCheck, FolderOpen, GraduationCap, House, LogOut, Plus, Search, UsersRound
+  Bell, BookOpen, ChevronDown, ClipboardCheck, FolderOpen, GraduationCap, House, LogOut, MessageSquarePlus, Plus, Search, UsersRound
 } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
 import { teacherStats } from '../../api'

@@ -98,6 +98,8 @@
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
+                    <!-- Keep Spring MVC path/query parameter names available at runtime. -->
+                    <parameters>true</parameters>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>

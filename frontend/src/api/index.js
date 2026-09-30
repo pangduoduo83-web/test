@@ -53,6 +53,10 @@ export const fetchNotifications = () => http.get('/notifications')
 export const markNotificationRead = (id) => http.post(`/notifications/${id}/read`)
 export const markAllNotificationsRead = () => http.post('/notifications/read-all')
 
+// ---------- 问题反馈 ----------
+export const createFeedback = (data) => http.post('/feedbacks', data)
+export const myFeedbacks = () => http.get('/feedbacks/mine')
+
 // ---------- 教师端 ----------
 export const teacherStats = () => http.get('/teacher/stats')
 export const teacherProjects = () => http.get('/teacher/projects')
@@ -129,6 +133,8 @@ export const adminSendNotification = (data) => http.post('/admin/notifications',
 export const adminDeleteNotification = (id) => http.delete(`/admin/notifications/${id}`)
 export const adminListDiscussions = (params) => http.get('/admin/discussions', { params })
 export const adminDeleteDiscussion = (id) => http.delete(`/admin/discussions/${id}`)
+export const adminListFeedbacks = (params) => http.get('/admin/feedbacks', { params })
+export const adminUpdateFeedback = (id, data) => http.put(`/admin/feedbacks/${id}`, data)
 export const adminAiReview = (id, body = {}) => http.post(`/admin/submissions/${id}/ai-review`, body)
 export const adminAiReviewStatus = (id) => http.get(`/admin/submissions/${id}/ai-review`)
 export const adminReturnSubmission = (id, feedback) => http.post(`/admin/submissions/${id}/return`, { feedback })

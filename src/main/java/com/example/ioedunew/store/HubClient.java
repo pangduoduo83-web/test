@@ -86,6 +86,11 @@ public class HubClient {
         return get("/api/store/mine", null);
     }
 
+    /** 汇总当前租户的用户问题反馈到平台中心。 */
+    public JsonNode submitFeedback(JsonNode body, String actingUser) {
+        return exchange(HttpMethod.POST, "/api/store/feedbacks", body, actingUser);
+    }
+
     /** 上传附件到商店,返回 /hub-assets/{sha}.{ext} */
     public String uploadAsset(Path file) {
         HttpHeaders headers = authHeaders(null);

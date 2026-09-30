@@ -228,7 +228,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   BarChart3, Bell, BookOpen, Bookmark, Bot, CircuitBoard, ClipboardList, GraduationCap,
-  HelpCircle, LogOut, Megaphone, Package, Rocket, School, Search, Settings, User, Wrench
+  HelpCircle, LogOut, Megaphone, MessageSquarePlus, Package, Rocket, School, Search, Settings, User, Wrench
 } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
 import {
@@ -284,6 +284,7 @@ const menus = [
   { path: '/app/borrowing', icon: ClipboardList, title: '借阅管理', desc: '申请审批追踪' },
   { path: '/app/skills', icon: BarChart3, title: '技能评估', desc: '能力测评与提升' },
   { path: '/app/ai', icon: Bot, title: 'AI 助教', desc: '推荐 · 配设备 · 审 BOM · 解答' },
+  { path: '/app/feedback', icon: MessageSquarePlus, title: '问题反馈', desc: '提交问题与优化建议' },
   { path: '/app/dashboard', icon: User, title: '个人中心', desc: '我的项目进度' }
 ]
 

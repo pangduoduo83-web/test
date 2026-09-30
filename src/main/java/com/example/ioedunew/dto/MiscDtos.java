@@ -105,4 +105,35 @@ public class MiscDtos {
         private Integer sortOrder;
         private Boolean enabled;
     }
+
+    @Data
+    public static class FeedbackCreateRequest {
+        @NotNull(message = "请选择反馈类型")
+        @Size(max = 20, message = "反馈类型无效")
+        private String category;
+
+        @NotNull(message = "请填写问题标题")
+        @Size(min = 2, max = 120, message = "标题长度为2至120字")
+        private String title;
+
+        @NotNull(message = "请描述具体问题")
+        @Size(min = 5, max = 5000, message = "问题描述长度为5至5000字")
+        private String content;
+
+        @Size(max = 300, message = "页面地址过长")
+        private String pageUrl;
+
+        /** 已上传附件的 JSON 数组字符串 */
+        @Size(max = 8000, message = "附件信息过长")
+        private String attachments;
+    }
+
+    @Data
+    public static class FeedbackUpdateRequest {
+        @NotNull(message = "请选择处理状态")
+        private String status;
+
+        @Size(max = 5000, message = "回复不能超过5000字")
+        private String adminReply;
+    }
 }

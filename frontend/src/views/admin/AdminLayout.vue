@@ -31,6 +31,9 @@
         <a v-if="authStore.isAdmin" class="admin-menu-item kicad-link" href="/hw/admin" target="_blank" title="硬件设计助手的用量与用户管理(本站)">
           <span class="ami-icon"><CircuitBoard :size="17" /></span>硬件助手管理 <ArrowUpRight :size="13" class="external-icon" />
         </a>
+        <a class="admin-menu-item" @click="$router.push('/app/feedback')">
+          <span class="ami-icon"><MessageSquarePlus :size="17" /></span>提交问题反馈
+        </a>
         <a class="admin-menu-item" @click="$router.push('/app/dashboard')">
           <span class="ami-icon"><GraduationCap :size="17" /></span>学生端视图
         </a>
@@ -66,7 +69,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowUpRight, Bell, Bot, CircuitBoard, ClipboardCheck, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu,
-  MessageSquareText, MonitorPlay, Radar, Rocket, School, ScrollText, Settings, ShieldCheck, Sparkles, Store, UserRoundCheck, Users, Wrench, X
+  MessageSquarePlus, MessageSquareText, MonitorPlay, Radar, Rocket, School, ScrollText, Settings, ShieldCheck, Sparkles, Store, UserRoundCheck, Users, Wrench, X
 } from 'lucide-vue-next'
 import { adminStats } from '../../api'
 import { useAuthStore } from '../../stores/auth'
@@ -90,6 +93,7 @@ const allMenus = [
   { path: '/admin/skill-dimensions', icon: Radar, title: '技能维度', group: 'operations' },
   { path: '/admin/notifications', icon: Bell, title: '通知管理', group: 'operations' },
   { path: '/admin/discussions', icon: MessageSquareText, title: '讨论管理', group: 'operations' },
+  { path: '/admin/feedbacks', icon: MessageSquarePlus, title: '问题反馈', group: 'operations' },
   { path: '/admin/users', icon: Users, title: '用户管理', group: 'operations' },
   { path: '/admin/store', icon: Store, title: '项目商店', group: 'operations' },
   { path: '/admin/ai-center', icon: Bot, title: 'AI 中心', group: 'configuration' },
