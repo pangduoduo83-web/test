@@ -1,0 +1,59 @@
+# 云效 Flow Pipeline-as-code 模板
+# 使用前在云效控制台替换:
+#   <GITEE_SERVICE_CONNECTION_ID>  Gitee OAuth/服务连接 ID
+#   <CLOUD_EFFECT_MACHINE_GROUP_ID> 生产服务器主机组 ID
+name: ioedu-gitee-auto-deploy
+
+sources:
+  ioedu_repo:
+    type: gitee
+    name: IOEDU-New
+    endpoint: https://gitee.com/wjc1238765/future-learning-platform.git
+    branch: main
+    triggerEvents:
+      - push
+    certificate:
+      type: serviceConnection
+      serviceConnection: <GITEE_SERVICE_CONNECTION_ID>
+
+stages:
+  package_stage:
+    name: 生成发布制品
+    jobs:
+      package_job:
+        name: 打包源码
+        runsOn: public/cn-beijing
+        steps:
+          package_step:
+            step: Command
+            name: 打包发布包
+            with:
+              run: |
+                chmod +x scripts/cloud-effect/package.sh
+                ./scripts/cloud-effect/package.sh
+          upload_step:
+            step: ArtifactUpload
+            name: 上传发布包
+            with:
+              uploadType: flowPublic
+              artifact: default
+              filePath:
+                - package.tgz
+
+  deploy_stage:
+    name: 部署到生产主机
+    jobs:
+      deploy_job:
+        name: Docker Compose 主机部署
+        component: VMDeploy
+        with:
+          artifact: $[stages.package_stage.package_job.upload_step.artifacts.default]
+          machineGroup: <CLOUD_EFFECT_MACHINE_GROUP_ID>
+          artifactDownloadPath: /home/admin/ioedu-flow/package.tgz
+          executeUser: root
+          run: |
+            rm -rf /home/admin/ioedu-flow/source
+            mkdir -p /home/admin/ioedu-flow/source
+            tar -xzf /home/admin/ioedu-flow/package.tgz -C /home/admin/ioedu-flow/source
+            bash /home/admin/ioedu-flow/source/scripts/cloud-effect/deploy.sh /home/admin/ioedu-flow/package.tgz
+
